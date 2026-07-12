@@ -1,0 +1,59 @@
+/* SugarCube Story Harness - App Stylesheet
+ * Supplemental styles for the single-page UI.
+ * The main UI layout is defined inline in templates/index.html;
+ * this file provides additional component styles, print helpers,
+ * and responsive overrides that benefit from being cached separately.
+ */
+
+/* ── Responsive: narrow sidebar on small viewports ─────────────────────────── */
+@media (max-width: 900px) {
+  #pane-left { width: 240px; }
+  #pane-right { font-size: 13px; }
+}
+
+@media (max-width: 600px) {
+  #pane-left { width: 200px; }
+  #topbar { flex-wrap: wrap; }
+  #validation-bar { order: 2; width: 100%; }
+}
+
+/* ── Scrollbar styling (WebKit + Firefox) ───────────────────────────────────── */
+.scroll-y { overflow-y: auto; }
+.scroll-y::-webkit-scrollbar { width: 6px; }
+.scroll-y::-webkit-scrollbar-track { background: var(--surface); }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.scroll-y::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Generation log entry styling ────────────────────────────────────────────── */
+.gen-entry {
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.gen-entry.draft { border-left-color: var(--accent); }
+.gen-entry.commit { border-left-color: var(--ok); }
+.gen-entry .gen-meta { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+
+/* ── Character sheet rendering ───────────────────────────────────────────────── */
+.char-field { margin-bottom: 6px; }
+.char-field-label { font-weight: 600; color: var(--accent); font-size: 12px; }
+.char-field-value { color: var(--text); font-size: 13px; margin-top: 2px; }
+
+/* ── Arc name badge ──────────────────────────────────────────────────────────── */
+.arc-badge {
+  display: inline-block;
+  background: var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: monospace;
+}
+
+/* ── Print mode: hide controls, show only prose ─────────────────────────────── */
+@media print {
+  #topbar, #pane-left, .left-tabs { display: none !important; }
+  #pane-right { width: 100% !important; overflow: visible !important; }
+  body { height: auto; overflow: visible; }
+}

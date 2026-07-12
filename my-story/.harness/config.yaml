@@ -4,7 +4,7 @@ model_mode: compact
 num_ctx: 4096
 num_predict: 1024
 ollama_base_url: http://localhost:11434
-ollama_model: dolphin-llama3:8b-256k
+ollama_model: llama3.2
 output_format: delimited
 rag_enabled: true
 rag_min_score: 0.3

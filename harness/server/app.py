@@ -112,7 +112,14 @@ _PROJECT_ROOT = Path(os.environ.get("HARNESS_PROJECT", ".")).resolve()
 app = FastAPI(title="Sugarcube Agentic Story Harness", version="0.1.0")
 
 _HERE = Path(__file__).parent
-app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
+
+# Mount static directory if it exists; create it on the fly if missing so the
+# server never crashes on a fresh checkout. The mount serves CSS, JS, and
+# other static assets for the single-page UI.
+_static_dir = _HERE / "static"
+if not _static_dir.exists():
+    _static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 # ── Error handling ─────────────────────────────────────────────────────────────

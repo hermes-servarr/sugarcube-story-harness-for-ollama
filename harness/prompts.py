@@ -697,7 +697,14 @@ def build_characters_sketch_prompt(
     count: int = 3,
     direction: str = "",
 ) -> str:
-    """JSON output: {"characters": [{"id", "name", "description"}, ...]}."""
+    """JSON output: {"characters": [{"id", "name", "description", ...}, ...]}.
+
+    Enriched to produce deep characters with structured fields:
+    physical description, personality traits, motivation, backstory,
+    relationships, and speech mannerisms. Each field is optional in the
+    JSON schema so smaller models that omit some fields still parse, but
+    the prompt explicitly requests all six.
+    """
     n = max(1, min(count, 12))
     return f"""Given the premise (and optional world overview), invent {n} principal characters.
 
@@ -709,6 +716,16 @@ Reply with a single JSON object:
   - id: lowercase_snake_case slug, 1-3 words (e.g. "warden_kael").
   - name: display name.
   - description: 2-3 sentences covering role, distinguishing trait, and tension with the world.
+  - physical: 1-2 sentences describing appearance, build, clothing, distinguishing features.
+  - personality: 2-3 key personality traits, comma-separated or short phrases.
+  - motivation: 1-2 sentences — what drives this character, what they want.
+  - backstory: 2-3 sentences — relevant history that shaped them.
+  - relationships: 1-2 sentences — key connections to other characters or factions.
+  - speech: 1-2 sentences — how they talk, verbal tics, vocabulary, accent.
+
+All seven fields (description, physical, personality, motivation, backstory,
+relationships, speech) are REQUIRED. Write concrete, specific details — not
+generic archetypes. Characters should feel like real people with depth.
 
 No preamble. No code fences.
 """

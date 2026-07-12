@@ -65,6 +65,32 @@ class Snapshot(BaseModel):
     open_threads: list[str] = Field(default_factory=list)
 
 
+# ── Snapshot deltas ───────────────────────────────────────────────────────────
+# Defined here (not in snapshot_delta.py) to avoid a circular import:
+# PassageEntry references SnapshotDelta, and snapshot_delta.py's functions
+# operate on Snapshot/CharacterPresent/etc from this module.
+
+class CharacterSectionDelta(BaseModel):
+    """Delta for one of the two character lists (present/offscreen)."""
+    added: list[dict[str, Any]] = Field(default_factory=list)
+    modified: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    removed: list[str] = Field(default_factory=list)
+
+
+class ListSectionDelta(BaseModel):
+    """Delta for a plain list-of-strings section (world_state, open_threads)."""
+    added: list[str] = Field(default_factory=list)
+    removed: list[str] = Field(default_factory=list)
+
+
+class SnapshotDelta(BaseModel):
+    """The full delta between two consecutive snapshots."""
+    characters_present: CharacterSectionDelta = Field(default_factory=CharacterSectionDelta)
+    characters_offscreen: CharacterSectionDelta = Field(default_factory=CharacterSectionDelta)
+    world_state: ListSectionDelta = Field(default_factory=ListSectionDelta)
+    open_threads: ListSectionDelta = Field(default_factory=ListSectionDelta)
+
+
 class PassageEntry(BaseModel):
     file: str
     arc: str
@@ -78,6 +104,7 @@ class PassageEntry(BaseModel):
     beats: list[str] = Field(default_factory=list)  # 2-5 scene-level events; high-signal RAG keys
     plan_beats: list[str] = Field(default_factory=list)  # StoryPlan beat ids this passage advances
     snapshot: Snapshot = Field(default_factory=Snapshot)
+    snapshot_delta: Optional[SnapshotDelta] = None  # diff from parent snapshot
     passage_type: str = "normal"           # see PASSAGE_TYPES
     # type-specific fields — empty/default for normal passages
     entry_condition: str = ""              # conditional: SugarCube expr e.g. "$has_key"

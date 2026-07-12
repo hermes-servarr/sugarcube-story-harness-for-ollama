@@ -154,8 +154,18 @@ def _entities_in_context(
     *,
     compact: bool = False,
     summary_chars: int = 220,
+    arc_name: str = "",
 ) -> str:
-    """Load full character/lore sheets for entities named in snapshot or prompt."""
+    """Load full character/lore sheets for entities named in snapshot or prompt.
+
+    Lore matching uses three signals, not just the prompt text:
+    1. Direct keyword match: lore ID appears in the human prompt.
+    2. Arc-context match: lore ID shares the arc name as a prefix (e.g. arc
+       "atlantis" matches "atlantis_ruins", "atlantis_undersea_city"). This
+       is the primary fix for mismatched lore — without it, Atlantis lore
+       was never injected unless the author happened to type the slug.
+    3. Arc-name-as-lore-id: the arc name itself is a lore entry ID.
+    """
     char_ids: set[str] = set()
     for c in snap.characters_present:
         char_ids.add(c.id)
@@ -168,10 +178,36 @@ def _entities_in_context(
         if cid.lower() in prompt_low:
             char_ids.add(cid)
 
+    # Normalise arc name for matching: strip leading NN_ prefix, keep the
+    # short_name portion (e.g. "01_atlantis" -> "atlantis").
+    arc_key = (arc_name or "").strip().lower()
+    arc_key = re.sub(r"^\d+_", "", arc_key)
+
     lore_refs: set[tuple[str, str]] = set()
-    for lore in list_lore(p):
-        if lore["id"].lower() in prompt_low:
-            lore_refs.add((lore["category"], lore["id"]))
+    all_lore = list_lore(p)
+    for lore in all_lore:
+        lid = lore["id"].lower()
+        cat = lore["category"]
+
+        # Signal 1: lore ID appears directly in the prompt text.
+        if lid in prompt_low:
+            lore_refs.add((cat, lore["id"]))
+            continue
+
+        # Signal 2: lore ID shares the arc's short_name as a prefix.
+        # e.g. arc_key="atlantis" matches lid="atlantis_ruins".
+        if arc_key and lid.startswith(arc_key + "_"):
+            lore_refs.add((cat, lore["id"]))
+            continue
+
+        # Signal 3: lore ID is exactly the arc's short_name.
+        if arc_key and lid == arc_key:
+            lore_refs.add((cat, lore["id"]))
+            continue
+
+        # Signal 4: arc name appears in the lore's title or summary text.
+        if arc_key and arc_key in (lore.get("title", "") or "").lower():
+            lore_refs.add((cat, lore["id"]))
 
     sheets: list[str] = []
     for eid in sorted(char_ids):
@@ -281,6 +317,7 @@ def build_prompt(
         human_prompt,
         compact=use_compact,
         summary_chars=max(120, profile.entities_chars // 2),
+        arc_name=arc_name,
     )
     snapshot_text = _render_snapshot_compact(parent_snap) if use_compact else _render_snapshot(parent_snap)
 

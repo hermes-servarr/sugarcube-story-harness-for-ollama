@@ -25,6 +25,7 @@ from .project import (
     save_story,
 )
 from .snapshot import derive_snapshot
+from .snapshot_delta import diff_snapshots
 
 
 # ── Concurrency guard ─────────────────────────────────────────────────────────
@@ -392,6 +393,10 @@ def create_passage(
         if parent_id and parent_id in graph.passages:
             parent_snapshot = graph.passages[parent_id].snapshot
         new_snapshot = derive_snapshot(parent_snapshot, output)
+
+        # compute delta from parent to new snapshot
+        delta_base = parent_snapshot if parent_snapshot is not None else Snapshot()
+        snapshot_delta = diff_snapshots(delta_base, new_snapshot)
 
         # Auto-summary fallback: covers human edits that clear the field, and
         # ModelOutputs assembled programmatically (e.g. in tests).
