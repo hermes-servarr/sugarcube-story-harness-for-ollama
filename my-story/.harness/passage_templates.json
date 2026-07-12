@@ -1,0 +1,41 @@
+{
+  "templates": [
+    {
+      "id": "event_motion",
+      "title": "Event: moving scene",
+      "type": "event",
+      "keywords": [
+        "event",
+        "motion",
+        "image",
+        "audio",
+        "cinematic"
+      ],
+      "body": "Write an EVENT passage. Keep it punchy and cinematic.\n\nGoals:\n- One clear scene beat that feels like a moving sequence.\n- Use media suggestions for changing visuals if useful.\n- End with 2-4 choices that push the scene forward.\n"
+    },
+    {
+      "id": "hub_location",
+      "title": "Hub: revisitable location",
+      "type": "hub",
+      "keywords": [
+        "hub",
+        "location",
+        "return",
+        "npc"
+      ],
+      "body": "Write a HUB passage. This should be a revisitable location with ongoing threads.\n\nGoals:\n- Introduce the place and who is here.\n- Offer choices that let the player talk, inspect, or branch out.\n- Keep the space reusable so the story can return later.\n"
+    },
+    {
+      "id": "room_exits",
+      "title": "Room: exits + actions",
+      "type": "room",
+      "keywords": [
+        "room",
+        "exits",
+        "navigation",
+        "location"
+      ],
+      "body": "Write a ROOM passage. This is a location node with named exits.\n\nGoals:\n- Describe the room and its immediate details.\n- Make exits clear and distinct.\n- Offer choices for actions or inspection.\n"
+    }
+  ]
+}

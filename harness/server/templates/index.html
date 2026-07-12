@@ -1,0 +1,3802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Story Harness</title>
+<script src="https://unpkg.com/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+  --text: #d4d8e8; --muted: #6b7080; --accent: #7c8cf8;
+  --warn: #f5a623; --err: #e05555; --ok: #4caf7d;
+  --font: 'Segoe UI', system-ui, sans-serif;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--font);
+       font-size:14px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── Top bar ── */
+#topbar { background:var(--surface); border-bottom:1px solid var(--border);
+          padding:6px 12px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+#topbar h1 { font-size:15px; font-weight:600; color:var(--accent); white-space:nowrap; }
+#branch-indicator { background:var(--border); border-radius:4px; padding:2px 8px;
+                    font-size:12px; color:var(--muted); white-space:nowrap; }
+#validation-bar { flex:1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.vbadge { font-size:11px; padding:2px 6px; border-radius:3px; cursor:default; }
+.vbadge.err  { background:rgba(224,85,85,.2);  color:var(--err); }
+.vbadge.warn { background:rgba(245,166,35,.15);color:var(--warn); }
+.vbadge.ok   { background:rgba(76,175,125,.15);color:var(--ok); }
+.topbar-btn { background:var(--border); border:1px solid var(--border); color:var(--text);
+              border-radius:4px; padding:4px 10px; cursor:pointer; font-size:12px; white-space:nowrap; }
+.topbar-btn:hover { border-color:var(--accent); color:var(--accent); }
+#btn-compile { background:var(--accent); color:#fff; border:none; border-radius:4px;
+               padding:4px 12px; cursor:pointer; font-size:13px; white-space:nowrap; }
+#btn-compile:hover { opacity:.85; }
+
+/* ── Main layout ── */
+#main { display:flex; flex:1; overflow:hidden; }
+
+/* ── Left pane ── */
+#pane-left { width:300px; flex-shrink:0; border-right:1px solid var(--border);
+             display:flex; flex-direction:column; }
+.left-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.left-tab { flex:1; padding:7px; text-align:center; font-size:12px; font-weight:500;
+            color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
+.left-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.left-tab:hover:not(.active) { color:var(--text); }
+#cy { flex:1; }
+
+/* World panel */
+#world-panel { flex:1; overflow-y:auto; display:none; flex-direction:column; }
+.world-section { border-bottom:1px solid var(--border); }
+.world-section-hdr { padding:8px 12px; display:flex; align-items:center; cursor:pointer;
+                     user-select:none; }
+.world-section-hdr span { flex:1; font-size:12px; font-weight:600; color:var(--text); }
+.world-section-hdr .wsh-meta { font-size:10px; color:var(--muted); margin-right:6px; }
+.world-section-toggle { font-size:11px; color:var(--muted); }
+.world-section-body { padding:0 8px 8px; display:none; }
+.world-section-body.open { display:block; }
+.world-item { display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:4px;
+              cursor:pointer; }
+.world-item:hover { background:var(--border); }
+.world-item .wi-label { flex:1; font-size:12px; color:var(--text); }
+.world-item .wi-sub   { font-size:10px; color:var(--muted); }
+.world-item .wi-tag   { font-size:10px; padding:1px 5px; border-radius:10px;
+                        background:rgba(124,140,248,.15); color:var(--accent); }
+.world-add-btn { display:flex; align-items:center; gap:5px; padding:5px 6px; border-radius:4px;
+                 cursor:pointer; color:var(--muted); font-size:12px; margin-top:2px; }
+.world-add-btn:hover { color:var(--accent); }
+
+/* ── Center pane ── */
+#pane-passage { flex:1; border-right:1px solid var(--border);
+                display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+#passage-header { padding:10px 14px; border-bottom:1px solid var(--border);
+                  display:flex; gap:10px; align-items:center; flex-shrink:0; }
+#passage-id { font-size:12px; color:var(--accent); font-family:monospace; flex:1; }
+#passage-body { flex:1; overflow-y:auto; padding:14px; }
+.passage-section { margin-bottom:18px; }
+.passage-section h3 { font-size:11px; text-transform:uppercase; color:var(--muted);
+                       letter-spacing:.08em; margin-bottom:6px; }
+.prose { white-space:pre-wrap; line-height:1.7; }
+.choice-item { background:var(--border); border-radius:4px; padding:4px 8px;
+               margin-bottom:4px; font-size:13px; }
+.state-item  { font-family:monospace; font-size:12px; color:var(--accent); }
+.snapshot-item { font-size:12px; color:var(--muted); margin-bottom:3px; }
+.media-slot { display:flex; gap:8px; align-items:center; padding:6px 8px;
+              background:var(--border); border-radius:4px; margin-bottom:6px; }
+.media-slot .keywords { flex:1; font-size:11px; color:var(--muted); }
+.media-slot .status { font-size:11px; padding:1px 6px; border-radius:3px; }
+.media-slot .status.pending  { background:rgba(245,166,35,.2); color:var(--warn); }
+.media-slot .status.resolved { background:rgba(76,175,125,.2); color:var(--ok); }
+.media-slot .caption { font-size:10px; color:var(--muted); font-style:italic; }
+
+/* ── Plan panel ── */
+#plan-panel { flex:1; overflow:hidden; display:none; flex-direction:column; }
+.plan-group h4 { font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+                 color:var(--muted); margin:0 0 6px; }
+.beat-row { display:flex; gap:6px; align-items:flex-start; padding:5px 6px;
+            border-radius:4px; background:var(--border); margin-bottom:5px; font-size:12px; }
+.beat-row .beat-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+.beat-row .beat-dot.covered { background:var(--ok); }
+.beat-row .beat-dot.open    { background:var(--warn); }
+.beat-row .beat-text { flex:1; }
+.beat-row .beat-meta { font-size:10px; color:var(--muted); }
+.beat-row .beat-act  { font-size:10px; color:var(--accent); }
+.arc-row { padding:6px; border:1px solid var(--border); border-radius:4px; margin-bottom:6px; }
+.arc-row .arc-name { font-size:12px; font-weight:600; }
+.arc-row .arc-status { font-size:10px; padding:1px 6px; border-radius:10px; margin-left:6px; }
+.arc-row .arc-status.planned { background:rgba(124,140,248,.15); color:var(--accent); }
+.arc-row .arc-status.active  { background:rgba(245,166,35,.2);  color:var(--warn); }
+.arc-row .arc-status.done    { background:rgba(76,175,125,.2);  color:var(--ok); }
+.plan-gap { font-size:11px; color:var(--warn); margin-bottom:3px; }
+.plan-input { width:100%; background:var(--surface); border:1px solid var(--border);
+              color:var(--text); border-radius:4px; padding:4px 6px; font-size:12px; }
+.media-meta-field { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
+.media-meta-field label { font-size:11px; color:var(--muted); }
+.media-opts { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; margin-bottom:8px; }
+.media-opts label { display:flex; align-items:center; gap:3px; color:var(--text); }
+.media-opts input { width:auto; }
+.file-pick { display:flex; gap:6px; }
+.btn-sm { background:var(--surface); border:1px solid var(--border); color:var(--text);
+          border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
+.btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Editor overlay in center pane */
+#editor-panel { flex:1; overflow-y:auto; padding:16px; display:none; flex-direction:column; gap:12px; }
+#editor-panel.visible { display:flex; }
+#editor-title-row { display:flex; align-items:center; gap:10px; }
+#editor-label { font-size:13px; font-weight:600; color:var(--accent); flex:1; }
+#editor-textarea { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text);
+                   border-radius:6px; padding:10px; font-size:13px; font-family:monospace;
+                   resize:none; line-height:1.7; min-height:300px; }
+#editor-textarea:focus { outline:none; border-color:var(--accent); }
+#editor-actions { display:flex; gap:8px; flex-shrink:0; }
+
+/* ── Right pane ── */
+#pane-chat { width:360px; flex-shrink:0; display:flex; flex-direction:column; }
+#chat-header { padding:8px 12px; border-bottom:1px solid var(--border);
+               display:flex; gap:8px; align-items:center; flex-shrink:0; }
+#mode-select { background:var(--surface); border:1px solid var(--border); color:var(--text);
+               border-radius:4px; padding:3px 6px; font-size:12px; }
+#chat-log { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
+.msg { max-width:100%; }
+.msg.human .bubble { background:var(--accent); color:#fff; border-radius:10px 10px 2px 10px; }
+.msg.bot   .bubble { background:var(--surface); border:1px solid var(--border);
+                     border-radius:10px 10px 10px 2px; }
+.msg .bubble { padding:8px 12px; white-space:pre-wrap; font-size:13px; line-height:1.6; }
+.msg.human { align-self:flex-end; }
+.msg.bot   { align-self:flex-start; }
+#chat-input-area { padding:10px 12px; border-top:1px solid var(--border); flex-shrink:0; }
+#arc-slug-row { display:flex; gap:4px; margin-bottom:6px; align-items:center; }
+#arc-slug-row input { flex:1; background:var(--surface); border:1px solid var(--border);
+                      color:var(--text); border-radius:4px; padding:4px 8px; font-size:12px; min-width:0; }
+#arc-slug-row input:focus { outline:none; border-color:var(--accent); }
+#btn-names { background:var(--border); border:none; color:var(--muted); border-radius:4px;
+             padding:4px 8px; cursor:pointer; font-size:13px; flex-shrink:0; }
+#btn-names:hover { color:var(--accent); }
+#chat-input { width:100%; background:var(--surface); border:1px solid var(--border);
+              color:var(--text); border-radius:6px; padding:8px 10px; font-size:13px;
+              resize:none; min-height:70px; font-family:inherit; }
+#chat-input:focus { outline:none; border-color:var(--accent); }
+#chat-btn-row { display:flex; gap:6px; margin-top:6px; }
+#btn-generate { flex:1; background:var(--surface); border:1px solid var(--accent);
+                color:var(--accent); border-radius:4px; padding:5px 10px; cursor:pointer; font-size:12px; }
+#btn-generate:hover { background:var(--accent); color:#fff; }
+#btn-commit { background:var(--ok); color:#fff; border:none; border-radius:4px;
+              padding:5px 14px; cursor:pointer; font-size:12px; display:none; }
+#btn-commit:hover { opacity:.85; }
+#facts-queue { border-top:1px solid var(--border); padding:8px 12px; max-height:200px; overflow-y:auto; }
+#facts-queue h4 { font-size:11px; text-transform:uppercase; color:var(--muted);
+                   letter-spacing:.06em; margin-bottom:6px; }
+.fact-item { background:var(--surface); border:1px solid var(--border); border-radius:5px;
+             padding:6px 8px; margin-bottom:6px; font-size:12px; }
+.fact-item .fact-id    { font-weight:600; color:var(--accent); }
+.fact-item .fact-prose { color:var(--muted); margin:4px 0; white-space:pre-wrap;
+                          max-height:60px; overflow-y:auto; font-size:11px; }
+.fact-item .fact-btns  { display:flex; gap:6px; }
+.fact-accept { background:rgba(76,175,125,.2); color:var(--ok);  border:1px solid var(--ok);
+               border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
+.fact-reject { background:rgba(224,85,85,.15); color:var(--err); border:1px solid var(--err);
+               border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
+
+/* ── Modal base ── */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65);
+                 display:flex; align-items:center; justify-content:center; z-index:100; }
+.modal-overlay.hidden { display:none; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+         padding:20px; width:560px; max-width:95vw; max-height:88vh;
+         overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.modal.wide { width:700px; }
+.modal h2 { font-size:15px; font-weight:600; color:var(--text); }
+.modal-close { margin-left:auto; background:none; border:none; color:var(--muted);
+               font-size:18px; cursor:pointer; line-height:1; }
+.modal-close:hover { color:var(--text); }
+.modal-title-row { display:flex; align-items:center; }
+.field-row { display:flex; flex-direction:column; gap:4px; }
+.field-row label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.field-row input,.field-row select,.field-row textarea {
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  border-radius:5px; padding:6px 10px; font-size:13px; font-family:inherit; width:100%; }
+.field-row input:focus,.field-row select:focus,.field-row textarea:focus {
+  outline:none; border-color:var(--accent); }
+.field-hint { font-size:11px; color:var(--muted); }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.btn-primary   { background:var(--accent); color:#fff; border:none; border-radius:5px;
+                 padding:7px 18px; cursor:pointer; font-size:13px; }
+.btn-primary:hover { opacity:.85; }
+.btn-secondary { background:var(--border); color:var(--text); border:none; border-radius:5px;
+                 padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn-secondary:hover { border:1px solid var(--accent); color:var(--accent); }
+.divider { border:none; border-top:1px solid var(--border); }
+
+/* ── Settings modal ── */
+.model-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.model-chip { background:var(--border); border:1px solid var(--border); color:var(--muted);
+              border-radius:14px; padding:3px 10px; font-size:12px; cursor:pointer;
+              display:inline-flex; align-items:center; gap:5px; }
+.model-chip:hover { border-color:var(--accent); color:var(--accent); }
+.model-chip.active    { border-color:var(--accent); color:var(--accent); background:rgba(124,140,248,.12); }
+.model-chip.test-ok   { border-color:var(--ok); }
+.model-chip.test-fail { border-color:var(--err); color:var(--err); }
+.model-chip.test-oom  { border-color:var(--warn); color:var(--warn); }
+.chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.chip-dot.spin { background:var(--warn); animation:pulse .8s infinite alternate; }
+.chip-dot.ok   { background:var(--ok); }
+.chip-dot.fail { background:var(--err); }
+@keyframes pulse { from{opacity:.3} to{opacity:1} }
+.chip-retest { font-size:10px; color:var(--muted); margin-left:2px; opacity:.5; }
+.chip-retest:hover { opacity:1; color:var(--accent); }
+.chip-del { font-size:10px; margin-left:2px; opacity:.45; }
+.chip-del:hover { opacity:1; }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
+.status-dot.ok       { background:var(--ok); }
+.status-dot.err      { background:var(--err); }
+.status-dot.checking { background:var(--warn); }
+
+/* ── Names modal ── */
+#names-arc-list { display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; }
+.arc-item { background:var(--bg); border:1px solid var(--border); border-radius:5px;
+            padding:6px 10px; cursor:pointer; }
+.arc-item:hover { border-color:var(--accent); }
+.arc-item.selected { border-color:var(--accent); background:rgba(124,140,248,.08); }
+.arc-item .arc-name  { font-size:13px; font-weight:500; }
+.arc-item .arc-count { font-size:11px; color:var(--muted); }
+#names-passage-list { display:flex; flex-direction:column; gap:3px; max-height:120px; overflow-y:auto; }
+.passage-chip { background:var(--bg); border:1px solid var(--border); border-radius:4px;
+                padding:4px 8px; font-size:12px; cursor:pointer; font-family:monospace; color:var(--muted); }
+.passage-chip:hover { border-color:var(--accent); color:var(--accent); }
+#names-suggest-result { background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:8px 10px; }
+.sug-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+.sug-value { font-family:monospace; font-size:13px; color:var(--accent); }
+.sug-use { font-size:11px; color:var(--ok); cursor:pointer; margin-left:8px; }
+.sug-use:hover { text-decoration:underline; }
+
+/* ── World init / new-entity modals ── */
+.dyn-list { display:flex; flex-direction:column; gap:6px; }
+.dyn-row { display:flex; gap:6px; align-items:flex-start; }
+.dyn-row input,.dyn-row textarea {
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  border-radius:4px; padding:5px 8px; font-size:12px; font-family:inherit; }
+.dyn-row .ri { width:110px; flex-shrink:0; }
+.dyn-row .rn { flex:1; }
+.dyn-row .rd { flex:2; }
+.dyn-row .rm { background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px;
+               padding:2px 4px; flex-shrink:0; }
+.dyn-row .rm:hover { color:var(--err); }
+.add-row-btn { font-size:12px; color:var(--accent); background:none; border:none; cursor:pointer;
+               padding:2px 0; text-align:left; }
+.add-row-btn:hover { text-decoration:underline; }
+.init-steps { display:flex; gap:6px; margin-bottom:4px; }
+.init-step { flex:1; padding:5px; text-align:center; font-size:11px; border-radius:4px;
+             background:var(--border); color:var(--muted); cursor:pointer; }
+.init-step.active { background:rgba(124,140,248,.2); color:var(--accent); font-weight:600; }
+.init-step.done   { background:rgba(76,175,125,.15); color:var(--ok); }
+.step-page { display:none; flex-direction:column; gap:12px; }
+.step-page.visible { display:flex; }
+
+/* Passage type toggle buttons */
+.ptype-btn { background:var(--border); border:1px solid var(--border); color:var(--muted);
+             border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+.ptype-btn:hover { border-color:var(--accent); color:var(--accent); }
+.ptype-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(124,140,248,.12); }
+.ptype-btn[data-type="hub"].active  { border-color:var(--ok);   color:var(--ok);   background:rgba(76,175,125,.12); }
+.ptype-btn[data-type="random"].active { border-color:var(--warn); color:var(--warn); background:rgba(245,166,35,.12); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+
+/* ── Visual polish ── */
+:root {
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+  --radius: 6px;
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+button, .topbar-btn, .btn-sm, #btn-compile {
+  transition: background-color .15s var(--ease), border-color .15s var(--ease),
+              color .15s var(--ease), transform .12s var(--ease), box-shadow .15s var(--ease);
+}
+button:focus-visible, .topbar-btn:focus-visible, .btn-sm:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+button:active:not(:disabled), .topbar-btn:active:not(:disabled),
+.btn-sm:active:not(:disabled) { transform: translateY(1px); }
+button:disabled, .topbar-btn:disabled, .btn-sm:disabled, #btn-compile:disabled {
+  opacity: .55; cursor: not-allowed; transform: none;
+}
+.vbadge { transition: transform .12s var(--ease), filter .12s var(--ease); }
+.vbadge[data-target] { cursor: pointer; }
+.vbadge[data-target]:hover { transform: translateY(-1px); filter: brightness(1.2); }
+
+/* Graph node focus pulse — triggered by .focus-pulse on a node element */
+@keyframes node-pulse {
+  0%   { box-shadow: 0 0 0 0    rgba(124,140,248,.6); }
+  70%  { box-shadow: 0 0 0 14px rgba(124,140,248,0); }
+  100% { box-shadow: 0 0 0 0    rgba(124,140,248,0); }
+}
+
+/* ── Toast container ── */
+#toast-stack {
+  position: fixed; top: 14px; right: 14px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none; max-width: 360px;
+}
+.toast {
+  pointer-events: auto;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); padding: 9px 12px;
+  font-size: 13px; line-height: 1.45; box-shadow: var(--shadow-md);
+  display: flex; gap: 10px; align-items: flex-start;
+  animation: toast-in .18s var(--ease);
+}
+.toast.success { border-left-color: var(--ok); }
+.toast.error   { border-left-color: var(--err); }
+.toast.warn    { border-left-color: var(--warn); }
+.toast.info    { border-left-color: var(--accent); }
+.toast .t-body { flex: 1; word-wrap: break-word; }
+.toast .t-close {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px;
+}
+.toast .t-close:hover { color: var(--text); }
+.toast.leaving { animation: toast-out .16s var(--ease) forwards; }
+@keyframes toast-in  { from { opacity: 0; transform: translateX(20px); }
+                       to   { opacity: 1; transform: translateX(0); } }
+@keyframes toast-out { from { opacity: 1; transform: translateX(0); }
+                       to   { opacity: 0; transform: translateX(20px); } }
+
+/* ── Busy spinner (inline button) ── */
+.spin {
+  display: inline-block; width: 11px; height: 11px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin .7s linear infinite;
+  vertical-align: -2px; margin-right: 5px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Shortcuts help overlay ── */
+#shortcuts-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 9998;
+  display: none; align-items: center; justify-content: center;
+  animation: fade-in .15s var(--ease);
+}
+#shortcuts-overlay.visible { display: flex; }
+#shortcuts-overlay .panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 24px;
+  max-width: 480px; box-shadow: var(--shadow-md);
+}
+#shortcuts-overlay h2 { font-size: 14px; color: var(--accent); margin-bottom: 12px; }
+#shortcuts-overlay table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#shortcuts-overlay td { padding: 5px 0; }
+#shortcuts-overlay td.k { width: 130px; }
+#shortcuts-overlay kbd {
+  background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 3px; padding: 1px 6px; font-family: monospace; font-size: 11px;
+  color: var(--text);
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- Toast container (managed via window.toast()) -->
+<div id="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Keyboard shortcuts overlay (toggled via ? key) -->
+<div id="shortcuts-overlay" role="dialog" aria-label="Keyboard shortcuts" onclick="if(event.target===this)closeShortcuts()">
+  <div class="panel">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <tr><td class="k"><kbd>?</kbd></td><td>Toggle this help</td></tr>
+      <tr><td class="k"><kbd>Esc</kbd></td><td>Close modal / editor / overlay</td></tr>
+      <tr><td class="k"><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Commit current draft</td></tr>
+      <tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Send chat / generate</td></tr>
+      <tr><td class="k"><kbd>/</kbd></td><td>Focus chat input</td></tr>
+      <tr><td class="k"><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Run validation</td></tr>
+      <tr><td class="k"><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Compile</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ── Top bar ── -->
+<div id="topbar">
+  <h1>Story Harness</h1>
+  <span id="branch-indicator">branch: —</span>
+  <div id="validation-bar"><span class="vbadge ok">valid</span></div>
+  <button class="topbar-btn" onclick="openStoryInit()">+ New Story</button>
+  <button class="topbar-btn" onclick="openSettings()">Settings</button>
+  <button class="topbar-btn" title="Keyboard shortcuts (?)" onclick="openShortcuts()" aria-label="Show keyboard shortcuts">?</button>
+  <button id="btn-compile" onclick="compileStory()">Compile</button>
+</div>
+
+<!-- ── Main ── -->
+<div id="main">
+
+  <!-- Left pane: Graph + World tabs -->
+  <div id="pane-left">
+    <div class="left-tabs">
+      <div class="left-tab active" id="tab-graph" onclick="switchLeftTab('graph')">Graph</div>
+      <div class="left-tab"        id="tab-world" onclick="switchLeftTab('world')">World</div>
+      <div class="left-tab"        id="tab-plan"  onclick="switchLeftTab('plan')">Plan</div>
+    </div>
+    <div id="graph-toolbar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.08)">
+      <span id="graph-selection-label" style="font-size:11px;color:var(--muted)">Select a passage node to create a child passage.</span>
+      <button class="btn-sm" id="btn-new-from-graph" onclick="createPassageFromGraph()" disabled title="Use the selected graph node as the parent passage">+ New passage from node</button>
+    </div>
+    <div id="cy"></div>
+    <div id="world-panel">
+
+      <!-- Story -->
+      <div class="world-section">
+        <div class="world-section-hdr" onclick="toggleSection('ws-story')">
+          <span>Story</span><span class="world-section-toggle">▾</span>
+        </div>
+        <div class="world-section-body" id="ws-story">
+          <div class="world-item" onclick="openEditor('premise','Premise','premise')">
+            <span class="wi-label">Premise</span>
+            <span class="wi-sub">premise.md</span>
+          </div>
+          <div class="world-item" onclick="openEditor('story_points','Story Points','story_points')">
+            <span class="wi-label">Story Points</span>
+            <span class="wi-sub">story_points.md</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Characters -->
+      <div class="world-section">
+        <div class="world-section-hdr" onclick="toggleSection('ws-chars')">
+          <span>Characters</span>
+          <span class="wsh-meta" id="chars-count"></span>
+          <span class="world-section-toggle">▾</span>
+        </div>
+        <div class="world-section-body" id="ws-chars">
+          <div id="chars-list"></div>
+          <div class="world-add-btn" onclick="openNewEntity('character')">+ New character</div>
+        </div>
+      </div>
+
+      <!-- Lore -->
+      <div class="world-section">
+        <div class="world-section-hdr" onclick="toggleSection('ws-lore')">
+          <span>Lore</span>
+          <span class="wsh-meta" id="lore-count"></span>
+          <span class="world-section-toggle">▾</span>
+        </div>
+        <div class="world-section-body" id="ws-lore">
+          <div id="lore-list"></div>
+          <div class="world-add-btn" onclick="openNewEntity('lore')">+ New lore entry</div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="world-section">
+        <div class="world-section-hdr" onclick="toggleSection('ws-notes')">
+          <span>Notes</span>
+          <span class="wsh-meta" id="notes-count"></span>
+          <span class="world-section-toggle">▾</span>
+        </div>
+        <div class="world-section-body" id="ws-notes">
+          <div id="notes-list"></div>
+          <div class="world-add-btn" onclick="openNewNote()">+ New note</div>
+        </div>
+      </div>
+
+      <!-- Inspiration corpus (RAG) -->
+      <div class="world-section">
+        <div class="world-section-hdr" onclick="toggleSection('ws-insp')">
+          <span>Inspiration</span>
+          <span class="wsh-meta" id="insp-count"></span>
+          <span class="world-section-toggle">▾</span>
+        </div>
+        <div class="world-section-body" id="ws-insp">
+          <div id="insp-stats" style="font-size:11px;color:var(--muted);margin-bottom:6px"></div>
+          <div id="insp-list"></div>
+          <div style="font-size:10px;color:var(--muted);margin:6px 0">
+            Drop reference files (incl. old SugarCube <code>.json</code> reports) into the
+            <code>inspiration/</code> folder, then reindex. Used as retrieval context — not compiled into the game.
+          </div>
+          <button class="btn-sm" id="btn-reindex" onclick="reindexInspiration()">Reindex</button>
+        </div>
+      </div>
+
+    </div><!-- /world-panel -->
+
+    <div id="plan-panel">
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border)">
+        <strong style="font-size:12px;flex:1">Story Plan</strong>
+        <button class="btn-sm" onclick="importStoryPoints()" title="Promote story_points.md acts/bullets into structured beats">Import points</button>
+        <button class="btn-sm" onclick="refreshPlanPanel()" title="Refresh">↻</button>
+      </div>
+      <div id="plan-body" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:14px">
+        <div style="color:var(--muted);font-size:12px">Loading…</div>
+      </div>
+    </div><!-- /plan-panel -->
+  </div><!-- /pane-left -->
+
+  <!-- Center pane: passage view OR editor -->
+  <div id="pane-passage">
+    <div id="passage-header">
+      <span id="passage-id" style="color:var(--muted)">No passage selected</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn-sm" id="btn-create-child" onclick="createPassageFromCurrent()" style="display:none">+ Child passage</button>
+        <button class="btn-sm" id="btn-delete-passage" onclick="deleteCurrentPassage()" style="display:none;color:var(--err)" title="Delete this passage">Delete</button>
+        <button class="btn-sm" id="btn-back-passage" onclick="closeEditor()" style="display:none">← Back</button>
+      </div>
+    </div>
+    <!-- passage view -->
+    <div id="passage-body">
+      <p style="color:var(--muted);font-size:13px;padding:10px">Click a node in the graph, or open the World tab.</p>
+    </div>
+    <!-- editor view -->
+    <div id="editor-panel">
+      <div id="editor-title-row">
+        <span id="editor-label">Editing</span>
+        <button class="btn-sm" onclick="closeEditor()">Discard</button>
+      </div>
+      <textarea id="editor-textarea"></textarea>
+      <div id="editor-keywords-row" style="display:none;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">Keywords:</span>
+          <div id="editor-keywords-chips" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+          <button class="btn-sm" onclick="generateKeywords()" title="AI-generate keywords from sheet">Generate</button>
+          <button class="btn-sm" onclick="saveKeywords()" title="Persist current keywords to frontmatter">Save</button>
+        </div>
+        <input id="editor-keywords-input" type="text" placeholder="add keyword and press Enter"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addKeywordChip(this.value);this.value='';}"
+               style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 6px;font-size:12px" />
+      </div>
+      <div id="editor-actions">
+        <button class="btn-primary" onclick="saveEditor()">Save</button>
+        <button class="btn-secondary" onclick="closeEditor()">Cancel</button>
+        <button class="btn-secondary" id="editor-delete-btn" onclick="editorDelete()" style="display:none;color:var(--err)">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right pane: chat -->
+  <div id="pane-chat">
+    <div id="chat-header">
+      <span style="font-size:13px;font-weight:600">Chat</span>
+      <select id="mode-select" onchange="setMode(this.value)">
+        <option value="co-author">Co-Author</option>
+        <option value="director">Director</option>
+        <option value="editor">Editor</option>
+      </select>
+    </div>
+    <div id="chat-log"></div>
+    <div id="facts-queue" style="display:none">
+      <h4>Pending Facts</h4>
+      <div id="facts-list"></div>
+    </div>
+    <div id="chat-input-area">
+      <div id="arc-slug-row">
+        <input id="input-arc" placeholder="arc" />
+        <input id="input-slug" placeholder="passage slug" />
+        <button id="btn-names" onclick="openNames()" title="Names helper">+</button>
+      </div>
+      <div id="ptype-row" style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">Type:</span>
+        <select id="ptype-select" onchange="setPType(this.value)"
+                style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px">
+          <option value="normal">normal</option>
+          <option value="event">event</option>
+          <option value="hub">hub</option>
+          <option value="room">room</option>
+          <option value="random">random</option>
+          <option value="random_event">random_event</option>
+          <option value="conditional">conditional</option>
+          <option value="dialogue">dialogue</option>
+          <option value="ending">ending</option>
+        </select>
+      </div>
+      <div id="template-row" style="display:flex;gap:4px;margin-bottom:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">Template:</span>
+        <select id="template-select" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px">
+          <option value="">(none)</option>
+        </select>
+        <input id="template-filter" placeholder="keywords" style="width:110px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px" />
+        <button class="btn-sm" onclick="applySelectedTemplate()" title="Apply selected template">Apply</button>
+        <button class="btn-sm" onclick="openTemplateModal('new')" title="Create a template">New</button>
+        <button class="btn-sm" onclick="openTemplateModal('edit')" title="Edit selected template">Edit</button>
+        <button class="btn-sm" onclick="deleteSelectedTemplate()" title="Delete selected template">Delete</button>
+      </div>
+      <div id="media-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">Media:</span>
+        <select id="media-type" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px">
+          <option value="image">image</option>
+          <option value="audio">audio</option>
+          <option value="video">video</option>
+        </select>
+        <input id="media-keywords" placeholder="keywords (comma)" style="width:160px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px" />
+        <button class="btn-sm" onclick="addPendingMedia()" title="Add media slot">Add</button>
+        <button class="btn-sm" onclick="suggestSceneKeywords()" title="Suggest keywords from scene">Suggest</button>
+        <button class="btn-sm" onclick="clearPendingMedia()" title="Clear pending media">Clear</button>
+      </div>
+      <div id="media-queue" style="display:none;margin-bottom:6px"></div>
+      <div id="media-summary" style="display:none;margin-bottom:6px;font-size:11px;color:var(--muted)"></div>
+
+      <!-- Inspiration & ideas: per-generation steering, esp. when seeding a new arc -->
+      <div id="gen-extra" style="margin-bottom:6px;border:1px solid var(--border);border-radius:4px">
+        <div onclick="toggleGenExtra()" style="cursor:pointer;padding:5px 8px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;user-select:none">
+          <span id="gen-extra-arrow">▸</span><span>Inspiration &amp; ideas</span>
+          <span id="gen-extra-badge" style="margin-left:auto;font-size:10px;color:var(--accent)"></span>
+        </div>
+        <div id="gen-extra-body" style="display:none;padding:6px 8px;border-top:1px solid var(--border);flex-direction:column;gap:6px">
+          <label style="font-size:10px;color:var(--muted)">My ideas / arc seed — added to your direction</label>
+          <textarea id="gen-ideas" placeholder="e.g. this arc moves to the harbor; introduce a smuggler; shift to a darker tone"
+                    oninput="updateGenExtraBadge()"
+                    style="min-height:44px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-size:12px;resize:vertical"></textarea>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:10px;color:var(--muted);flex:1">Pin inspiration files (targeted retrieval)</label>
+            <button class="btn-sm" onclick="loadGenInspFiles()" title="Reload inspiration file list">↻</button>
+          </div>
+          <div id="gen-insp-files" style="max-height:96px;overflow:auto;font-size:11px;display:flex;flex-direction:column;gap:2px"></div>
+          <label style="font-size:10px;color:var(--muted)">Paste reference text — injected verbatim</label>
+          <textarea id="gen-insp-text" placeholder="paste reference prose/snippets to steer this generation"
+                    style="min-height:44px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-size:12px;resize:vertical"
+                    oninput="updateGenExtraBadge()"></textarea>
+        </div>
+      </div>
+
+      <textarea id="chat-input" placeholder="Give direction to the model…"></textarea>
+      <div id="chat-btn-row">
+        <button id="btn-generate" onclick="generate()">Generate</button>
+        <button id="btn-edit-parsed" onclick="toggleEditParsed()" style="display:none">Edit JSON</button>
+        <button id="btn-commit"   onclick="commitPassage()">Commit</button>
+      </div>
+      <div id="parsed-editor-wrap" style="display:none;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px">
+          <span>Edit parsed JSON before commit. Invalid JSON falls back to original.</span>
+          <span id="parsed-editor-status"></span>
+        </div>
+        <textarea id="parsed-editor" rows="12" style="width:100%;font-family:monospace;font-size:12px"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ STORY INIT WIZARD ════════ -->
+<div id="modal-init" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-init')">
+  <div class="modal wide">
+    <div class="modal-title-row">
+      <h2>Story Setup</h2>
+      <button class="modal-close" onclick="document.getElementById('modal-init').classList.add('hidden')">✕</button>
+    </div>
+
+    <!-- Step indicators -->
+    <div class="init-steps">
+      <div class="init-step active" id="istep-0" onclick="gotoStep(0)">1 · Premise</div>
+      <div class="init-step"        id="istep-1" onclick="gotoStep(1)">2 · Story Points</div>
+      <div class="init-step"        id="istep-2" onclick="gotoStep(2)">3 · Characters</div>
+      <div class="init-step"        id="istep-3" onclick="gotoStep(3)">4 · Locations</div>
+    </div>
+
+    <!-- Shared steering: your ideas + inspiration, fed into every ✦ Generate below -->
+    <div class="field-row" style="background:rgba(124,140,248,.06);border:1px solid var(--border);border-radius:5px;padding:8px;margin-bottom:6px">
+      <label style="font-size:11px">Your ideas / inspiration — steers every ✦ Generate in this wizard</label>
+      <textarea id="init-direction" style="min-height:48px"
+                placeholder="e.g. lean into cosmic horror; protagonist is an unreliable narrator; riff on the attached old story — paste reference text or ideas here"></textarea>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+        <label style="font-size:10px;color:var(--muted);flex:1">Pin inspiration files (from your indexed corpus)</label>
+        <button class="btn-sm" onclick="loadWizardInspFiles()" title="Reload inspiration file list">↻</button>
+      </div>
+      <div id="init-insp-files" style="max-height:84px;overflow:auto;font-size:11px;display:flex;flex-direction:column;gap:2px;margin-top:2px"></div>
+    </div>
+
+    <!-- Step 0: Premise -->
+    <div class="step-page visible" id="ipage-0">
+      <div class="field-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="flex:1">Story Title & Premise</label>
+          <button class="btn-sm" onclick="genInitPremise(this)" title="Generate title + premise from a seed idea (and optional direction)">✦ Generate</button>
+        </div>
+        <input id="init-title" placeholder="e.g. The Ravenhold Chronicles" />
+        <textarea id="init-premise" style="min-height:80px;margin-top:6px" placeholder="A century after the Compact sealed the old gods away, their pacts are fraying…"></textarea>
+      </div>
+      <div class="field-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="flex:1">Tone</label>
+          <button class="btn-sm" onclick="genInitToneThemes(this)" title="Generate tone + themes from premise">✦ Generate tone+themes</button>
+        </div>
+        <input id="init-tone" placeholder="e.g. Dark fantasy, melancholy, occasional dry wit" />
+      </div>
+      <div class="field-row">
+        <label>Themes</label>
+        <input id="init-themes" placeholder="e.g. Memory, complicity, what we owe the past" />
+      </div>
+      <div class="field-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="flex:1">World Overview</label>
+          <button class="btn-sm" onclick="genInitWorld(this)" title="Generate world overview from premise/tone/themes">✦ Generate</button>
+        </div>
+        <textarea id="init-world" style="min-height:70px" placeholder="Brief geography, history, rules of the world…"></textarea>
+      </div>
+      <div class="field-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="flex:1">Opening Situation</label>
+          <button class="btn-sm" onclick="genInitOpening(this)" title="Generate opening situation from premise/world">✦ Generate</button>
+        </div>
+        <textarea id="init-opening" style="min-height:60px" placeholder="Where does the player start? What is immediately happening?"></textarea>
+      </div>
+    </div>
+
+    <!-- Step 1: Story Points -->
+    <div class="step-page" id="ipage-1">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <p style="font-size:12px;color:var(--muted);flex:1">High-level plot beats per act — author intent, not passage prose.</p>
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+          <input type="number" id="init-num-acts" value="3" min="1" max="20"
+                 style="width:46px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px"
+                 title="How many acts to generate" />
+          <button class="btn-secondary" id="btn-gen-acts" onclick="generateStoryActs()"
+                  style="font-size:11px;padding:4px 10px;white-space:nowrap">✦ Generate with AI</button>
+        </div>
+      </div>
+      <div class="dyn-list" id="init-acts-list">
+        <div class="dyn-act-row" style="display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:5px;padding:8px;margin-bottom:4px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="ra" placeholder="Act name (e.g. Act 1 — Opening)"
+                   style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit" />
+            <button onclick="removeDynActRow(this)"
+                    style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;line-height:1">×</button>
+          </div>
+          <textarea class="rb" placeholder="- Beat 1&#10;- Beat 2&#10;- Beat 3"
+                    style="min-height:64px;resize:vertical;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit"></textarea>
+        </div>
+      </div>
+      <button class="add-row-btn" onclick="addActRow()">+ Add act</button>
+      <div class="field-row" style="margin-top:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="flex:1">Open Questions (mysteries, unresolved tensions)</label>
+          <button class="btn-sm" onclick="genInitOpenQuestions(this)" title="Generate open questions from premise/tone/world">✦ Generate</button>
+        </div>
+        <textarea id="init-questions" style="min-height:50px" placeholder="- Who sent the letter?&#10;- What did Alice sell?"></textarea>
+      </div>
+    </div>
+
+    <!-- Step 2: Characters -->
+    <div class="step-page" id="ipage-2">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <p style="font-size:12px;color:var(--muted);flex:1">Seed your main cast. ID = lowercase slug. Description becomes the character sheet body.</p>
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+          <input type="number" id="init-num-chars" value="3" min="1" max="12"
+                 style="width:46px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px"
+                 title="How many character sketches to generate" />
+          <button class="btn-secondary" onclick="genInitCharacters(this)" style="font-size:11px;padding:4px 10px;white-space:nowrap">✦ Generate sketches</button>
+        </div>
+      </div>
+      <div class="dyn-list" id="init-chars-list">
+        <div class="dyn-row">
+          <input class="ri" placeholder="id (alice)" />
+          <input class="rn" placeholder="Name" />
+          <textarea class="rd" placeholder="Brief description / personality / role…" style="min-height:36px;resize:vertical"></textarea>
+          <button class="rm" onclick="removeDynRow(this)">×</button>
+        </div>
+      </div>
+      <button class="add-row-btn" onclick="addCharRow()">+ Add character</button>
+    </div>
+
+    <!-- Step 3: Locations -->
+    <div class="step-page" id="ipage-3">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <p style="font-size:12px;color:var(--muted);flex:1">Key locations. These become lore/locations entries.</p>
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+          <input type="number" id="init-num-locs" value="3" min="1" max="12"
+                 style="width:46px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px"
+                 title="How many location sketches to generate" />
+          <button class="btn-secondary" onclick="genInitLocations(this)" style="font-size:11px;padding:4px 10px;white-space:nowrap">✦ Generate sketches</button>
+        </div>
+      </div>
+      <div class="dyn-list" id="init-locs-list">
+        <div class="dyn-row">
+          <input class="ri" placeholder="id (ravenhold)" />
+          <input class="rn" placeholder="Name" />
+          <textarea class="rd" placeholder="Brief description…" style="min-height:36px;resize:vertical"></textarea>
+          <button class="rm" onclick="removeDynRow(this)">×</button>
+        </div>
+      </div>
+      <button class="add-row-btn" onclick="addLocRow()">+ Add location</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="init-prev" onclick="prevStep()" style="display:none">Back</button>
+      <button class="btn-secondary" onclick="document.getElementById('modal-init').classList.add('hidden')">Skip</button>
+      <button class="btn-primary"   id="init-next" onclick="nextOrFinish()">Next</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ NEW ENTITY MODAL ════════ -->
+<div id="modal-new-entity" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-new-entity')">
+  <div class="modal">
+    <div class="modal-title-row">
+      <h2 id="new-entity-title">New Character</h2>
+      <button class="modal-close" onclick="closeModal('modal-new-entity')">✕</button>
+    </div>
+    <div class="field-row">
+      <label>ID (slug)</label>
+      <input id="ne-id" placeholder="e.g. alice or ravenhold_market" />
+    </div>
+    <div id="ne-name-row" class="field-row">
+      <label>Name</label>
+      <input id="ne-name" placeholder="Display name" />
+    </div>
+    <div id="ne-category-row" class="field-row" style="display:none">
+      <label>Category</label>
+      <input id="ne-category" placeholder="locations / factions / misc" />
+    </div>
+    <div class="field-row">
+      <label>Description</label>
+      <textarea id="ne-description" style="min-height:80px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('modal-new-entity')">Cancel</button>
+      <button class="btn-primary" onclick="submitNewEntity()">Create</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ SETTINGS MODAL ════════ -->
+<div id="modal-settings" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-settings')">
+  <div class="modal">
+    <div class="modal-title-row">
+      <h2>Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="field-row">
+      <label>Ollama Base URL</label>
+      <input id="cfg-ollama-url" type="text" placeholder="http://localhost:11434" />
+    </div>
+    <div class="field-row">
+      <label>Model Mode</label>
+      <select id="cfg-model-mode" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-size:13px;font-family:inherit;width:100%">
+        <option value="auto">Auto — compact for small/local models, standard for larger ones (recommended)</option>
+        <option value="compact">Compact — short prompt + repair/fallback parser (small models: gemma, phi, tinyllama, 7B-ish locals)</option>
+        <option value="standard">Standard — full structured prompt (llama3, mistral, larger models)</option>
+      </select>
+      <span class="field-hint">Compact trims context, lowers output budget, and auto-repairs busted formatting. Good fit for weaker local models and ~12 GB VRAM boxes.</span>
+    </div>
+    <div class="field-row">
+      <label>Ollama Model
+        <span style="margin-left:8px;font-size:11px">
+          <span class="status-dot checking" id="ollama-dot"></span>
+          <span id="ollama-status-text">—</span>
+        </span>
+      </label>
+      <div style="display:flex;gap:6px">
+        <input id="cfg-ollama-model" type="text" placeholder="llama3.2" style="flex:1" />
+        <button class="btn-secondary" onclick="checkOllama()" style="white-space:nowrap">Test</button>
+      </div>
+      <div id="model-chips" class="model-list"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span class="field-hint" style="flex:1">Green dot = responds. Click chip to select. 🗑 deletes from Ollama.</span>
+        <button class="btn-sm" id="btn-del-unresponsive" style="display:none;color:var(--warn)"
+                onclick="deleteUnresponsiveModels()"
+                title="Delete every model whose smoke test failed">Delete unresponsive</button>
+      </div>
+    </div>
+    <hr class="divider" />
+    <div class="field-row">
+      <label>Tweego Path
+        <span id="tweego-status" style="margin-left:8px;font-size:11px;color:var(--muted)"></span>
+      </label>
+      <div style="display:flex;gap:6px">
+        <input id="cfg-tweego-path" type="text" placeholder="tweego" style="flex:1" />
+        <button class="btn-secondary" onclick="autoDetectTweego()" style="white-space:nowrap;font-size:11px">Auto-detect</button>
+      </div>
+      <span class="field-hint">
+        Not installed?
+        <a href="https://www.motoslave.net/tweego/" target="_blank"
+           style="color:var(--accent);text-decoration:none">Download Tweego ↗</a>
+        — place tweego.exe anywhere and enter its full path here.
+      </span>
+    </div>
+    <div class="field-row">
+      <label>SugarCube Format Path (optional)</label>
+      <input id="cfg-sugarcube-path" type="text" />
+    </div>
+    <hr class="divider" />
+    <div class="field-row">
+      <label>Story Title</label>
+      <input id="cfg-story-title" type="text" />
+    </div>
+    <hr class="divider" />
+    <div class="field-row">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="flex:1">Debug — recent model calls
+          <span id="debug-current" style="font-size:11px;color:var(--muted)"></span>
+        </label>
+        <button class="btn-sm" onclick="refreshDebugCalls()" title="Reload">↻</button>
+        <button class="btn-sm" onclick="clearDebugCalls()" title="Clear log">Clear</button>
+      </div>
+      <div id="debug-calls" style="max-height:200px;overflow:auto;font-size:11px;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px"></div>
+      <span class="field-hint">Each generation logs the model + prompt variant that served it. In-memory; resets on restart.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn-primary"   onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ NEW NOTE MODAL ════════ -->
+<div id="modal-new-note" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-new-note')">
+  <div class="modal" style="width:380px">
+    <div class="modal-title-row">
+      <h2>New Note</h2>
+      <button class="modal-close" onclick="closeModal('modal-new-note')">✕</button>
+    </div>
+    <div class="field-row">
+      <label>Title</label>
+      <input id="new-note-title" placeholder="e.g. Foreshadowing ideas"
+             oninput="document.getElementById('new-note-id').value=this.value.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')"
+             onkeydown="if(event.key==='Enter')submitNewNote()" />
+    </div>
+    <div class="field-row">
+      <label>ID (auto-filled from title)</label>
+      <input id="new-note-id" placeholder="auto"
+             style="font-family:monospace;color:var(--muted)" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('modal-new-note')">Cancel</button>
+      <button class="btn-primary" onclick="submitNewNote()">Create</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ NAMES HELPER MODAL ════════ -->
+<div id="modal-names" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-names')">
+  <div class="modal" style="width:480px">
+    <div class="modal-title-row">
+      <h2>Names Helper</h2>
+      <button class="modal-close" onclick="closeNames()">✕</button>
+    </div>
+    <div class="field-row">
+      <label>Existing Arcs</label>
+      <div id="names-arc-list"></div>
+    </div>
+    <div class="field-row" id="names-passages-section" style="display:none">
+      <label>Passages in <span id="names-selected-arc" style="color:var(--accent)"></span></label>
+      <div id="names-passage-list"></div>
+    </div>
+    <hr class="divider" />
+    <div class="field-row">
+      <label>Generate slug from description</label>
+      <textarea id="names-desc" style="min-height:52px;resize:vertical"></textarea>
+      <label style="margin-top:4px;font-size:12px;color:var(--muted)">
+        <input type="checkbox" id="names-also-arc" style="width:auto;margin-right:4px" />
+        Also suggest arc name
+      </label>
+    </div>
+    <div id="names-suggest-result" style="display:none">
+      <div class="sug-label">Suggestion</div>
+      <div>SLUG: <span class="sug-value" id="sug-slug">—</span>
+           <span class="sug-use" onclick="useSlug()">use</span></div>
+      <div id="sug-arc-row" style="display:none">
+           ARC: <span class="sug-value" id="sug-arc">—</span>
+           <span class="sug-use" onclick="useArc()">use</span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeNames()">Close</button>
+      <button class="btn-primary"   onclick="suggestNames()">Generate</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ PASSAGE TEMPLATES MODAL ════════ -->
+<div id="modal-templates" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-templates')">
+  <div class="modal" style="width:540px">
+    <div class="modal-title-row">
+      <h2>Passage Templates</h2>
+      <button class="modal-close" onclick="closeTemplates()">✕</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label style="font-size:12px;color:var(--muted)">Templates</label>
+        <div id="template-list" style="margin-top:6px"></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <label>Title</label>
+        <input id="tpl-title" placeholder="e.g. Event: Moving scene" />
+        <label>Type</label>
+        <select id="tpl-type" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-size:12px">
+          <option value="normal">normal</option>
+          <option value="event">event</option>
+          <option value="hub">hub</option>
+          <option value="room">room</option>
+          <option value="random">random</option>
+          <option value="dialogue">dialogue</option>
+          <option value="ending">ending</option>
+        </select>
+        <label>Keywords (comma-separated)</label>
+        <input id="tpl-keywords" placeholder="event, motion, image" />
+        <label>Body</label>
+        <textarea id="tpl-body" style="min-height:140px;resize:vertical" placeholder="Template body or prompt scaffold..."></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeTemplates()">Cancel</button>
+      <button class="btn-secondary" onclick="useTemplateBody()">Use in composer</button>
+      <button class="btn-primary"   onclick="saveTemplate()">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ MEDIA SLOT MODAL ════════ -->
+<div id="modal-media-resolve" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-media-resolve')">
+  <div class="modal" style="width:460px">
+    <div class="modal-title-row">
+      <h2>Media Slot <span id="media-modal-id" style="font-size:11px;color:var(--muted);font-family:monospace"></span></h2>
+      <button class="modal-close" onclick="closeMediaResolve()">✕</button>
+    </div>
+    <div id="media-modal-keywords" class="field-hint" style="margin-bottom:8px"></div>
+
+    <div class="media-meta-field">
+      <label>Type</label>
+      <select id="media-modal-type" onchange="onMediaTypeChange()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px">
+        <option value="image">image</option>
+        <option value="audio">audio</option>
+        <option value="video">video</option>
+      </select>
+    </div>
+
+    <div class="media-meta-field">
+      <label>File path (relative to project, e.g. media/scene_01.png)</label>
+      <div class="file-pick">
+        <input id="media-resolve-path" placeholder="media/scene_01.png" style="flex:1" />
+        <select id="media-file-pick" onchange="pickMediaFile(this.value)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;max-width:150px">
+          <option value="">media/ files…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="media-meta-field">
+      <label>Alt text (accessibility — falls back to description, then keywords)</label>
+      <input id="media-alt" placeholder="describe the media for screen readers" />
+    </div>
+    <div class="media-meta-field">
+      <label>Caption (shown beneath the media in-game)</label>
+      <input id="media-caption" placeholder="optional visible caption" />
+    </div>
+    <div class="media-meta-field">
+      <label>Description (intent / notes — also alt fallback)</label>
+      <input id="media-description" placeholder="what this media should depict" />
+    </div>
+
+    <div class="media-opts" id="media-opts-image">
+      <label><input type="checkbox" id="media-lazy" checked /> lazy load</label>
+    </div>
+    <div class="media-opts" id="media-opts-av" style="display:none">
+      <label><input type="checkbox" id="media-controls" checked /> controls</label>
+      <label><input type="checkbox" id="media-loop" /> loop</label>
+      <label><input type="checkbox" id="media-autoplay" /> autoplay</label>
+      <label><input type="checkbox" id="media-muted" /> muted</label>
+    </div>
+    <div class="media-meta-field" id="media-poster-field" style="display:none">
+      <label>Poster image path (video only)</label>
+      <input id="media-poster" placeholder="media/poster.png" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeMediaResolve()">Cancel</button>
+      <button class="btn-secondary" id="media-unresolve-btn" onclick="unresolveFromModal()" style="display:none">Unresolve</button>
+      <button class="btn-primary" onclick="submitMediaResolve()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ ADD SCENE CHARACTER MODAL ════════ -->
+<div id="modal-scene-character" class="modal-overlay hidden" onclick="closeIfOverlay(event,'modal-scene-character')">
+  <div class="modal" style="width:460px">
+    <div class="modal-title-row">
+      <h2>Add Character To Scene</h2>
+      <button class="modal-close" onclick="closeSceneCharacterPicker()">✕</button>
+    </div>
+    <div class="field-row">
+      <label>Recurring character</label>
+      <select id="scene-character-select"></select>
+    </div>
+    <div class="field-row">
+      <label>Scene status</label>
+      <select id="scene-character-status">
+        <option value="present">present</option>
+        <option value="with player">with player</option>
+        <option value="nearby">nearby</option>
+        <option value="watching">watching</option>
+        <option value="injured">injured</option>
+        <option value="hostile">hostile</option>
+        <option value="dead">dead</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <label>Relationship</label>
+      <input id="scene-character-relationship" placeholder="e.g. uneasy ally, enemy, unknown" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSceneCharacterPicker()">Cancel</button>
+      <button class="btn-primary" onclick="submitSceneCharacterPicker()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ APP PROMPT MODAL ════════ -->
+<div id="modal-app-prompt" class="modal-overlay hidden" onclick="if(event.target===this) appPromptCancel()">
+  <div class="modal" style="width:520px">
+    <div class="modal-title-row">
+      <h2 id="app-prompt-title">Edit</h2>
+      <button class="modal-close" onclick="appPromptCancel()">✕</button>
+    </div>
+    <div class="field-row">
+      <label id="app-prompt-label">Value</label>
+      <div id="app-prompt-hint" class="field-hint" style="white-space:pre-wrap;display:none"></div>
+      <textarea id="app-prompt-value" style="min-height:120px;resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="appPromptCancel()">Cancel</button>
+      <button class="btn-primary" onclick="appPromptOk()">OK</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let cy;
+let currentPassageId = null;
+let selectedGraphNodeId = null;
+let lastGenerateResp = null;
+let pendingFacts = [];
+let _arcsCache = {};
+let _editorCtx = null;   // {type, id, category?, onSave, onDelete?}
+let _initStep  = 0;
+let _currentPassageType = 'normal';
+let _templates = [];
+let _editingTemplateId = null;
+let _pendingMedia = [];
+let _currentPassageProse = "";
+let _currentPassageData = null;
+let _resolveSlotId = null;
+let _appPromptResolve = null;
+
+// ═══════════════════════════════════════════════════════
+//  Toast / busy / keyboard / focus utilities
+// ═══════════════════════════════════════════════════════
+function toast(message, kind='info', timeoutMs=4000) {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) return;
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<div class="t-body"></div><button class="t-close" aria-label="Dismiss">×</button>`;
+  el.querySelector('.t-body').textContent = String(message || '');
+  const dismiss = () => {
+    if (el._dismissed) return;
+    el._dismissed = true;
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 180);
+  };
+  el.querySelector('.t-close').addEventListener('click', dismiss);
+  stack.appendChild(el);
+  if (timeoutMs > 0) setTimeout(dismiss, timeoutMs);
+  return dismiss;
+}
+
+// Run an async function while marking a button busy. Restores label/disabled
+// state even if the function throws. Optional `pendingLabel` swaps the button
+// text while the work runs.
+async function busy(btn, fn, pendingLabel=null) {
+  if (!btn) return await fn();
+  const originalLabel = btn.innerHTML;
+  const wasDisabled   = btn.disabled;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin" aria-hidden="true"></span>${pendingLabel ?? btn.textContent}`;
+  try { return await fn(); }
+  finally {
+    btn.innerHTML = originalLabel;
+    btn.disabled = wasDisabled;
+  }
+}
+
+function openShortcuts()  { document.getElementById('shortcuts-overlay').classList.add('visible'); }
+function closeShortcuts() { document.getElementById('shortcuts-overlay').classList.remove('visible'); }
+
+// Drop-in replacement for window.alert — non-blocking, integrates with toast stack.
+window.alert = (msg) => toast(String(msg), 'warn', 4500);
+
+// Focus a passage node in the graph and pulse it for one second.
+function focusPassage(passageId) {
+  if (!passageId || !cy) return;
+  const node = cy.getElementById(passageId);
+  if (!node || node.empty()) { toast(`Passage ${passageId} not found in graph.`, 'warn'); return; }
+  cy.animate({ center: { eles: node }, zoom: Math.max(cy.zoom(), 1.0) }, { duration: 280 });
+  node.flashClass('focus-pulse', 1000);
+  // Also load the passage into the center pane if the function exists.
+  if (typeof loadPassage === 'function') loadPassage(passageId).catch(()=>{});
+}
+
+// True when focus is inside an editable field (so we don't hijack typing).
+function _typingInField() {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+}
+
+function _onGlobalKey(ev) {
+  // Escape closes overlays / modals — handled even when typing.
+  if (ev.key === 'Escape') {
+    const shortcuts = document.getElementById('shortcuts-overlay');
+    if (shortcuts && shortcuts.classList.contains('visible')) { closeShortcuts(); return; }
+    if (typeof closeModal === 'function') {
+      const modal = document.querySelector('.modal.visible, .modal-overlay.visible');
+      if (modal) { closeModal(); return; }
+    }
+    return;
+  }
+  if (_typingInField()) {
+    // Ctrl+Enter still allowed inside text fields to send chat / generate.
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+      const send = document.getElementById('btn-send');
+      if (send) { ev.preventDefault(); send.click(); }
+    }
+    if (ev.key === 's' && (ev.ctrlKey || ev.metaKey)) {
+      const commit = document.getElementById('btn-commit');
+      if (commit && !commit.disabled) { ev.preventDefault(); commit.click(); }
+    }
+    return;
+  }
+  if (ev.key === '?') {
+    ev.preventDefault();
+    const o = document.getElementById('shortcuts-overlay');
+    o.classList.toggle('visible');
+    return;
+  }
+  if (ev.key === '/') {
+    const inp = document.getElementById('chat-input') || document.getElementById('msg-input');
+    if (inp) { ev.preventDefault(); inp.focus(); }
+    return;
+  }
+  if (ev.key === 's' && (ev.ctrlKey || ev.metaKey)) {
+    const commit = document.getElementById('btn-commit');
+    if (commit && !commit.disabled) { ev.preventDefault(); commit.click(); }
+    return;
+  }
+  if (ev.key === 'b' && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    const c = document.getElementById('btn-compile');
+    if (c && !c.disabled) c.click();
+    return;
+  }
+  if (ev.key === 'k' && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    refreshValidation().then(() => toast('Validation refreshed.', 'info', 1800));
+    return;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  initCytoscape();
+  await loadSession();
+  await refreshGraph();
+  await refreshValidation();
+  setInterval(refreshValidation, 15000);
+  await loadTemplates();
+  document.addEventListener('keydown', _onGlobalKey);
+  // show init wizard if project is empty
+  const status = await api('/api/project-status', 'GET', null, {silent:true}).catch(()=>null);
+  if (status?.is_empty) openStoryInit();
+});
+
+// ═══════════════════════════════════════════════════════
+//  Left tab switch
+// ═══════════════════════════════════════════════════════
+function switchLeftTab(tab) {
+  document.getElementById('tab-graph').classList.toggle('active', tab==='graph');
+  document.getElementById('tab-world').classList.toggle('active', tab==='world');
+  document.getElementById('tab-plan').classList.toggle('active', tab==='plan');
+  document.getElementById('cy').style.display     = tab==='graph' ? 'block' : 'none';
+  document.getElementById('graph-toolbar').style.display = tab==='graph' ? 'flex' : 'none';
+  document.getElementById('world-panel').style.display = tab==='world' ? 'flex' : 'none';
+  document.getElementById('plan-panel').style.display  = tab==='plan'  ? 'flex' : 'none';
+  if (tab==='world') refreshWorldPanel();
+  if (tab==='plan')  refreshPlanPanel();
+}
+
+function toggleSection(id) {
+  const body = document.getElementById(id);
+  body.classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════
+//  World panel
+// ═══════════════════════════════════════════════════════
+async function refreshWorldPanel() {
+  await Promise.all([refreshChars(), refreshLore(), refreshNotes(), refreshInspiration()]);
+}
+
+async function refreshInspiration() {
+  const r = await api('/api/rag/status').catch(()=>({index:{},files:[]}));
+  const files = r.files || [], idx = r.index || {};
+  document.getElementById('insp-count').textContent = files.length;
+  const indexed = idx.exists ? `${idx.chunks} chunk(s) from ${idx.sources} source(s)` : 'not indexed yet';
+  document.getElementById('insp-stats').textContent =
+    files.length ? `${files.length} file(s) · ${indexed}` : 'No files in inspiration/ yet.';
+  document.getElementById('insp-list').innerHTML = files.length
+    ? files.map((f,i) => {
+        const name = f.path.replace(/^inspiration\//,'');
+        return `<div class="world-item" style="flex-wrap:wrap">
+          <span class="wi-label">${escHtml(name)}</span>
+          <span class="wi-sub">${escHtml(f.ext||'')}</span>
+          <button class="btn-sm" onclick="digestInspiration('${escAttr(f.path)}','insp-dg-${i}')" title="Summarize themes, characters, game type">Digest</button>
+          <div id="insp-dg-${i}" style="flex-basis:100%;font-size:11px;color:var(--muted);margin-top:4px"></div>
+        </div>`;
+      }).join('')
+    : '';
+}
+
+async function digestInspiration(path, outId) {
+  const out = document.getElementById(outId);
+  if (out) out.textContent = 'Analyzing…';
+  try {
+    const r = await api('/api/inspiration/summarize','POST',{path},{silent:true});
+    const themes = (r.themes||[]).join(', ');
+    const cast = (r.characters||[]).join(', ');
+    out.innerHTML = `
+      ${r.game_type?`<div><strong style="color:var(--accent)">Type:</strong> ${escHtml(r.game_type)}</div>`:''}
+      ${themes?`<div><strong style="color:var(--accent)">Themes:</strong> ${escHtml(themes)}</div>`:''}
+      ${cast?`<div><strong style="color:var(--accent)">Characters:</strong> ${escHtml(cast)}</div>`:''}
+      ${r.summary?`<div style="margin-top:2px">${escHtml(r.summary)}</div>`:''}` ||
+      '<span style="color:var(--warn)">No digest returned.</span>';
+  } catch(e) {
+    out.innerHTML = `<span style="color:var(--err)">Digest failed: ${escHtml(e.message)}</span>`;
+  }
+}
+
+async function reindexInspiration() {
+  const btn = document.getElementById('btn-reindex');
+  await busy(btn, async () => {
+    try {
+      const r = await api('/api/rag/reindex','POST',{}, {silent:true});
+      toast('Inspiration reindexed.','success');
+      await refreshInspiration();
+    } catch(e) {
+      toast('Reindex failed: '+e.message+' (is the embed model pulled? ollama pull nomic-embed-text)','error',7000);
+    }
+  }, 'Reindexing');
+}
+
+async function refreshChars() {
+  const r = await api('/api/characters').catch(()=>({characters:[]}));
+  const chars = r.characters || [];
+  document.getElementById('chars-count').textContent = chars.length;
+  document.getElementById('chars-list').innerHTML = chars.map(c =>
+    `<div class="world-item" onclick="editCharacter('${escAttr(c.id)}')">
+       <span class="wi-label">${escHtml(c.name||c.id)}</span>
+       <span class="wi-sub">${escHtml(c.id)}</span>
+       ${(c.tags||[]).map(t=>`<span class="wi-tag">${escHtml(t)}</span>`).join('')}
+     </div>`
+  ).join('');
+}
+
+async function refreshLore() {
+  const r = await api('/api/lore').catch(()=>({lore:[]}));
+  const lore = r.lore || [];
+  document.getElementById('lore-count').textContent = lore.length;
+  // group by category
+  const by_cat = {};
+  for (const l of lore) {
+    if (!by_cat[l.category]) by_cat[l.category] = [];
+    by_cat[l.category].push(l);
+  }
+  document.getElementById('lore-list').innerHTML = Object.entries(by_cat).map(([cat,items])=>
+    `<div style="margin-bottom:4px">
+       <div style="font-size:10px;color:var(--muted);padding:3px 6px;text-transform:uppercase;letter-spacing:.05em">${escHtml(cat)}</div>
+       ${items.map(l=>`<div class="world-item" onclick="editLore('${escAttr(l.category)}','${escAttr(l.id)}')">
+           <span class="wi-label">${escHtml(l.title||l.id)}</span>
+           <span class="wi-sub">${escHtml(l.summary||'')}</span>
+         </div>`).join('')}
+     </div>`
+  ).join('');
+}
+
+async function refreshNotes() {
+  const r = await api('/api/notes').catch(()=>({notes:[]}));
+  const notes = r.notes || [];
+  document.getElementById('notes-count').textContent = notes.length;
+  document.getElementById('notes-list').innerHTML = notes.map(n =>
+    `<div class="world-item" onclick="editNote('${escAttr(n.id)}')">
+       <span class="wi-label">${escHtml(n.title)}</span>
+     </div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Center pane editor
+// ═══════════════════════════════════════════════════════
+function showEditor(label, content, ctx) {
+  _editorCtx = ctx;
+  document.getElementById('passage-body').style.display   = 'none';
+  document.getElementById('editor-panel').classList.add('visible');
+  document.getElementById('editor-label').textContent = label;
+  document.getElementById('editor-textarea').value    = content;
+  document.getElementById('btn-back-passage').style.display = 'inline-block';
+  document.getElementById('editor-delete-btn').style.display = ctx.onDelete ? 'inline-block' : 'none';
+  // Keywords row only meaningful for character/lore sheets.
+  const kwRow = document.getElementById('editor-keywords-row');
+  const supportsKeywords = ctx.type === 'character' || ctx.type === 'lore';
+  kwRow.style.display = supportsKeywords ? 'flex' : 'none';
+  if (supportsKeywords) {
+    _editorKeywords = Array.isArray(ctx.keywords) ? [...ctx.keywords] : [];
+    renderKeywordChips();
+  } else {
+    _editorKeywords = [];
+  }
+  // size textarea to fill space
+  setTimeout(()=>{ const ta=document.getElementById('editor-textarea'); ta.style.height=''; ta.style.height=(ta.scrollHeight+20)+'px'; }, 50);
+}
+
+let _editorKeywords = [];
+
+function renderKeywordChips() {
+  const wrap = document.getElementById('editor-keywords-chips');
+  if (!_editorKeywords.length) {
+    wrap.innerHTML = '<span style="color:var(--muted);font-size:11px">(none)</span>';
+    return;
+  }
+  wrap.innerHTML = _editorKeywords.map((kw,i)=>
+    `<span class="kw-chip" style="background:var(--bg);border:1px solid var(--border);padding:1px 6px;border-radius:10px;font-size:11px;display:inline-flex;gap:4px;align-items:center">${escHtml(kw)}<button onclick="removeKeywordChip(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">×</button></span>`
+  ).join('');
+}
+
+function addKeywordChip(value) {
+  const kw = (value||'').trim().toLowerCase();
+  if (!kw || _editorKeywords.includes(kw)) return;
+  _editorKeywords.push(kw);
+  renderKeywordChips();
+}
+
+function removeKeywordChip(i) {
+  _editorKeywords.splice(i, 1);
+  renderKeywordChips();
+}
+
+async function generateKeywords() {
+  const ctx = _editorCtx;
+  if (!ctx) return;
+  const dir = _askDirection(`keywords for ${ctx.id}`);
+  if (dir === null) return;
+  const url = ctx.type === 'character'
+    ? `/api/characters/${ctx.id}/generate-keywords`
+    : `/api/lore/${ctx.category}/${ctx.id}/generate-keywords`;
+  const status = document.getElementById('editor-keywords-chips');
+  const prev = status.innerHTML;
+  status.innerHTML = '<span style="color:var(--muted);font-size:11px">generating…</span>';
+  try {
+    const r = await api(url, 'POST', {direction: dir});
+    _editorKeywords = Array.isArray(r.keywords) ? r.keywords : [];
+    renderKeywordChips();
+    addMsg('bot', `Generated ${_editorKeywords.length} keyword(s) for ${ctx.id}. Click Save to persist.`);
+  } catch(e) {
+    status.innerHTML = prev;
+    addMsg('bot', `Keyword generation error: ${e.message}`);
+  }
+}
+
+async function saveKeywords() {
+  const ctx = _editorCtx;
+  if (!ctx) return;
+  const url = ctx.type === 'character'
+    ? `/api/characters/${ctx.id}/keywords`
+    : `/api/lore/${ctx.category}/${ctx.id}/keywords`;
+  try {
+    await api(url, 'POST', {keywords: _editorKeywords});
+    addMsg('bot', `Saved ${_editorKeywords.length} keyword(s) for ${ctx.id}.`);
+    refreshWorldPanel();
+  } catch(e) {
+    addMsg('bot', `Save error: ${e.message}`);
+  }
+}
+
+function closeEditor() {
+  _editorCtx = null;
+  document.getElementById('editor-panel').classList.remove('visible');
+  document.getElementById('passage-body').style.display = '';
+  document.getElementById('btn-back-passage').style.display = 'none';
+}
+
+async function saveEditor() {
+  if (!_editorCtx) return;
+  const content = document.getElementById('editor-textarea').value;
+  const ctx = _editorCtx;
+  try {
+    if (ctx.type === 'premise') {
+      await api('/api/premise','POST',{premise: content});
+    } else if (ctx.type === 'story_points') {
+      await api('/api/premise','POST',{story_points: content});
+    } else if (ctx.type === 'character') {
+      await api(`/api/characters/${ctx.id}`,'POST',{content});
+    } else if (ctx.type === 'lore') {
+      await api(`/api/lore/${ctx.category}/${ctx.id}`,'POST',{content});
+    } else if (ctx.type === 'note') {
+      await api(`/api/notes/${ctx.id}`,'POST',{content});
+    }
+    addMsg('bot', `Saved ${ctx.label || ctx.id || ctx.type}.`);
+    closeEditor();
+    refreshWorldPanel();
+  } catch(e) {
+    addMsg('bot',`Save error: ${e.message}`);
+  }
+}
+
+async function editorDelete() {
+  if (!_editorCtx?.onDelete) return;
+  if (!confirm('Delete this? Cannot be undone.')) return;
+  try {
+    await _editorCtx.onDelete();
+    closeEditor();
+    refreshWorldPanel();
+  } catch(e) { addMsg('bot',`Delete error: ${e.message}`); }
+}
+
+async function openEditor(type, label, subtype) {
+  const r = await api('/api/premise');
+  const content = subtype==='premise' ? r.premise : r.story_points;
+  showEditor(label, content, {type, label});
+}
+
+async function editCharacter(id) {
+  const r = await api(`/api/characters/${id}`);
+  showEditor(`Character: ${id}`, r.content, {
+    type:'character', id, label:`Character: ${id}`,
+    keywords: r.keywords || [],
+    onDelete: async () => api(`/api/characters/${id}`,'DELETE',{}),
+  });
+}
+
+async function editLore(category, id) {
+  const r = await api(`/api/lore/${category}/${id}`);
+  showEditor(`${category}/${id}`, r.content, {
+    type:'lore', id, category, label:`${category}/${id}`,
+    keywords: r.keywords || [],
+  });
+}
+
+async function editNote(id) {
+  const r = await api(`/api/notes/${id}`);
+  showEditor(`Note: ${id}`, r.content, {
+    type:'note', id, label:`Note: ${id}`,
+    onDelete: async () => api(`/api/notes/${id}`,'DELETE',{}),
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  New entity modal
+// ═══════════════════════════════════════════════════════
+let _newEntityType = 'character';
+
+function openNewEntity(type) {
+  _newEntityType = type;
+  document.getElementById('new-entity-title').textContent = type==='character' ? 'New Character' : 'New Lore Entry';
+  document.getElementById('ne-category-row').style.display = type==='lore' ? 'block' : 'none';
+  document.getElementById('ne-id').value = '';
+  document.getElementById('ne-name').value = '';
+  document.getElementById('ne-category').value = type==='lore' ? 'locations' : '';
+  document.getElementById('ne-description').value = '';
+  document.getElementById('modal-new-entity').classList.remove('hidden');
+}
+
+async function submitNewEntity() {
+  const id   = document.getElementById('ne-id').value.trim();
+  const name = document.getElementById('ne-name').value.trim();
+  const desc = document.getElementById('ne-description').value.trim();
+  if (!id) return;
+  if (_newEntityType === 'character') {
+    await api('/api/characters','POST',{id, name, description:desc});
+  } else {
+    const cat = document.getElementById('ne-category').value.trim() || 'misc';
+    await api('/api/lore','POST',{id, title:name, category:cat, description:desc});
+  }
+  closeModal('modal-new-entity');
+  refreshWorldPanel();
+  addMsg('bot', `Created ${_newEntityType}: ${id}`);
+}
+
+function openNewNote() {
+  document.getElementById('new-note-title').value='';
+  document.getElementById('new-note-id').value='';
+  document.getElementById('modal-new-note').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('new-note-title').focus(),60);
+}
+
+async function submitNewNote() {
+  const title = document.getElementById('new-note-title').value.trim();
+  if (!title) return;
+  const id = document.getElementById('new-note-id').value.trim()
+    || title.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  if (!id) return;
+  try {
+    await api('/api/notes','POST',{id, title});
+    closeModal('modal-new-note');
+    await editNote(id);
+    refreshWorldPanel();
+  } catch(e) { addMsg('bot',`Note create error: ${e.message}`); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Story Init Wizard
+// ═══════════════════════════════════════════════════════
+function openStoryInit() {
+  _initStep = 0;
+  updateInitSteps();
+  document.getElementById('modal-init').classList.remove('hidden');
+  loadWizardInspFiles();
+}
+
+function gotoStep(n) {
+  _initStep = n;
+  updateInitSteps();
+}
+
+function updateInitSteps() {
+  for (let i=0;i<4;i++) {
+    document.getElementById(`ipage-${i}`).classList.toggle('visible', i===_initStep);
+    const s = document.getElementById(`istep-${i}`);
+    s.classList.remove('active','done');
+    if (i===_initStep) s.classList.add('active');
+    else if (i<_initStep) s.classList.add('done');
+  }
+  document.getElementById('init-prev').style.display = _initStep>0 ? 'inline-block' : 'none';
+  document.getElementById('init-next').textContent   = _initStep===3 ? 'Finish' : 'Next';
+}
+
+function prevStep() { if (_initStep>0) gotoStep(_initStep-1); }
+
+async function nextOrFinish() {
+  if (_initStep < 3) { gotoStep(_initStep+1); return; }
+  // Finish — collect all data
+  // Dynamic acts list
+  let story_points = '';
+  const actRows = document.querySelectorAll('#init-acts-list .dyn-act-row');
+  for (const row of actRows) {
+    const name    = row.querySelector('.ra')?.value.trim();
+    const content = row.querySelector('.rb')?.value.trim();
+    if (name || content) story_points += `## ${name || 'Act'}\n\n${content || ''}\n\n`;
+  }
+  const qs = document.getElementById('init-questions').value.trim();
+  if (qs) story_points += `## Open Questions\n\n${qs}\n`;
+
+  const chars = collectDynRows('init-chars-list');
+  const locs  = collectDynRows('init-locs-list');
+
+  const body = {
+    title:             document.getElementById('init-title').value.trim(),
+    premise:           document.getElementById('init-premise').value.trim(),
+    tone:              document.getElementById('init-tone').value.trim(),
+    themes:            document.getElementById('init-themes').value.trim(),
+    world_overview:    document.getElementById('init-world').value.trim(),
+    opening_situation: document.getElementById('init-opening').value.trim(),
+    story_points,
+    characters: chars,
+    locations:  locs,
+  };
+
+  try {
+    const r = await api('/api/init-story','POST',body);
+    document.getElementById('modal-init').classList.add('hidden');
+    addMsg('bot',`Story initialized. Created ${r.created_characters.length} character(s), ${r.created_locations.length} location(s).`);
+    refreshWorldPanel();
+  } catch(e) {
+    addMsg('bot',`Init error: ${e.message}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Wizard AI helpers
+// ═══════════════════════════════════════════════════════
+async function loadWizardInspFiles() {
+  const box = document.getElementById('init-insp-files');
+  if (!box) return;
+  const r = await api('/api/rag/status').catch(()=>({files:[]}));
+  const files = (r.files||[]).filter(f=>(f.path||'').startsWith('inspiration/'));
+  if (!files.length) { box.innerHTML='<span style="color:var(--muted)">No indexed inspiration files. Add to inspiration/ and Reindex (World tab).</span>'; return; }
+  box.innerHTML = files.map(f=>{
+    const name=f.path.replace(/^inspiration\//,'');
+    return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="checkbox" class="init-insp-file" value="${escAttr(f.path)}" style="width:auto" />
+      <span>${escHtml(name)}</span></label>`;
+  }).join('');
+}
+function getWizardInspFiles() {
+  return Array.from(document.querySelectorAll('.init-insp-file:checked')).map(c=>c.value);
+}
+
+function _askDirection(label) {
+  // While the Story Setup wizard is open, use its inline "Your ideas /
+  // inspiration" field instead of a popup — visible, pasteable, shared across
+  // every Generate step. Falls back to a prompt() elsewhere (e.g. editor keywords).
+  const modal = document.getElementById('modal-init');
+  const fld = document.getElementById('init-direction');
+  if (fld && modal && !modal.classList.contains('hidden')) {
+    return (fld.value || '').trim();
+  }
+  // null = user cancelled; "" = proceed without steering hint.
+  try {
+    const v = window.prompt(`Optional steering for ${label} (leave blank for default):`, '');
+    return v;
+  } catch (e) {
+    // Some embedded browsers or WebViews (used by the test harness) do not
+    // implement `window.prompt()` and will throw. In that case, silently
+    // proceed without a steering hint by returning an empty string.
+    return "";
+  }
+}
+
+function _setButtonBusy(btn, busy) {
+  if (!btn) return;
+  if (busy) { btn._origText = btn.textContent; btn.textContent = '… generating'; btn.disabled = true; }
+  else { btn.textContent = btn._origText || btn.textContent; btn.disabled = false; }
+}
+
+async function genInitPremise(btn) {
+  const seed = document.getElementById('init-premise').value.trim()
+            || document.getElementById('init-title').value.trim();
+  const dir = _askDirection('premise');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-premise', 'POST', {seed, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (r.title)   document.getElementById('init-title').value   = r.title;
+    if (r.premise) document.getElementById('init-premise').value = r.premise;
+  } catch(e) { addMsg('bot', `Premise gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitToneThemes(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const dir = _askDirection('tone & themes');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-tone-themes', 'POST', {premise, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (r.tone)   document.getElementById('init-tone').value   = r.tone;
+    if (r.themes) document.getElementById('init-themes').value = r.themes;
+  } catch(e) { addMsg('bot', `Tone gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitWorld(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const tone   = document.getElementById('init-tone').value.trim();
+  const themes = document.getElementById('init-themes').value.trim();
+  const dir = _askDirection('world overview');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-world', 'POST', {premise, tone, themes, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (r.world_overview) document.getElementById('init-world').value = r.world_overview;
+  } catch(e) { addMsg('bot', `World gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitOpening(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const world = document.getElementById('init-world').value.trim();
+  const dir = _askDirection('opening situation');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-opening', 'POST', {premise, world_overview: world, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (r.opening_situation) document.getElementById('init-opening').value = r.opening_situation;
+  } catch(e) { addMsg('bot', `Opening gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitCharacters(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const world = document.getElementById('init-world').value.trim();
+  const count = parseInt(document.getElementById('init-num-chars').value, 10) || 3;
+  const dir = _askDirection('character sketches');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-characters', 'POST',
+      {premise, world_overview: world, count, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (Array.isArray(r.characters) && r.characters.length) {
+      // Replace placeholder rows with generated ones.
+      const list = document.getElementById('init-chars-list');
+      list.innerHTML = '';
+      for (const c of r.characters) {
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = `<input class="ri" value="${escHtml(c.id)}" placeholder="id"/>
+          <input class="rn" value="${escHtml(c.name)}" placeholder="Name"/>
+          <textarea class="rd" style="min-height:36px;resize:vertical">${escHtml(c.description)}</textarea>
+          <button class="rm" onclick="removeDynRow(this)">×</button>`;
+        list.appendChild(row);
+      }
+    } else {
+      addMsg('bot', 'No characters returned. Try again with different direction.');
+    }
+  } catch(e) { addMsg('bot', `Characters gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitLocations(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const world = document.getElementById('init-world').value.trim();
+  const count = parseInt(document.getElementById('init-num-locs').value, 10) || 3;
+  const dir = _askDirection('location sketches');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/init/generate-locations', 'POST',
+      {premise, world_overview: world, count, direction: dir, inspiration_files: getWizardInspFiles()});
+    if (Array.isArray(r.locations) && r.locations.length) {
+      const list = document.getElementById('init-locs-list');
+      list.innerHTML = '';
+      for (const l of r.locations) {
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = `<input class="ri" value="${escHtml(l.id)}" placeholder="id"/>
+          <input class="rn" value="${escHtml(l.name)}" placeholder="Name"/>
+          <textarea class="rd" style="min-height:36px;resize:vertical">${escHtml(l.description)}</textarea>
+          <button class="rm" onclick="removeDynRow(this)">×</button>`;
+        list.appendChild(row);
+      }
+    } else {
+      addMsg('bot', 'No locations returned. Try again with different direction.');
+    }
+  } catch(e) { addMsg('bot', `Locations gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+async function genInitOpenQuestions(btn) {
+  const premise = document.getElementById('init-premise').value.trim();
+  if (!premise) { alert('Write or generate a premise first.'); return; }
+  const tone   = document.getElementById('init-tone').value.trim();
+  const themes = document.getElementById('init-themes').value.trim();
+  const dir = _askDirection('open questions');
+  if (dir === null) return;
+  _setButtonBusy(btn, true);
+  try {
+    const r = await api('/api/generate-story-points', 'POST', {
+      premise, tone, themes, world_overview: document.getElementById('init-world').value.trim(),
+      num_acts: 0, direction: dir, inspiration_files: getWizardInspFiles(),
+    });
+    if (r.open_questions) document.getElementById('init-questions').value = r.open_questions;
+    else addMsg('bot','No open questions returned.');
+  } catch (e) { addMsg('bot', `Open questions gen error: ${e.message}`); }
+  _setButtonBusy(btn, false);
+}
+
+// Dynamic act rows
+function addActRow(name='', content='') {
+  const row = document.createElement('div');
+  row.className = 'dyn-act-row';
+  row.style.cssText = 'display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:5px;padding:8px;margin-bottom:4px';
+  row.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center">
+      <input class="ra" placeholder="Act name (e.g. Act ${document.querySelectorAll('#init-acts-list .dyn-act-row').length+1})"
+             style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit"
+             value="${escAttr(name)}" />
+      <button onclick="removeDynActRow(this)"
+              style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;line-height:1">×</button>
+    </div>
+    <textarea class="rb" placeholder="- Beat 1&#10;- Beat 2&#10;- Beat 3"
+              style="min-height:64px;resize:vertical;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit">${escHtml(content)}</textarea>`;
+  document.getElementById('init-acts-list').appendChild(row);
+}
+
+function removeDynActRow(btn) { btn.closest('.dyn-act-row').remove(); }
+
+async function generateStoryActs() {
+  const dir = _askDirection('story acts');
+  if (dir === null) return;
+  const btn = document.getElementById('btn-gen-acts');
+  btn.textContent = 'Generating…'; btn.disabled = true;
+  try {
+    const numActs = parseInt(document.getElementById('init-num-acts').value)||3;
+    const body = {
+      premise:       document.getElementById('init-premise').value.trim(),
+      tone:          document.getElementById('init-tone').value.trim(),
+      themes:        document.getElementById('init-themes').value.trim(),
+      world_overview:document.getElementById('init-world').value.trim(),
+      num_acts:      numActs,
+      direction:     dir,
+      inspiration_files: getWizardInspFiles(),
+    };
+    const r = await api('/api/generate-story-points','POST',body);
+    // replace act rows with generated content
+    document.getElementById('init-acts-list').innerHTML='';
+    for (const act of (r.acts||[])) addActRow(act.name, act.content);
+    if (!r.acts?.length) addActRow();   // ensure at least one row
+    if (r.open_questions) document.getElementById('init-questions').value = r.open_questions;
+  } catch(e) {
+    addMsg('bot',`Generate error: ${e.message}`);
+  } finally {
+    btn.textContent='✦ Generate with AI'; btn.disabled=false;
+  }
+}
+
+function collectDynRows(listId) {
+  const rows = document.querySelectorAll(`#${listId} .dyn-row`);
+  const result = [];
+  for (const row of rows) {
+    const id   = row.querySelector('.ri')?.value.trim();
+    const name = row.querySelector('.rn')?.value.trim();
+    const desc = row.querySelector('.rd')?.value.trim();
+    if (id) result.push({id, name: name||id, description: desc||''});
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Passage type
+// ═══════════════════════════════════════════════════════
+function setPType(type) {
+  _currentPassageType = type;
+  const sel = document.getElementById('ptype-select');
+  if (sel && sel.value !== type) sel.value = type;
+}
+
+function addCharRow() {
+  const row = document.createElement('div');
+  row.className = 'dyn-row';
+  row.innerHTML = `<input class="ri" placeholder="id"/>
+    <input class="rn" placeholder="Name"/>
+    <textarea class="rd" placeholder="Description…" style="min-height:36px;resize:vertical"></textarea>
+    <button class="rm" onclick="removeDynRow(this)">×</button>`;
+  document.getElementById('init-chars-list').appendChild(row);
+}
+function addLocRow() {
+  const row = document.createElement('div');
+  row.className = 'dyn-row';
+  row.innerHTML = `<input class="ri" placeholder="id"/>
+    <input class="rn" placeholder="Name"/>
+    <textarea class="rd" placeholder="Description…" style="min-height:36px;resize:vertical"></textarea>
+    <button class="rm" onclick="removeDynRow(this)">×</button>`;
+  document.getElementById('init-locs-list').appendChild(row);
+}
+function removeDynRow(btn) { btn.closest('.dyn-row').remove(); }
+
+// ═══════════════════════════════════════════════════════
+//  Cytoscape
+// ═══════════════════════════════════════════════════════
+function initCytoscape() {
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    style: [
+      { selector:'node', style:{
+          'background-color':'#2a2d3a','border-color':'#7c8cf8','border-width':1,
+          'color':'#d4d8e8','label':'data(label)','font-size':9,
+          'text-valign':'center','text-halign':'center',
+          'width':60,'height':28,'shape':'roundrectangle',
+          'text-wrap':'wrap','text-max-width':55,
+      }},
+      { selector:'node:selected', style:{'border-color':'#4caf7d','border-width':2}},
+      { selector:'node[ptype="hub"]', style:{
+          'background-color':'#152515','border-color':'#4caf7d','border-width':2,
+      }},
+      { selector:'node[ptype="random"]', style:{
+          'background-color':'#2d2510','border-color':'#f5a623','border-width':2,'shape':'diamond',
+      }},
+      { selector:'edge', style:{
+          'width':1.5,'line-color':'#2a2d3a',
+          'target-arrow-color':'#7c8cf8','target-arrow-shape':'triangle','curve-style':'bezier',
+      }},
+    ],
+    layout:{name:'breadthfirst',directed:true,padding:10},
+    userZoomingEnabled:true, userPanningEnabled:true,
+  });
+  cy.on('tap','node', e=>selectGraphNode(e.target.id()));
+}
+
+function selectGraphNode(pid) {
+  selectedGraphNodeId = pid;
+  document.getElementById('graph-selection-label').textContent = `Selected: ${pid}`;
+  const btn = document.getElementById('btn-new-from-graph');
+  btn.disabled = false;
+  currentPassageId = pid;
+  focusPassage(pid);
+}
+
+function _seedPassageComposerFromParent(parentId) {
+  if (!parentId) return;
+  const arcInput = document.getElementById('input-arc');
+  const slugInput = document.getElementById('input-slug');
+  if (!arcInput.value.trim()) {
+    const node = cy ? cy.getElementById(parentId) : null;
+    const arc = node && node.length ? node.data('arc') : '';
+    if (arc) arcInput.value = arc;
+  }
+  if (!slugInput.value.trim()) {
+    const base = parentId.includes('__') ? parentId.split('__').pop() : parentId;
+    slugInput.value = `${base}_child`;
+  }
+}
+
+function createPassageFromGraph() {
+  const parentId = selectedGraphNodeId || currentPassageId;
+  if (!parentId) {
+    addMsg('bot', 'Select a passage node first.');
+    return;
+  }
+  _seedPassageComposerFromParent(parentId);
+  document.getElementById('chat-input').focus();
+  document.getElementById('graph-selection-label').textContent = `Selected: ${parentId}`;
+  document.getElementById('btn-new-from-graph').disabled = false;
+  addMsg('bot', `Creating a child passage from ${parentId}. Enter prompt and click Generate.`);
+}
+
+function createPassageFromCurrent() {
+  if (!currentPassageId) {
+    addMsg('bot', 'No passage selected.');
+    return;
+  }
+  selectedGraphNodeId = currentPassageId;
+  _seedPassageComposerFromParent(currentPassageId);
+  document.getElementById('chat-input').focus();
+  addMsg('bot', `Creating a child passage from ${currentPassageId}. Enter prompt and click Generate.`);
+}
+
+async function refreshGraph() {
+  const data = await api('/api/graph');
+  const nodes=[],edges=[];
+  for (const [id,entry] of Object.entries(data.passages||{})) {
+    nodes.push({data:{id,label:id.split('__').pop()||id,arc:entry.arc,ptype:entry.passage_type||'normal'}});
+    for (const child of entry.children||[])
+      edges.push({data:{source:id,target:child,id:`${id}->${child}`}});
+  }
+  cy.elements().remove();
+  cy.add([...nodes,...edges]);
+  cy.layout({name:'breadthfirst',directed:true,padding:10}).run();
+  const bn=Object.keys(data.branches||{});
+  document.getElementById('branch-indicator').textContent = bn.length?'branch: '+bn.join(' | '):'branch: —';
+}
+
+// ═══════════════════════════════════════════════════════
+//  Passage focus
+async function deleteCurrentPassage() {
+  const pid = currentPassageId;
+  if (!pid) return;
+  if (!confirm(`Delete passage "${pid}"?\n\nIts file and media slots are removed. Parent links become unresolved and any children may be orphaned — both are surfaced in validation.`)) return;
+  try {
+    const r = await api(`/api/passage/${encodeURIComponent(pid)}`,'DELETE',null,{silent:true});
+    toast(r.message || `Deleted ${pid}.`,'success');
+    // clear center pane + reset selection
+    currentPassageId = null;
+    _currentPassageData = null;
+    document.getElementById('passage-id').textContent = 'No passage selected';
+    document.getElementById('passage-body').innerHTML =
+      '<p style="color:var(--muted);font-size:13px;padding:10px">Passage deleted. Pick another node.</p>';
+    document.getElementById('btn-create-child').style.display = 'none';
+    document.getElementById('btn-delete-passage').style.display = 'none';
+    await api('/api/session','POST',{current_passage:null}).catch(()=>{});
+    await refreshGraph();
+    await refreshValidation();
+  } catch(e) {
+    toast(`Delete failed: ${e.message}`,'error',5000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+async function focusPassage(pid) {
+  closeEditor();
+  currentPassageId = pid;
+  selectedGraphNodeId = pid;
+  document.getElementById('graph-selection-label').textContent = `Selected: ${pid}`;
+  document.getElementById('btn-new-from-graph').disabled = false;
+  document.getElementById('btn-create-child').style.display = 'inline-block';
+  document.getElementById('btn-delete-passage').style.display = 'inline-block';
+  const data = await api(`/api/passage/${encodeURIComponent(pid)}`);
+  _currentPassageData = data;
+  document.getElementById('passage-id').textContent = pid;
+  document.getElementById('input-arc').value = data.arc||'';
+  const snap = data.snapshot||{};
+  const prose = extractProse(data.raw);
+  _currentPassageProse = prose;
+  document.getElementById('passage-body').innerHTML = `
+    <div class="passage-section">
+      <h3>Prose</h3>
+      <div class="prose">${escHtml(prose)}</div>
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Summary</h3>
+        <button class="btn-sm" onclick="editPassageSummary()">Edit</button>
+        <button class="btn-sm" onclick="generateSummaryForPassage('${pid}')">Generate</button>
+      </div>
+      <div class="snapshot-item">${escHtml(data.summary||'—')}</div>
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Choices / children</h3>
+        <button class="btn-sm" onclick="editPassageList('children','Choices / children')">Edit</button>
+        <button class="btn-sm" onclick="suggestChoicesForPassage('${pid}')">Suggest</button>
+      </div>
+      ${(data.children||[]).map(c=>`<div class="choice-item">${escHtml(c)}</div>`).join('')
+        ||'<span style="color:var(--muted);font-size:12px">none</span>'}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">State writes</h3>
+        <button class="btn-sm" onclick="editPassageList('state_writes','State writes')">Edit</button>
+        <button class="btn-sm" onclick="suggestStateForPassage('${pid}')">Suggest</button>
+      </div>
+      ${(data.state_writes||[]).map(s=>`<div class="state-item">${escHtml(s)}</div>`).join('')
+        ||'<span style="color:var(--muted);font-size:12px">none</span>'}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Characters in scene</h3>
+        <button class="btn-sm" onclick="addExistingSceneCharacter()">Add existing</button>
+        <button class="btn-sm" onclick="createSceneCharacter()">New</button>
+        <button class="btn-sm" onclick="editSceneCharacters()">Edit</button>
+        <button class="btn-sm" onclick="suggestSceneCharacters()">Generate</button>
+      </div>
+      ${(snap.characters_present||[]).map(c=>`<div class="snapshot-item">• ${escHtml(c.id)}${c.status?` (${escHtml(c.status)})`:''}</div>`).join('')
+        ||'<span style="color:var(--muted);font-size:12px">none</span>'}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Open threads</h3>
+        <button class="btn-sm" onclick="editPassageList('open_threads','Open threads')">Edit</button>
+        <button class="btn-sm" onclick="generateThreadsForPassage('${pid}')">Generate</button>
+      </div>
+      ${(snap.open_threads||[]).map(t=>`<div class="snapshot-item">• ${escHtml(t)}</div>`).join('')
+        ||'<span style="color:var(--muted);font-size:12px">none</span>'}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">World state</h3>
+        <button class="btn-sm" onclick="editPassageList('world_state','World state')">Edit</button>
+        <button class="btn-sm" onclick="generateThreadsForPassage('${pid}')">Generate</button>
+      </div>
+      ${(snap.world_state||[]).map(f=>`<div class="snapshot-item">• ${escHtml(f)}</div>`).join('')
+        ||'<span style="color:var(--muted);font-size:12px">none</span>'}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Media slots</h3>
+        <button class="btn-sm" onclick="addMediaSlotToPassage()">Add</button>
+        <button class="btn-sm" onclick="editPassageMediaSlots()">Edit</button>
+        <button class="btn-sm" onclick="suggestMediaForPassage('${pid}','image')" title="Suggest an image slot from the scene">Suggest image</button>
+        <button class="btn-sm" onclick="suggestMediaForPassage('${pid}','video')" title="Suggest a video slot from the scene">Suggest video</button>
+      </div>
+      ${await renderMediaSlots(data.media_slots||[])}
+    </div>
+    <div class="passage-section">
+      <div style="display:flex;align-items:center;gap:6px">
+        <h3 style="margin:0">Plan beats</h3>
+        <button class="btn-sm" onclick="editPassagePlanBeats('${pid}')">Edit</button>
+      </div>
+      ${renderPlanBeatTags(data.plan_beats||[])}
+    </div>
+  `;
+  await api('/api/session','POST',{current_passage:pid});
+}
+
+function renderPlanBeatTags(beats) {
+  if (!beats.length) return '<span style="color:var(--muted);font-size:12px">not linked to any beat</span>';
+  return beats.map(b => '<span class="wi-tag" style="margin-right:4px">' + escHtml(b) + '</span>').join('');
+}
+
+function extractProse(raw) {
+  if (!raw) return '';
+  return raw.replace(/^::.*$/m,'').replace(/<!--[\s\S]*?-->/g,'').replace(/<<[^>]+>>/g,'').trim();
+}
+
+async function renderMediaSlots(slot_ids) {
+  if (!slot_ids.length) return '<span style="color:var(--muted);font-size:12px">none</span>';
+  let sd={};
+  try{sd=await api('/api/media/slots');}catch{}
+  return slot_ids.map(sid=>{
+    const s=sd[sid]||{}, kw=(s.keywords||[]).join(', '), st=s.status||'pending';
+    const sub = escHtml(s.caption || s.description || '');
+    const resolveBtn = st==='pending'
+        ? '<button class="btn-sm" onclick="openResolveModal(\''+sid+'\')">Resolve</button>'
+        : '<button class="btn-sm" onclick="unresolveSlot(\''+sid+'\')">Unresolve</button>';
+    return `<div class="media-slot">
+      <span class="status ${st}">${st} ${escHtml(s.type||'image')}</span>
+      <span class="keywords">${escHtml(sid)}: ${escHtml(kw)}${sub?`<br><span class="caption">${sub}</span>`:''}</span>
+      <button class="btn-sm" onclick="openResolveModal('${sid}')">Edit</button>
+      ${resolveBtn}
+      <button class="btn-sm" onclick="deleteMediaSlotFromPassage('${sid}')" title="Delete this media slot" style="color:var(--err)">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Session
+// ═══════════════════════════════════════════════════════
+async function loadSession() {
+  const s=await api('/api/session');
+  if(s.current_passage){currentPassageId=s.current_passage;await focusPassage(s.current_passage);}
+  if(s.active_mode) document.getElementById('mode-select').value=s.active_mode;
+}
+async function setMode(mode){await api('/api/session','POST',{active_mode:mode});}
+
+// ═══════════════════════════════════════════════════════
+//  Validation
+// ═══════════════════════════════════════════════════════
+async function refreshValidation() {
+  const bar=document.getElementById('validation-bar');
+  try {
+    const r=await api('/api/validate', 'GET', null, {silent:true});
+    bar.innerHTML='';
+    if(!r.errors.length&&!r.warnings.length){bar.innerHTML='<span class="vbadge ok" title="No validation issues">valid</span>';return;}
+    const mkBadge = (lvl, issue) => {
+      const tgt = issue.passage || '';
+      const dataAttr = tgt ? ` data-target="${escAttr(tgt)}"` : '';
+      const ttip = issue.passage
+        ? `${issue.message} (click to focus ${issue.passage})`
+        : issue.message;
+      return `<span class="vbadge ${lvl}"${dataAttr} role="${tgt?'button':'status'}" tabindex="${tgt?'0':'-1'}" title="${escHtml(ttip)}">${escHtml(issue.code)}</span>`;
+    };
+    for(const e of r.errors)   bar.innerHTML+=mkBadge('err',  e);
+    for(const w of r.warnings) bar.innerHTML+=mkBadge('warn', w);
+    // Wire click/keyboard activation to focus the target passage in the graph.
+    bar.querySelectorAll('.vbadge[data-target]').forEach(el => {
+      const focus = () => focusPassage(el.dataset.target);
+      el.addEventListener('click', focus);
+      el.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); focus(); }
+      });
+    });
+  } catch(e) {
+    bar.innerHTML='<span class="vbadge warn" title="Server unreachable">offline</span>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Compile
+// ═══════════════════════════════════════════════════════
+async function compileStory() {
+  const btn = document.getElementById('btn-compile');
+  await busy(btn, async () => {
+    addMsg('bot','Compiling…');
+    let r;
+    try { r = await api('/api/compile','POST',{}, {silent:true}); }
+    catch (e) {
+      document.getElementById('chat-log').lastChild.remove();
+      addMsg('bot',`Compile failed: ${e.message}`);
+      toast(`Compile failed: ${e.message}`, 'error', 6000);
+      return;
+    }
+    document.getElementById('chat-log').lastChild.remove();
+    if (r.success) {
+      addMsg('bot',`Compiled: ${r.message}`);
+      toast('Compile succeeded.', 'success', 2500);
+    } else {
+      addMsg('bot',`Compile failed: ${r.message}`);
+      toast(`Compile failed: ${r.message}`, 'error', 6000);
+    }
+  }, 'Compiling');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Generate / Commit
+// ═══════════════════════════════════════════════════════
+let _genInspLoaded=false;
+function toggleGenExtra(){
+  const body=document.getElementById('gen-extra-body');
+  const open=body.style.display!=='flex';
+  body.style.display=open?'flex':'none';
+  document.getElementById('gen-extra-arrow').textContent=open?'▾':'▸';
+  if(open&&!_genInspLoaded) loadGenInspFiles();
+}
+async function loadGenInspFiles(){
+  _genInspLoaded=true;
+  const box=document.getElementById('gen-insp-files');
+  const r=await api('/api/rag/status').catch(()=>({files:[]}));
+  const files=(r.files||[]).filter(f=>(f.path||'').startsWith('inspiration/'));
+  if(!files.length){box.innerHTML='<span style="color:var(--muted)">No files in inspiration/. Add some, then Reindex (World tab).</span>';return;}
+  box.innerHTML=files.map(f=>{
+    const name=f.path.replace(/^inspiration\//,'');
+    return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="checkbox" class="gen-insp-file" value="${escAttr(f.path)}" onchange="updateGenExtraBadge()" style="width:auto" />
+      <span>${escHtml(name)}</span></label>`;
+  }).join('');
+}
+function getGenInspFiles(){
+  return Array.from(document.querySelectorAll('.gen-insp-file:checked')).map(c=>c.value);
+}
+function updateGenExtraBadge(){
+  const ideas=(document.getElementById('gen-ideas').value||'').trim();
+  const text=(document.getElementById('gen-insp-text').value||'').trim();
+  const nf=getGenInspFiles().length;
+  const bits=[];
+  if(ideas) bits.push('ideas');
+  if(nf) bits.push(`${nf} file${nf>1?'s':''}`);
+  if(text) bits.push('ref text');
+  document.getElementById('gen-extra-badge').textContent=bits.join(' · ');
+}
+
+async function generate() {
+  let prompt=document.getElementById('chat-input').value.trim();
+  const arc=document.getElementById('input-arc').value.trim();
+  const slug=document.getElementById('input-slug').value.trim();
+  const mode=document.getElementById('mode-select').value;
+  const extraIdeas=(document.getElementById('gen-ideas').value||'').trim();
+  const inspText=(document.getElementById('gen-insp-text').value||'').trim();
+  const inspFiles=getGenInspFiles();
+  if(!prompt||!arc||!slug){
+    const missing = [];
+    if(!arc) missing.push('arc');
+    if(!slug) missing.push('slug');
+    if(!prompt) missing.push('prompt');
+    toast(`Missing: ${missing.join(', ')}.`, 'warn', 3500);
+    addMsg('bot','Fill arc name, passage slug, and prompt.');
+    return;
+  }
+  // append passage-type hint so model tailors its output
+  if (_currentPassageType==='random')
+    prompt+='\n\n[RANDOM JUNCTION: list 2-4 equal-weight destination choices. Player will be sent to one at random.]';
+  else if (_currentPassageType==='hub')
+    prompt+='\n\n[HUB PASSAGE: design as a revisitable location hub with several ongoing choice threads.]';
+  if (_pendingMedia.length) {
+    const lines = _pendingMedia.map(m => `- ${m.type}: ${m.keywords.join(', ')}`);
+    prompt += `\n\n[MEDIA REQUESTS]\n${lines.join('\n')}`;
+  }
+  addMsg('human',document.getElementById('chat-input').value.trim());
+  document.getElementById('chat-input').value='';
+  addMsg('bot','Generating…');
+  const sendBtn = document.getElementById('btn-send');
+  try{
+    if (sendBtn) sendBtn.disabled = true;
+    const r=await api('/api/generate','POST',{prompt,arc_name:arc,passage_slug:slug,
+      parent_passage_id:currentPassageId,mode,branch_name:'main',
+      extra_ideas:extraIdeas,inspiration_files:inspFiles,inspiration_text:inspText}, {silent:true});
+    lastGenerateResp=r;
+    document.getElementById('chat-log').lastChild.remove();
+    const p=r.parsed;
+    let preview=`**${slug}**\n\n${p.prose||''}`;
+    if(p.choices?.length) preview+='\n\nChoices:\n'+p.choices.map(c=>`• ${c.text} → ${c.hint}`).join('\n');
+    if(p.summary) preview+=`\n\n_${p.summary}_`;
+    if(r.warnings?.length) preview+=`\n\nWarnings: ${r.warnings.join('; ')}`;
+    addMsg('bot',preview);
+    document.getElementById('btn-commit').style.display='block';
+    // Populate the parsed-JSON editor so a reviewer can tweak before committing.
+    const editor=document.getElementById('parsed-editor');
+    const initialJson=JSON.stringify(p,null,2);
+    editor.value=initialJson;
+    editor.dataset.initial=initialJson;
+    document.getElementById('parsed-editor-status').textContent='unchanged';
+    document.getElementById('parsed-editor-wrap').style.display='none';
+    document.getElementById('btn-edit-parsed').style.display='inline-block';
+    pendingFacts=[
+      ...(p.new_characters||[]).map(c=>({type:'character',id:c.id,prose_sheet:c.prose_sheet})),
+      ...(p.new_lore||[]).map(l=>({type:'lore',category:l.category,id:l.id,prose_sheet:l.prose_sheet})),
+    ];
+    renderPendingFacts();
+    applyPendingMediaToParsed();
+  }catch(e){
+    document.getElementById('chat-log').lastChild.remove();
+    addMsg('bot',`Error: ${e.message}`);
+  }
+}
+
+function toggleEditParsed() {
+  const wrap=document.getElementById('parsed-editor-wrap');
+  wrap.style.display = wrap.style.display==='none' ? 'block' : 'none';
+}
+
+function _readEditedParsed() {
+  const editor=document.getElementById('parsed-editor');
+  if(!editor||!editor.value) return null;
+  const initial=editor.dataset.initial||'';
+  if(editor.value.trim()===initial.trim()) return null;
+  try {
+    return JSON.parse(editor.value);
+  } catch(e) {
+    document.getElementById('parsed-editor-status').textContent='invalid JSON — sending original';
+    return null;
+  }
+}
+
+async function commitPassage() {
+  if(!lastGenerateResp) return;
+  const arc=document.getElementById('input-arc').value.trim();
+  const slug=document.getElementById('input-slug').value.trim();
+  const overrideParsed=_readEditedParsed();
+  const body={raw_output:lastGenerateResp.raw_output,
+    arc_name:arc,passage_slug:slug,parent_passage_id:currentPassageId,branch_name:'main',
+    passage_type:_currentPassageType};
+  if(overrideParsed) body.override_parsed=overrideParsed;
+  try{
+    const r=await api('/api/commit','POST',body);
+    addMsg('bot',`Committed as **${r.passage_id}**${overrideParsed?' (with edits)':''}`);
+    document.getElementById('btn-commit').style.display='none';
+    document.getElementById('btn-edit-parsed').style.display='none';
+    document.getElementById('parsed-editor-wrap').style.display='none';
+    lastGenerateResp=null;
+    // Link the committed passage back to its planned scene, if any.
+    if(_pendingSceneLink){
+      const {arc, sid}=_pendingSceneLink; _pendingSceneLink=null;
+      api(`/api/plan/arcs/${encodeURIComponent(arc)}/scenes/${encodeURIComponent(sid)}`,'PUT',{passage_id:r.passage_id})
+        .then(()=>{ if(_planCache) refreshPlanPanel(); }).catch(()=>{});
+    }
+    await refreshGraph();await refreshValidation();await focusPassage(r.passage_id);
+    if(r.pending_facts?.length){pendingFacts=r.pending_facts;renderPendingFacts();}
+  }catch(e){addMsg('bot',`Commit error: ${e.message}`);}
+}
+
+// ═══════════════════════════════════════════════════════
+//  Pending facts
+// ═══════════════════════════════════════════════════════
+function renderPendingFacts() {
+  const q=document.getElementById('facts-queue');
+  const list=document.getElementById('facts-list');
+  if(!pendingFacts.length){q.style.display='none';return;}
+  q.style.display='block';
+  list.innerHTML=pendingFacts.map((f,i)=>`
+    <div class="fact-item" id="fact-${i}">
+      <div class="fact-id">${escHtml(f.type)}: ${escHtml(f.id)}</div>
+      <div class="fact-prose">${escHtml(f.prose_sheet)}</div>
+      <div class="fact-btns">
+        <button class="fact-accept" onclick="approveFact(${i},'accept')">Accept</button>
+        <button class="fact-reject" onclick="approveFact(${i},'reject')">Reject</button>
+      </div></div>`).join('');
+}
+async function approveFact(idx,action) {
+  const f=pendingFacts[idx];
+  await api('/api/facts/approve','POST',{action,...f});
+  document.getElementById(`fact-${idx}`)?.remove();
+  pendingFacts.splice(idx,1);
+  if(!pendingFacts.length) document.getElementById('facts-queue').style.display='none';
+  if(action==='accept') refreshWorldPanel();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Media
+// ═══════════════════════════════════════════════════════
+async function resolveSlot(sid) {
+  openResolveModal(sid);
+}
+async function unresolveSlot(sid) {
+  try {
+    await api(`/api/media/slots/${sid}/unresolve`,'POST',{});
+    if(currentPassageId) await focusPassage(currentPassageId);
+    addMsg('bot', `Unresolved media slot ${sid}.`);
+  } catch(e) {
+    addMsg('bot', `Unresolve error: ${e.message}`);
+  }
+}
+
+async function deleteMediaSlotFromPassage(sid) {
+  if (!currentPassageId) return;
+  if (!confirm(`Delete media slot ${sid}? Removes it from this passage and drops any resolved file link.`)) return;
+  try {
+    await api(`/api/passage/${encodeURIComponent(currentPassageId)}/media/${encodeURIComponent(sid)}`,'DELETE');
+    if (currentPassageId) await focusPassage(currentPassageId);
+    toast(`Deleted media slot ${sid}.`,'success');
+  } catch(e) {
+    toast(`Delete failed: ${e.message}`,'error',5000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Settings
+// ═══════════════════════════════════════════════════════
+async function openSettings() {
+  const cfg=await api('/api/config');
+  document.getElementById('cfg-ollama-url').value    =cfg.ollama_base_url||'';
+  document.getElementById('cfg-ollama-model').value  =cfg.ollama_model||'';
+  document.getElementById('cfg-model-mode').value    =cfg.model_mode||'auto';
+  document.getElementById('cfg-tweego-path').value   =cfg.tweego_path||'';
+  document.getElementById('cfg-sugarcube-path').value=cfg.sugarcube_path||'';
+  document.getElementById('cfg-story-title').value   =cfg.story_title||'';
+  document.getElementById('tweego-status').textContent='';
+  document.getElementById('model-chips').innerHTML='';
+  document.getElementById('ollama-status-text').textContent='—';
+  document.getElementById('ollama-dot').className='status-dot checking';
+  document.getElementById('modal-settings').classList.remove('hidden');
+  checkOllama();
+  refreshDebugCalls();
+}
+function closeSettings(){document.getElementById('modal-settings').classList.add('hidden');}
+
+async function refreshDebugCalls() {
+  const box = document.getElementById('debug-calls');
+  let r;
+  try { r = await api('/api/debug/calls'); }
+  catch(e) { box.textContent = 'unavailable: ' + e.message; return; }
+  document.getElementById('debug-current').textContent =
+    `— current: ${r.current_model} (mode ${r.model_mode}, ${r.output_format})`;
+  const calls = r.calls || [];
+  if (!calls.length) { box.innerHTML = '<span style="color:var(--muted)">No calls yet. Generate something.</span>'; return; }
+  box.innerHTML = calls.map(c => {
+    const t = (c.ts||'').slice(11,19);
+    const col = c.status==='ok' ? 'var(--ok)' : 'var(--err)';
+    return `<div style="border-bottom:1px solid var(--border);padding:2px 0">
+      <span style="color:${col}">${escHtml(c.status)}</span>
+      <span style="color:var(--accent)">${escHtml(c.label)}</span>
+      → <strong>${escHtml(c.model)}</strong>
+      <span style="color:var(--muted)">[${escHtml(c.variant)}] ctx ${c.num_ctx}/pred ${c.num_predict} · ${c.prompt_chars}c · ${c.ms}ms · ${t}</span>
+      ${c.detail?`<div style="color:var(--err)">${escHtml(c.detail)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+async function clearDebugCalls() {
+  try { await api('/api/debug/calls/clear','POST',{}); await refreshDebugCalls(); }
+  catch(e) { toast('Clear failed: '+e.message,'error'); }
+}
+
+async function autoDetectTweego() {
+  const st = document.getElementById('tweego-status');
+  st.textContent = 'searching…'; st.style.color = 'var(--warn)';
+  try {
+    const r = await api('/api/tweego/find');
+    if (r.found) {
+      document.getElementById('cfg-tweego-path').value = r.found;
+      st.textContent = 'found: ' + r.found; st.style.color = 'var(--ok)';
+    } else {
+      st.textContent = 'not found — download below'; st.style.color = 'var(--err)';
+    }
+  } catch(e) {
+    st.textContent = 'error: ' + e.message; st.style.color = 'var(--err)';
+  }
+}
+
+async function saveSettings() {
+  const body={ollama_base_url:document.getElementById('cfg-ollama-url').value.trim(),
+    ollama_model:document.getElementById('cfg-ollama-model').value.trim(),
+    model_mode:document.getElementById('cfg-model-mode').value,
+    tweego_path:document.getElementById('cfg-tweego-path').value.trim(),
+    sugarcube_path:document.getElementById('cfg-sugarcube-path').value.trim(),
+    story_title:document.getElementById('cfg-story-title').value.trim()};
+  await api('/api/config','POST',body);
+  closeSettings(); addMsg('bot','Settings saved.');
+}
+async function checkOllama() {
+  const dot=document.getElementById('ollama-dot');
+  const txt=document.getElementById('ollama-status-text');
+  const chips=document.getElementById('model-chips');
+  dot.className='status-dot checking'; txt.textContent='checking…';
+  const r=await api('/api/ollama/status').catch(e=>({status:'error',error:String(e),models:[],scores:{}}));
+  if(r.status==='ok') {
+    const current=document.getElementById('cfg-ollama-model').value.trim()||r.current;
+    const pulled=r.models.includes(current);
+    dot.className=pulled?'status-dot ok':'status-dot warn';
+    txt.textContent=pulled?`connected — ${r.models.length} model(s)`:`"${current}" not pulled — run: ollama pull ${current}`;
+    if(!r.models.length){chips.innerHTML='<span style="color:var(--warn);font-size:11px">No models pulled. Run: ollama pull llama3.2</span>';return;}
+    const scores=r.scores||{};
+    chips.innerHTML=r.models.map(m=>{
+      const sc=scores[m],cid=cssId(m),active=m===current?' active':'';
+      let dotCls,chipCls,title;
+      if(!sc){dotCls='chip-dot spin';chipCls='';title='not yet tested';}
+      else if(sc.ok){dotCls='chip-dot ok';chipCls=' test-ok';title=`OK — "${sc.reply||''}" — ${fmtAge(sc.tested_at)}`;}
+      else if(sc.oom){dotCls='chip-dot fail';chipCls=' test-oom';title=`TOO BIG — ${sc.error||'?'} — ${fmtAge(sc.tested_at)}`;}
+      else{dotCls='chip-dot fail';chipCls=' test-fail';title=`FAIL — ${sc.error||'?'} — ${fmtAge(sc.tested_at)}`;}
+      const tag=sc&&sc.oom?'💾 ':'';
+      return `<span class="model-chip${active}${chipCls}" id="chip-${cid}"
+                    onclick="selectModel('${escAttr(m)}')" title="${escHtml(title)}">
+                <span class="${dotCls}" id="chip-dot-${cid}"></span>${tag}${escHtml(m)}
+                <span class="chip-retest" id="chip-rt-${cid}"
+                      onclick="event.stopPropagation();retestChip('${escAttr(m)}')"
+                      title="Re-test">↺</span>
+                <span class="chip-del" onclick="event.stopPropagation();deleteModel('${escAttr(m)}')"
+                      title="Delete this model from Ollama">🗑</span></span>`;
+    }).join('');
+    // bulk-delete button visible only when at least one model failed its test.
+    const failing=r.models.filter(m=>scores[m]&&!scores[m].ok);
+    const bulk=document.getElementById('btn-del-unresponsive');
+    if(bulk) bulk.style.display=failing.length?'inline-block':'none';
+    r.models.filter(m=>!scores[m]).forEach(m=>testModelChip(m,false));
+  } else {
+    dot.className='status-dot err';txt.textContent=`error: ${r.error||'unreachable'}`;chips.innerHTML='';
+  }
+}
+async function testModelChip(model,forceSpinner=true) {
+  const cid=cssId(model),chip=document.getElementById(`chip-${cid}`),dot=document.getElementById(`chip-dot-${cid}`);
+  if(!chip||!dot) return;
+  if(forceSpinner){dot.className='chip-dot spin';chip.classList.remove('test-ok','test-fail','test-oom');chip.title='testing…';}
+  try{
+    const r=await api('/api/ollama/test-model','POST',{model});
+    chip.classList.remove('test-ok','test-fail','test-oom');
+    if(r.ok){dot.className='chip-dot ok';chip.classList.add('test-ok');chip.title=`OK — "${r.reply||''}" — ${fmtAge(r.tested_at)}`;}
+    else if(r.oom){dot.className='chip-dot fail';chip.classList.add('test-oom');chip.title=`TOO BIG — ${r.error||'?'} — ${fmtAge(r.tested_at)}`;}
+    else{dot.className='chip-dot fail';chip.classList.add('test-fail');chip.title=`FAIL — ${r.error||'?'} — ${fmtAge(r.tested_at)}`;}
+  }catch(e){dot.className='chip-dot fail';chip.classList.remove('test-ok','test-oom');chip.classList.add('test-fail');chip.title=`FAIL — ${e.message}`;}
+}
+function retestChip(model){testModelChip(model,true);}
+async function deleteModel(model){
+  if(!confirm(`Delete model "${model}" from Ollama? This removes the downloaded weights and cannot be undone.`)) return;
+  try{
+    const r=await api('/api/ollama/delete-model','POST',{model});
+    toast(`Deleted ${model}.`,'success');
+    if(r.was_current){
+      document.getElementById('cfg-ollama-model').value='';
+      toast('That was your selected model — pick another.','warn',5000);
+    }
+    await checkOllama();
+  }catch(e){toast('Delete failed: '+e.message,'error',5000);}
+}
+async function deleteUnresponsiveModels(){
+  if(!confirm('Delete every model whose smoke test failed? This removes their weights from Ollama and cannot be undone.')) return;
+  try{
+    const r=await api('/api/ollama/delete-unresponsive','POST',{});
+    const n=(r.deleted||[]).length, errs=Object.keys(r.errors||{}).length;
+    toast(n?`Deleted ${n} model(s)${errs?`, ${errs} failed`:''}.`:'No models deleted.', n?'success':'info',4000);
+    if(r.current_deleted){document.getElementById('cfg-ollama-model').value='';toast('Your selected model was deleted — pick another.','warn',5000);}
+    await checkOllama();
+  }catch(e){toast('Bulk delete failed: '+e.message,'error',5000);}
+}
+function selectModel(name){
+  document.getElementById('cfg-ollama-model').value=name;
+  document.querySelectorAll('.model-chip').forEach(c=>c.classList.remove('active'));
+  const chip=document.getElementById(`chip-${cssId(name)}`);
+  if(chip) chip.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Names helper
+// ═══════════════════════════════════════════════════════
+async function openNames() {
+  document.getElementById('modal-names').classList.remove('hidden');
+  document.getElementById('names-suggest-result').style.display='none';
+  document.getElementById('names-desc').value='';
+  document.getElementById('names-passages-section').style.display='none';
+  await loadArcList();
+}
+function closeNames(){document.getElementById('modal-names').classList.add('hidden');}
+
+async function loadArcList() {
+  const arcList=document.getElementById('names-arc-list');
+  arcList.innerHTML='<span style="color:var(--muted);font-size:12px">Loading…</span>';
+  try{
+    const r=await api('/api/arcs');
+    _arcsCache=r.arcs||{};
+    if(!Object.keys(_arcsCache).length){arcList.innerHTML='<span style="color:var(--muted);font-size:12px">No arcs yet.</span>';return;}
+    arcList.innerHTML=Object.entries(_arcsCache).map(([name,passages])=>
+      `<div class="arc-item" id="arc-item-${escAttr(name)}" onclick="selectArc('${escAttr(name)}')">
+         <div class="arc-name">${escHtml(name)}</div>
+         <div class="arc-count">${passages.length} passage(s)</div>
+       </div>`).join('');
+    const cur=document.getElementById('input-arc').value.trim();
+    if(cur&&_arcsCache[cur]) selectArc(cur);
+  }catch(e){arcList.innerHTML=`<span style="color:var(--err);font-size:12px">Error: ${escHtml(e.message)}</span>`;}
+}
+
+function selectArc(name) {
+  document.querySelectorAll('.arc-item').forEach(el=>el.classList.remove('selected'));
+  const el=document.getElementById(`arc-item-${name}`);
+  if(el) el.classList.add('selected');
+  document.getElementById('input-arc').value=name;
+  const passages=_arcsCache[name]||[];
+  const section=document.getElementById('names-passages-section');
+  const list=document.getElementById('names-passage-list');
+  document.getElementById('names-selected-arc').textContent=name;
+  if(passages.length){
+    list.innerHTML=passages.map(p=>`<div class="passage-chip" onclick="usePassageSlug('${escAttr(p.id)}')" title="${escHtml(p.summary||'')}">${escHtml(p.id.split('__').pop()||p.id)}</div>`).join('');
+    section.style.display='block';
+  }else{section.style.display='none';}
+}
+
+function usePassageSlug(pid) {
+  document.getElementById('input-slug').value=pid.includes('__')?pid.split('__').slice(1).join('__'):pid;
+  closeNames();
+}
+
+async function suggestNames() {
+  const desc=document.getElementById('names-desc').value.trim();
+  if(!desc) return;
+  const alsoArc=document.getElementById('names-also-arc').checked;
+  const resultEl=document.getElementById('names-suggest-result');
+  resultEl.style.display='block';
+  document.getElementById('sug-slug').textContent='…';
+  try{
+    const r=await api('/api/suggest-names','POST',{description:desc,suggest_arc:alsoArc});
+    document.getElementById('sug-slug').textContent=r.slug||'(none)';
+    const arcRow=document.getElementById('sug-arc-row');
+    if(alsoArc){document.getElementById('sug-arc').textContent=r.arc||'(none)';arcRow.style.display='block';}
+    else arcRow.style.display='none';
+  }catch(e){document.getElementById('sug-slug').textContent=`error: ${e.message}`;}
+}
+function useSlug(){const v=document.getElementById('sug-slug').textContent;if(v&&v!=='(none)'&&!v.startsWith('error')){document.getElementById('input-slug').value=v;closeNames();}}
+function useArc(){const v=document.getElementById('sug-arc').textContent;if(v&&v!=='(none)'&&!v.startsWith('error')) document.getElementById('input-arc').value=v;}
+
+// ═══════════════════════════════════════════════════════
+//  Passage templates
+// ═══════════════════════════════════════════════════════
+function _normalizeKeywordsInput(text) {
+  return (text || '').split(/[\s,]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+
+function _templateMatches(t, tokens) {
+  if (!tokens.length) return true;
+  const hay = [t.title, t.id, ...(t.keywords || [])].join(' ').toLowerCase();
+  return tokens.every(tok => hay.indexOf(tok) >= 0);
+}
+
+async function loadTemplates() {
+  const r = await api('/api/templates').catch(()=>({templates:[]}));
+  _templates = r.templates || [];
+  renderTemplateSelect();
+  renderTemplateList();
+  const filter = document.getElementById('template-filter');
+  if (filter && !filter._bound) {
+    filter.addEventListener('input', renderTemplateSelect);
+    filter._bound = true;
+  }
+}
+
+function renderTemplateSelect() {
+  const sel = document.getElementById('template-select');
+  if (!sel) return;
+  const filterEl = document.getElementById('template-filter');
+  const tokens = _normalizeKeywordsInput(filterEl ? filterEl.value : '');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">(none)</option>';
+  _templates.filter(t => _templateMatches(t, tokens)).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.title || t.id;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function renderTemplateList() {
+  const list = document.getElementById('template-list');
+  if (!list) return;
+  if (!_templates.length) {
+    list.innerHTML = '<span style="color:var(--muted);font-size:12px">No templates yet.</span>';
+    return;
+  }
+  list.innerHTML = _templates.map(t => {
+    const kws = (t.keywords || []).join(', ');
+    return `<div class="template-item" id="tpl-item-${escAttr(t.id)}"
+                onclick="selectTemplate('${escAttr(t.id)}')"
+                style="padding:6px 8px;border:1px solid var(--border);border-radius:4px;margin-bottom:4px;cursor:pointer">
+              <div style="font-size:12px">${escHtml(t.title || t.id)}</div>
+              <div style="font-size:10px;color:var(--muted)">${escHtml(kws)}</div>
+            </div>`;
+  }).join('');
+  if (_editingTemplateId) selectTemplate(_editingTemplateId, true);
+}
+
+function getSelectedTemplate() {
+  const sel = document.getElementById('template-select');
+  if (!sel || !sel.value) return null;
+  return _templates.find(t => t.id === sel.value) || null;
+}
+
+function applySelectedTemplate() {
+  const t = getSelectedTemplate();
+  if (!t) return;
+  applyTemplate(t);
+}
+
+function applyTemplate(t) {
+  setPType(t.type || 'normal');
+  let body = t.body || '';
+  if (Array.isArray(t.keywords) && t.keywords.length) {
+    body = `Keywords: ${t.keywords.join(', ')}\n\n${body}`;
+  }
+  const input = document.getElementById('chat-input');
+  input.value = body;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function openTemplateModal(mode) {
+  if (mode === 'edit') {
+    const t = getSelectedTemplate();
+    if (!t) { alert('Select a template first.'); return; }
+    _editingTemplateId = t.id;
+    document.getElementById('tpl-title').value = t.title || '';
+    document.getElementById('tpl-type').value = t.type || 'normal';
+    document.getElementById('tpl-keywords').value = (t.keywords || []).join(', ');
+    document.getElementById('tpl-body').value = t.body || '';
+  } else {
+    _editingTemplateId = null;
+    document.getElementById('tpl-title').value = '';
+    document.getElementById('tpl-type').value = 'normal';
+    document.getElementById('tpl-keywords').value = '';
+    document.getElementById('tpl-body').value = '';
+  }
+  document.getElementById('modal-templates').classList.remove('hidden');
+  renderTemplateList();
+}
+
+function closeTemplates() {
+  document.getElementById('modal-templates').classList.add('hidden');
+}
+
+function selectTemplate(id, skipFormUpdate) {
+  const t = _templates.find(x => x.id === id);
+  if (!t) return;
+  _editingTemplateId = t.id;
+  document.querySelectorAll('.template-item').forEach(el => {
+    el.style.background = (el.id === `tpl-item-${id}`) ? 'var(--surface)' : 'transparent';
+  });
+  if (skipFormUpdate) return;
+  document.getElementById('tpl-title').value = t.title || '';
+  document.getElementById('tpl-type').value = t.type || 'normal';
+  document.getElementById('tpl-keywords').value = (t.keywords || []).join(', ');
+  document.getElementById('tpl-body').value = t.body || '';
+}
+
+function useTemplateBody() {
+  const t = _templates.find(x => x.id === _editingTemplateId) || getSelectedTemplate();
+  if (!t) return;
+  applyTemplate(t);
+  closeTemplates();
+}
+
+async function saveTemplate() {
+  const title = document.getElementById('tpl-title').value.trim();
+  if (!title) { alert('Title is required.'); return; }
+  const type = document.getElementById('tpl-type').value;
+  const keywords = _normalizeKeywordsInput(document.getElementById('tpl-keywords').value);
+  const body = document.getElementById('tpl-body').value;
+  const payload = {title, type, keywords, body};
+  if (_editingTemplateId) {
+    await api(`/api/templates/${encodeURIComponent(_editingTemplateId)}`,'PUT',payload);
+  } else {
+    await api('/api/templates','POST',payload);
+  }
+  await loadTemplates();
+  closeTemplates();
+}
+
+async function deleteSelectedTemplate() {
+  const t = getSelectedTemplate();
+  if (!t) return;
+  if (!confirm(`Delete template "${t.title || t.id}"?`)) return;
+  await api(`/api/templates/${encodeURIComponent(t.id)}`,'DELETE',{});
+  await loadTemplates();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Media quick add (composer)
+// ═══════════════════════════════════════════════════════
+function _parseKeywords(text) {
+  return (text || '').split(/[\s,]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+
+function addPendingMedia() {
+  const type = document.getElementById('media-type').value;
+  const kws = _parseKeywords(document.getElementById('media-keywords').value);
+  if (!kws.length) { alert('Add at least one keyword.'); return; }
+  _pendingMedia.push({type, keywords: kws});
+  document.getElementById('media-keywords').value = '';
+  renderPendingMedia();
+  applyPendingMediaToParsed();
+}
+
+function removePendingMedia(idx) {
+  _pendingMedia.splice(idx, 1);
+  renderPendingMedia();
+  applyPendingMediaToParsed();
+}
+
+function clearPendingMedia() {
+  _pendingMedia = [];
+  renderPendingMedia();
+  applyPendingMediaToParsed();
+  const summary = document.getElementById('media-summary');
+  if (summary) { summary.style.display = 'none'; summary.textContent = ''; }
+}
+
+function renderPendingMedia() {
+  const wrap = document.getElementById('media-queue');
+  if (!_pendingMedia.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  wrap.style.flexWrap = 'wrap';
+  wrap.style.gap = '6px';
+  wrap.innerHTML = _pendingMedia.map((m, i) =>
+    `<span style="background:var(--bg);border:1px solid var(--border);padding:2px 6px;border-radius:10px;font-size:11px">
+       ${escHtml(m.type)}: ${escHtml(m.keywords.join(', '))}
+       <button onclick="removePendingMedia(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 0 0 6px">×</button>
+     </span>`
+  ).join('');
+}
+
+function _mergeMediaSlots(media, pending) {
+  const out = Array.isArray(media) ? [...media] : [];
+  const key = (m) => `${m.type}|${(m.keywords||[]).join(',')}`;
+  const seen = new Set(out.map(key));
+  for (const m of pending) {
+    if (!m || !m.type || !m.keywords) continue;
+    const k = key(m);
+    if (!seen.has(k)) {
+      out.push({type: m.type, keywords: m.keywords});
+      seen.add(k);
+    }
+  }
+  return out;
+}
+
+function _readParsedEditorJson() {
+  const editor = document.getElementById('parsed-editor');
+  if (!editor || !editor.value) return null;
+  try { return JSON.parse(editor.value); } catch { return null; }
+}
+
+function applyPendingMediaToParsed() {
+  if (!lastGenerateResp || !_pendingMedia.length) return;
+  const editor = document.getElementById('parsed-editor');
+  const base = _readParsedEditorJson() || lastGenerateResp.parsed;
+  if (!base) return;
+  const merged = {...base, media: _mergeMediaSlots(base.media, _pendingMedia)};
+  editor.value = JSON.stringify(merged, null, 2);
+  const status = document.getElementById('parsed-editor-status');
+  if (status) status.textContent = 'media applied';
+}
+
+async function suggestSceneKeywords() {
+  const source = (lastGenerateResp && lastGenerateResp.parsed && lastGenerateResp.parsed.prose)
+    ? lastGenerateResp.parsed.prose
+    : document.getElementById('chat-input').value.trim();
+  if (!source) { alert('Generate a passage or enter a prompt first.'); return; }
+  try {
+    const r = await api('/api/scene-keywords','POST',{text: source});
+    if (Array.isArray(r.keywords) && r.keywords.length) {
+      document.getElementById('media-keywords').value = r.keywords.join(', ');
+    }
+    const summary = document.getElementById('media-summary');
+    if (summary) {
+      summary.style.display = r.summary ? 'block' : 'none';
+      summary.textContent = r.summary ? `Scene summary: ${r.summary}` : '';
+    }
+  } catch (e) {
+    addMsg('bot', `Scene keywords error: ${e.message}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Passage metadata helpers
+// ═══════════════════════════════════════════════════════
+function appPrompt(title, value='', opts={}) {
+  if (_appPromptResolve) _appPromptResolve(null);
+  document.getElementById('app-prompt-title').textContent = title || 'Edit';
+  document.getElementById('app-prompt-label').textContent = opts.label || 'Value';
+  const hint = document.getElementById('app-prompt-hint');
+  hint.textContent = opts.hint || '';
+  hint.style.display = opts.hint ? 'block' : 'none';
+  const ta = document.getElementById('app-prompt-value');
+  ta.value = value || '';
+  ta.style.minHeight = opts.compact ? '44px' : '120px';
+  document.getElementById('modal-app-prompt').classList.remove('hidden');
+  setTimeout(()=>ta.focus(), 0);
+  return new Promise(resolve => { _appPromptResolve = resolve; });
+}
+
+function appPromptOk() {
+  const resolve = _appPromptResolve;
+  _appPromptResolve = null;
+  document.getElementById('modal-app-prompt').classList.add('hidden');
+  if (resolve) resolve(document.getElementById('app-prompt-value').value);
+}
+
+function appPromptCancel() {
+  const resolve = _appPromptResolve;
+  _appPromptResolve = null;
+  document.getElementById('modal-app-prompt').classList.add('hidden');
+  if (resolve) resolve(null);
+}
+
+function _linesFromText(text) {
+  return String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+function _slugifyClient(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'choice';
+}
+
+function _sceneCharacters() {
+  return (((_currentPassageData || {}).snapshot || {}).characters_present || [])
+    .map(c => ({
+      id: c.id || '',
+      status: c.status || 'present',
+      knows: Array.isArray(c.knows) ? c.knows : [],
+      relationship_to_player: c.relationship_to_player || '',
+    }))
+    .filter(c => c.id);
+}
+
+async function savePassageMetadata(patch) {
+  const pid = currentPassageId;
+  if (!pid) return;
+  await api(`/api/passage/${encodeURIComponent(pid)}/metadata`, 'POST', patch);
+  await focusPassage(pid);
+  await refreshGraph();
+  await refreshValidation();
+}
+
+async function editPassageSummary() {
+  if (!currentPassageId || !_currentPassageData) return;
+  const value = await appPrompt('Summary', _currentPassageData.summary || '', {
+    label: 'Summary',
+    compact: true,
+  });
+  if (value === null) return;
+  try {
+    await savePassageMetadata({summary: value});
+    addMsg('bot', `Saved summary for ${currentPassageId}.`);
+  } catch(e) { addMsg('bot', `Summary save error: ${e.message}`); }
+}
+
+async function editPassageList(field, label, prefill=null) {
+  if (!currentPassageId || !_currentPassageData) return;
+  const snap = _currentPassageData.snapshot || {};
+  const values = field === 'open_threads' || field === 'world_state'
+    ? (snap[field] || [])
+    : (_currentPassageData[field] || []);
+  const value = await appPrompt(label, prefill ?? values.join('\n'), {
+    label: 'One per line',
+  });
+  if (value === null) return;
+  try {
+    await savePassageMetadata({[field]: _linesFromText(value)});
+    addMsg('bot', `Saved ${label.toLowerCase()} for ${currentPassageId}.`);
+  } catch(e) { addMsg('bot', `${label} save error: ${e.message}`); }
+}
+
+function _characterLines(chars) {
+  return chars.map(c =>
+    `${c.id} | ${c.status || 'present'} | ${(c.knows || []).join(', ')} | ${c.relationship_to_player || ''}`
+  ).join('\n');
+}
+
+function _parseCharacterLines(text) {
+  return _linesFromText(text).map(line => {
+    const parts = line.split('|').map(s => s.trim());
+    return {
+      id: parts[0] || '',
+      status: parts[1] || 'present',
+      knows: parts[2] ? parts[2].split(',').map(s => s.trim()).filter(Boolean) : [],
+      relationship_to_player: parts[3] || '',
+    };
+  }).filter(c => c.id);
+}
+
+async function editSceneCharacters(prefill=null) {
+  if (!currentPassageId) return;
+  const value = await appPrompt('Characters in scene', prefill ?? _characterLines(_sceneCharacters()), {
+    label: 'One per line',
+    hint: 'Format: id | status | knows comma-list | relationship',
+  });
+  if (value === null) return;
+  try {
+    await savePassageMetadata({characters_present: _parseCharacterLines(value)});
+    addMsg('bot', `Saved characters in scene for ${currentPassageId}.`);
+  } catch(e) { addMsg('bot', `Character scene save error: ${e.message}`); }
+}
+
+async function addExistingSceneCharacter() {
+  if (!currentPassageId) return;
+  const r = await api('/api/characters').catch(()=>({characters:[]}));
+  const chars = r.characters || [];
+  if (!chars.length) { addMsg('bot', 'No recurring characters yet. Use New to create one.'); return; }
+  const alreadyPresent = new Set(_sceneCharacters().map(c => c.id));
+  const available = chars.filter(c => !alreadyPresent.has(c.id));
+  const select = document.getElementById('scene-character-select');
+  select.innerHTML = (available.length ? available : chars).map(c =>
+    `<option value="${escAttr(c.id)}">${escHtml(c.name || c.id)} (${escHtml(c.id)})${alreadyPresent.has(c.id) ? ' - already in scene' : ''}</option>`
+  ).join('');
+  document.getElementById('scene-character-status').value = 'present';
+  document.getElementById('scene-character-relationship').value = '';
+  document.getElementById('modal-scene-character').classList.remove('hidden');
+}
+
+function closeSceneCharacterPicker() {
+  document.getElementById('modal-scene-character').classList.add('hidden');
+}
+
+async function submitSceneCharacterPicker() {
+  const id = document.getElementById('scene-character-select').value.trim();
+  if (!id) return;
+  const status = document.getElementById('scene-character-status').value.trim() || 'present';
+  const relationship = document.getElementById('scene-character-relationship').value.trim();
+  const existing = _sceneCharacters().filter(c => c.id !== id);
+  existing.push({id, status, knows: [], relationship_to_player: relationship});
+  try {
+    await savePassageMetadata({characters_present: existing});
+    closeSceneCharacterPicker();
+    addMsg('bot', `Added ${id} to ${currentPassageId}.`);
+  } catch(e) { addMsg('bot', `Add character error: ${e.message}`); }
+}
+
+async function createSceneCharacter() {
+  if (!currentPassageId) return;
+  const id = await appPrompt('New recurring character', '', {
+    label: 'Character id',
+    compact: true,
+  });
+  if (id === null || !id.trim()) return;
+  const name = await appPrompt('New recurring character', id.trim(), {
+    label: 'Display name',
+    compact: true,
+  });
+  if (name === null) return;
+  const description = await appPrompt('New recurring character', '', {
+    label: 'Brief description',
+  });
+  if (description === null) return;
+  try {
+    await api('/api/characters', 'POST', {id: id.trim(), name: name.trim() || id.trim(), description});
+    const chars = _sceneCharacters().filter(c => c.id !== id.trim());
+    chars.push({id: id.trim(), status: 'present', knows: [], relationship_to_player: ''});
+    await savePassageMetadata({characters_present: chars});
+    await refreshWorldPanel();
+    addMsg('bot', `Created recurring character ${id.trim()} and added them to the scene.`);
+  } catch(e) { addMsg('bot', `Create character error: ${e.message}`); }
+}
+
+async function suggestSceneCharacters() {
+  if (!currentPassageId) return;
+  try {
+    const r = await api(`/api/passage/${encodeURIComponent(currentPassageId)}/suggest-characters`, 'POST', {});
+    const suggested = (r.characters || []).map(c => ({
+      id: c.id,
+      status: c.status || 'present',
+      knows: [],
+      relationship_to_player: '',
+    }));
+    if (!suggested.length) { addMsg('bot', 'No character suggestions returned.'); return; }
+    const merged = [..._sceneCharacters()];
+    for (const c of suggested) {
+      if (!merged.some(existing => existing.id === c.id)) merged.push(c);
+    }
+    await editSceneCharacters(_characterLines(merged));
+  } catch(e) { addMsg('bot', `Character suggestion error: ${e.message}`); }
+}
+
+function _parseMediaLines(text) {
+  return _linesFromText(text).map(line => {
+    const parts = line.split('|').map(s => s.trim());
+    return {
+      id: parts[0] || '',
+      type: parts[1] || 'image',
+      keywords: parts[2] ? parts[2].split(',').map(s => s.trim()).filter(Boolean) : [],
+    };
+  }).filter(s => s.id);
+}
+
+async function _mediaSlotLines() {
+  const all = await api('/api/media/slots').catch(()=>({}));
+  return (_currentPassageData.media_slots || []).map(id => {
+    const slot = all[id] || {};
+    return `${id} | ${slot.type || 'image'} | ${(slot.keywords || []).join(', ')}`;
+  }).join('\n');
+}
+
+async function editPassageMediaSlots(prefill=null) {
+  if (!currentPassageId || !_currentPassageData) return;
+  const current = prefill ?? await _mediaSlotLines();
+  const value = await appPrompt('Media slots', current, {
+    label: 'One per line',
+    hint: 'Format: id | type | keywords comma-list',
+  });
+  if (value === null) return;
+  try {
+    await savePassageMetadata({media_slots: _parseMediaLines(value)});
+    addMsg('bot', `Saved media slots for ${currentPassageId}.`);
+  } catch(e) { addMsg('bot', `Media slot save error: ${e.message}`); }
+}
+
+async function addMediaSlotToPassage() {
+  if (!currentPassageId) return;
+  const defaultId = `${currentPassageId.replace(/[^a-zA-Z0-9_]/g, '_')}__image_${((_currentPassageData.media_slots || []).length + 1)}`;
+  const id = await appPrompt('Add media slot', defaultId, {
+    label: 'Media slot id',
+    compact: true,
+  });
+  if (id === null || !id.trim()) return;
+  const type = await appPrompt('Add media slot', 'image', {
+    label: 'Type',
+    compact: true,
+  });
+  if (type === null) return;
+  const keywords = await appPrompt('Add media slot', '', {
+    label: 'Keywords, comma-separated',
+  });
+  if (keywords === null) return;
+  const current = await _mediaSlotLines();
+  const next = `${current ? current + '\n' : ''}${id.trim()} | ${type.trim() || 'image'} | ${keywords}`;
+  await editPassageMediaSlots(next);
+}
+
+async function generateSummaryForPassage(pid) {
+  try {
+    await api(`/api/passage/${encodeURIComponent(pid)}/generate-summary`,'POST',{});
+    await focusPassage(pid);
+    addMsg('bot', `Generated summary for ${pid}.`);
+  } catch(e) { addMsg('bot', `Summary error: ${e.message}`); }
+}
+
+async function generateThreadsForPassage(pid) {
+  try {
+    await api(`/api/passage/${encodeURIComponent(pid)}/generate-threads`,'POST',{});
+    await focusPassage(pid);
+    addMsg('bot', `Generated threads/world state for ${pid}.`);
+  } catch(e) { addMsg('bot', `Threads error: ${e.message}`); }
+}
+
+async function suggestChoicesForPassage(pid) {
+  try {
+    const r = await api(`/api/passage/${encodeURIComponent(pid)}/suggest-choices`,'POST',{});
+    if (!r.choices || !r.choices.length) { addMsg('bot','No choice suggestions returned.'); return; }
+    const lines = r.choices.map(c => `• ${c.text}${c.hint ? ` | ${c.hint}` : ''}`).join('\n');
+    addMsg('bot', `Choice suggestions for ${pid}:\n${lines}`);
+    const current = (_currentPassageData?.children || []);
+    const arc = _currentPassageData?.arc || '';
+    const generatedIds = r.choices.map(c => `${arc}__${_slugifyClient(c.hint || c.text)}`);
+    await editPassageList('children', 'Choices / children', [...current, ...generatedIds].join('\n'));
+  } catch(e) { addMsg('bot', `Choice suggestion error: ${e.message}`); }
+}
+
+async function suggestStateForPassage(pid) {
+  try {
+    const r = await api(`/api/passage/${encodeURIComponent(pid)}/suggest-state`,'POST',{});
+    if (!r.state || !r.state.length) { addMsg('bot','No state writes suggested.'); return; }
+    addMsg('bot', `State write suggestions for ${pid}:\n${r.state.map(s=>`• ${s}`).join('\n')}`);
+    const current = (_currentPassageData?.state_writes || []);
+    await editPassageList('state_writes', 'State writes', [...current, ...r.state].join('\n'));
+  } catch(e) { addMsg('bot', `State suggestion error: ${e.message}`); }
+}
+
+// Split a list into `n` near-equal contiguous chunks (no empty chunks).
+function _chunkList(items, n) {
+  n = Math.max(1, Math.min(n, items.length || 1));
+  if (!items.length) return Array.from({length:n}, ()=>[]);
+  const out = [];
+  const size = Math.ceil(items.length / n);
+  for (let i=0; i<items.length; i+=size) out.push(items.slice(i, i+size));
+  // if rounding produced fewer chunks than asked, pad by reusing the full set
+  while (out.length < n) out.push(items.slice());
+  return out;
+}
+
+async function suggestMediaForPassage(pid, type='image', count=null) {
+  if (!_currentPassageProse) { addMsg('bot','No passage prose to analyze.'); return; }
+  if (!['image','audio','video'].includes(type)) type = 'image';
+
+  // Ask how many slots to suggest (default 1). Cancel aborts.
+  if (count === null) {
+    const ans = await appPrompt(`Suggest ${type} slots`, '1', {
+      label: `How many ${type} slots?`, compact: true,
+    });
+    if (ans === null) return;
+    count = parseInt(ans, 10);
+  }
+  count = Math.max(1, Math.min(count || 1, 10));
+
+  try {
+    const r = await api('/api/scene-keywords','POST',{text:_currentPassageProse});
+    const kws = Array.isArray(r.keywords) ? r.keywords : [];
+    if (kws.length) document.getElementById('media-keywords').value = kws.join(', ');
+    const summary = document.getElementById('media-summary');
+    if (summary) {
+      summary.style.display = r.summary ? 'block' : 'none';
+      summary.textContent = r.summary ? `Scene summary: ${r.summary}` : '';
+    }
+    if (!kws.length) { addMsg('bot', `No keywords returned for ${pid}.`); return; }
+
+    // One slot per keyword-chunk so multiple slots differ instead of duplicating.
+    const groups = _chunkList(kws, count);
+    let current = await _mediaSlotLines();
+    let base = (_currentPassageData.media_slots || []).length;
+    const safe = pid.replace(/[^a-zA-Z0-9_]/g, '_');
+    for (let i=0; i<groups.length; i++) {
+      const sid = `${safe}__${type}_${base + i + 1}`;
+      const line = `${sid} | ${type} | ${groups[i].join(', ')}`;
+      current = current ? `${current}\n${line}` : line;
+    }
+    addMsg('bot', `Suggested ${groups.length} ${type} slot(s) for ${pid}.`);
+    await editPassageMediaSlots(current);
+  } catch(e) { addMsg('bot', `Media suggestion error: ${e.message}`); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Media resolve modal
+// ═══════════════════════════════════════════════════════
+function onMediaTypeChange() {
+  const t = document.getElementById('media-modal-type').value;
+  document.getElementById('media-opts-image').style.display = t==='image' ? 'flex' : 'none';
+  document.getElementById('media-opts-av').style.display    = t==='image' ? 'none' : 'flex';
+  document.getElementById('media-poster-field').style.display = t==='video' ? 'flex' : 'none';
+}
+
+function pickMediaFile(rel) {
+  if (!rel) return;
+  document.getElementById('media-resolve-path').value = rel;
+  document.getElementById('media-file-pick').value = '';
+}
+
+// Opens the full slot editor. Named openResolveModal for backward-compat with
+// existing call sites; also exposed as openMediaModal.
+async function openResolveModal(sid) {
+  _resolveSlotId = sid;
+  let slots = {}; try { slots = await api('/api/media/slots'); } catch {}
+  const s = slots[sid] || {};
+  document.getElementById('media-modal-id').textContent = sid;
+  document.getElementById('media-modal-keywords').textContent =
+    (s.keywords||[]).length ? 'keywords: ' + (s.keywords||[]).join(', ') : '';
+  document.getElementById('media-modal-type').value = s.type || 'image';
+  document.getElementById('media-resolve-path').value = s.resolved_path || '';
+  document.getElementById('media-alt').value = s.alt || '';
+  document.getElementById('media-caption').value = s.caption || '';
+  document.getElementById('media-description').value = s.description || '';
+  document.getElementById('media-lazy').checked     = s.lazy !== false;
+  document.getElementById('media-controls').checked = s.controls !== false;
+  document.getElementById('media-loop').checked     = !!s.loop;
+  document.getElementById('media-autoplay').checked = !!s.autoplay;
+  document.getElementById('media-muted').checked    = !!s.muted;
+  document.getElementById('media-poster').value     = s.poster || '';
+  document.getElementById('media-unresolve-btn').style.display =
+    s.status === 'resolved' ? 'inline-block' : 'none';
+  onMediaTypeChange();
+
+  // Populate the media/ file picker.
+  const sel = document.getElementById('media-file-pick');
+  sel.innerHTML = '<option value="">media/ files…</option>';
+  try {
+    const r = await api('/api/media/files');
+    for (const f of (r.files||[])) {
+      const o = document.createElement('option');
+      o.value = f.rel_path; o.textContent = `${f.name} (${f.type})`;
+      sel.appendChild(o);
+    }
+  } catch {}
+
+  document.getElementById('modal-media-resolve').classList.remove('hidden');
+}
+const openMediaModal = openResolveModal;
+
+function closeMediaResolve() {
+  document.getElementById('modal-media-resolve').classList.add('hidden');
+  _resolveSlotId = null;
+}
+
+async function submitMediaResolve() {
+  if (!_resolveSlotId) return;
+  const path = document.getElementById('media-resolve-path').value.trim();
+  const meta = {
+    type:        document.getElementById('media-modal-type').value,
+    alt:         document.getElementById('media-alt').value,
+    caption:     document.getElementById('media-caption').value,
+    description: document.getElementById('media-description').value,
+    lazy:        document.getElementById('media-lazy').checked,
+    controls:    document.getElementById('media-controls').checked,
+    loop:        document.getElementById('media-loop').checked,
+    autoplay:    document.getElementById('media-autoplay').checked,
+    muted:       document.getElementById('media-muted').checked,
+    poster:      document.getElementById('media-poster').value,
+  };
+  try {
+    await api(`/api/media/slots/${_resolveSlotId}/meta`,'POST',meta);
+    if (path) await api(`/api/media/slots/${_resolveSlotId}/resolve`,'POST',{resolved_path:path});
+    if (currentPassageId) await focusPassage(currentPassageId);
+    toast(`Saved media slot ${_resolveSlotId}.`,'success');
+  } catch(e) {
+    toast(`Media save error: ${e.message}`,'error',5000);
+    return;
+  }
+  closeMediaResolve();
+}
+
+async function unresolveFromModal() {
+  if (!_resolveSlotId) return;
+  try {
+    await api(`/api/media/slots/${_resolveSlotId}/unresolve`,'POST');
+    if (currentPassageId) await focusPassage(currentPassageId);
+    toast('Slot set back to pending.','success');
+  } catch(e) { toast('Unresolve error: '+e.message,'error'); }
+  closeMediaResolve();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Planning panel
+// ═══════════════════════════════════════════════════════
+let _planCache = null;
+// When a passage is being generated from a planned scene, remember which scene
+// so commit can link the new passage id back onto it.
+let _pendingSceneLink = null;
+
+async function refreshPlanPanel() {
+  const body = document.getElementById('plan-body');
+  let data;
+  try { data = await api('/api/plan'); }
+  catch (e) { body.innerHTML = `<div class="plan-gap">Plan unavailable: ${escHtml(e.message)}</div>`; return; }
+  _planCache = data;
+  try {
+    renderPlanPanel(data);
+  } catch (e) {
+    body.innerHTML = `<div class="plan-gap">Plan render error: ${escHtml(e.message)}</div>`;
+    console.error('renderPlanPanel failed', e);
+  }
+}
+
+function renderPlanPanel(data) {
+  const body = document.getElementById('plan-body');
+  const beats = data.beats || [], arcs = data.arcs || [], gaps = data.gaps || {};
+  const covered = beats.filter(b=>b.covered).length;
+
+  const beatsHtml = beats.length ? beats.map(b=>`
+    <div class="beat-row">
+      <span class="beat-dot ${b.covered?'covered':'open'}" title="${b.covered?'covered':'open'}"></span>
+      <div class="beat-text">
+        ${b.act?`<span class="beat-act">${escHtml(b.act)}</span> · `:''}${escHtml(b.text)}
+        <div class="beat-meta">${escHtml(b.id)}${b.arcs.length?' · arcs: '+b.arcs.map(escHtml).join(', '):''}${b.passages.length?' · '+b.passages.length+' passage(s)':''}</div>
+      </div>
+      <button class="btn-sm" onclick="editPlanBeat('${b.id}')">✎</button>
+      <button class="btn-sm" onclick="deletePlanBeat('${b.id}')">✕</button>
+    </div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px">No beats. Add one or import from story points.</div>';
+
+  const beatOpts = beats.map(b=>escHtml(b.id)).join(', ');
+  const arcsHtml = arcs.length ? arcs.map(a=>renderArcCard(a, beatOpts)).join('')
+    : '<div style="color:var(--muted);font-size:12px">No arcs yet.</div>';
+
+  const gapLines = [];
+  (gaps.open_beats||[]).length && gapLines.push(`${gaps.open_beats.length} uncovered beat(s): ${gaps.open_beats.map(escHtml).join(', ')}`);
+  (gaps.arcs_without_beats||[]).length && gapLines.push(`Arcs with no linked beats: ${gaps.arcs_without_beats.map(escHtml).join(', ')}`);
+  (gaps.beats_without_arc||[]).length && gapLines.push(`Beats not linked to any arc: ${gaps.beats_without_arc.map(escHtml).join(', ')}`);
+  (gaps.unknown_beat_refs||[]).length && gapLines.push(`Dangling beat refs: ${gaps.unknown_beat_refs.map(escHtml).join(', ')}`);
+  const gapsHtml = gapLines.length ? gapLines.map(g=>`<div class="plan-gap">⚠ ${g}</div>`).join('')
+    : '<div style="color:var(--ok);font-size:11px">No planning gaps.</div>';
+
+  const oq = (data.open_questions||[]);
+  const oqHtml = oq.length ? oq.map(q=>`<div class="snapshot-item">• ${escHtml(q)}</div>`).join('') : '';
+
+  body.innerHTML = `
+    <div class="plan-group">
+      <h4>Beats — ${covered}/${beats.length} covered</h4>
+      ${beatsHtml}
+      <div class="file-pick" style="margin-top:6px">
+        <input id="new-beat-text" class="plan-input" placeholder="New beat (act: text  or  just text)" onkeydown="if(event.key==='Enter')addPlanBeat()" />
+        <button class="btn-sm" onclick="addPlanBeat()">Add</button>
+        <input id="gen-beat-count" type="number" value="5" min="1" max="50" title="how many to generate" style="width:42px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px" />
+        <button class="btn-sm" onclick="generatePlanBeats()" title="AI-propose new beats from premise + story points">✦ Generate</button>
+      </div>
+    </div>
+    <div class="plan-group">
+      <h4>Arcs</h4>
+      ${arcsHtml}
+      <div class="file-pick" style="margin-top:6px">
+        <input id="new-arc-name" class="plan-input" placeholder="new arc id e.g. 02_ravenhold" onkeydown="if(event.key==='Enter')addArc()" />
+        <button class="btn-sm" onclick="addArc()">Add</button>
+        <input id="gen-arc-count" type="number" value="3" min="1" max="50" title="how many to generate" style="width:42px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px" />
+        <button class="btn-sm" onclick="generatePlanArcs()" title="AI-propose arcs from premise + beats">✦ Generate</button>
+      </div>
+    </div>
+    <div class="plan-group"><h4>Gaps</h4>${gapsHtml}</div>
+    ${oqHtml?`<div class="plan-group"><h4>Open questions</h4>${oqHtml}</div>`:''}
+  `;
+}
+
+async function generatePlanBeats() {
+  const el = document.getElementById('gen-beat-count');
+  const count = Math.max(1, Math.min(parseInt(el?.value,10)||5, 50));
+  toast('Generating beats…','info',2000);
+  try {
+    const r = await api('/api/plan/generate-beats','POST',{count,direction:''},{silent:true});
+    await refreshPlanPanel();
+    toast(`Added ${(r.created||[]).length} beat(s).`,'success');
+  } catch(e){ toast('Generate beats failed: '+e.message,'error',6000); }
+}
+
+async function addArc() {
+  const inp = document.getElementById('new-arc-name');
+  const name = (inp?.value||'').trim();
+  if (!name) { toast('Enter an arc id first.','warn'); return; }
+  try {
+    const r = await api('/api/plan/arcs','POST',{name,goal:''});
+    inp.value='';
+    _planExpandedArcs.add(r.arc);
+    await refreshPlanPanel();
+    toast(`Created arc ${r.arc}.`,'success');
+  } catch(e){ toast('Add arc failed: '+e.message,'error'); }
+}
+
+async function generatePlanArcs() {
+  const el = document.getElementById('gen-arc-count');
+  const count = Math.max(1, Math.min(parseInt(el?.value,10)||3, 50));
+  toast('Generating arcs…','info',2000);
+  try {
+    const r = await api('/api/plan/generate-arcs','POST',{count,direction:''},{silent:true});
+    await refreshPlanPanel();
+    toast(`Created ${(r.created||[]).length} arc(s).`,'success');
+  } catch(e){ toast('Generate arcs failed: '+e.message,'error',6000); }
+}
+
+async function addPlanBeat() {
+  const inp = document.getElementById('new-beat-text');
+  let text = (inp.value||'').trim(); if (!text) return;
+  let act = '';
+  // "Act 1: text" → act="Act 1", text="text"
+  const m = text.match(/^([^:]{1,40}):\s*(.+)$/);
+  if (m && /act|chapter|part/i.test(m[1])) { act = m[1].trim(); text = m[2].trim(); }
+  try { await api('/api/plan/beats','POST',{text, act}); inp.value=''; await refreshPlanPanel(); }
+  catch(e){ toast('Add beat failed: '+e.message,'error'); }
+}
+
+async function editPlanBeat(id) {
+  const b = (_planCache?.beats||[]).find(x=>x.id===id); if (!b) return;
+  const text = await appPrompt('Edit beat', b.text, {label:'Beat text', compact:true}); if (text===null) return;
+  const act = await appPrompt('Edit beat', b.act||'', {label:'Act label (optional)', compact:true}); if (act===null) return;
+  try { await api('/api/plan/beats/'+id,'PUT',{text, act: act||''}); await refreshPlanPanel(); }
+  catch(e){ toast('Edit failed: '+e.message,'error'); }
+}
+
+async function deletePlanBeat(id) {
+  if (!confirm('Delete beat '+id+'? It will be unlinked from arcs and passages.')) return;
+  try { await api('/api/plan/beats/'+id,'DELETE'); await refreshPlanPanel(); if(currentPassageId) focusPassage(currentPassageId); }
+  catch(e){ toast('Delete failed: '+e.message,'error'); }
+}
+
+// Arcs the user has expanded in the Plan panel (preserved across re-renders).
+const _planExpandedArcs = new Set();
+
+function renderArcCard(a, beatOpts) {
+  const arc = a.arc;
+  const sceneArr = a.scenes || [];
+  const beatIds = a.beat_ids || [];
+  const open = _planExpandedArcs.has(arc);
+  const arrow = open ? '▾' : '▸';
+  const status = a.status || 'planned';
+  const statusSel = `<select class="arc-status ${escHtml(status)}" onclick="event.stopPropagation()" onchange="setArcStatus('${escAttr(arc)}', this.value)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:10px">
+      ${['planned','active','done'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('')}
+    </select>`;
+  const header = `<div class="arc-hdr" onclick="toggleArc('${escAttr(arc)}')" style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">
+      <span>${arrow}</span>
+      <span class="arc-name" style="flex:1">${escHtml(arc)}</span>
+      <span class="beat-meta">${sceneArr.length} scene(s) · ${a.passage_count||0} passage(s)</span>
+      ${statusSel}
+    </div>`;
+  if (!open) return `<div class="arc-row">${header}</div>`;
+
+  const goalLine = `<div class="beat-meta" style="margin-top:4px">${a.goal?escHtml(a.goal):'<span style="color:var(--muted)">no goal set</span>'}</div>
+    <div class="beat-meta">beats: ${beatIds.length?beatIds.map(escHtml).join(', '):'—'}</div>
+    <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+      <button class="btn-sm" onclick="editArcGoal('${escAttr(arc)}')">Goal</button>
+      <button class="btn-sm" onclick="editArcBeats('${escAttr(arc)}')" title="Link beats (e.g. ${beatOpts||'b1,b2'})">Link beats</button>
+    </div>`;
+
+  const scenes = sceneArr.map(s=>renderScene(arc, s)).join('')
+    || '<div style="color:var(--muted);font-size:11px;margin:4px 0">No scenes planned. Add one or generate.</div>';
+  const sceneTools = `<div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn-sm" onclick="addScenePrompt('${escAttr(arc)}')">+ Scene</button>
+      <button class="btn-sm" onclick="genArcScenes('${escAttr(arc)}')" title="AI-outline scenes from premise + goal + beats">✦ Generate scenes</button>
+    </div>`;
+
+  return `<div class="arc-row">${header}
+    <div style="margin-top:4px">${goalLine}
+      <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+        <div class="beat-meta" style="margin-bottom:4px">SCENES</div>
+        ${scenes}${sceneTools}
+      </div>
+    </div></div>`;
+}
+
+function renderScene(arc, s) {
+  const kw = (s.keywords||[]).join(', ');
+  const cast = (s.characters||[]).join(', ');
+  const drafted = s.status === 'drafted' && s.passage_id;
+  const dot = drafted ? '<span class="beat-dot covered" title="drafted"></span>'
+                      : '<span class="beat-dot open" title="planned"></span>';
+  const meta = [
+    kw ? 'kw: ' + escHtml(kw) : '',
+    cast ? 'cast: ' + escHtml(cast) : '',
+    (s.beat_ids||[]).length ? 'beats: ' + s.beat_ids.map(escHtml).join(', ') : '',
+    drafted ? '→ ' + escHtml(s.passage_id) : '',
+  ].filter(Boolean).join(' · ');
+  const goBtn = drafted
+    ? `<button class="btn-sm" onclick="focusPassage('${escAttr(s.passage_id)}')" title="Open the passage">Open</button>`
+    : `<button class="btn-sm" onclick="sceneToGraph('${escAttr(arc)}','${escAttr(s.id)}')" title="Create this passage in the graph">→ Graph</button>`;
+  return `<div class="beat-row">
+    ${dot}
+    <div class="beat-text">
+      <strong>${escHtml(s.title || s.id)}</strong>${s.summary?' — '+escHtml(s.summary):''}
+      ${meta?`<div class="beat-meta">${meta}</div>`:''}
+    </div>
+    ${goBtn}
+    <button class="btn-sm" onclick="editScenePrompt('${escAttr(arc)}','${escAttr(s.id)}')">✎</button>
+    <button class="btn-sm" onclick="deleteScene('${escAttr(arc)}','${escAttr(s.id)}')">✕</button>
+  </div>`;
+}
+
+function toggleArc(arc) {
+  if (_planExpandedArcs.has(arc)) _planExpandedArcs.delete(arc);
+  else _planExpandedArcs.add(arc);
+  if (_planCache) renderPlanPanel(_planCache);
+}
+
+function _findScene(arc, sid) {
+  const a = (_planCache?.arcs||[]).find(x=>x.arc===arc);
+  return a ? (a.scenes||[]).find(s=>s.id===sid) : null;
+}
+
+async function addScenePrompt(arc) {
+  const title = await appPrompt('New scene', '', {label:'Scene title', compact:true}); if (title===null || !title.trim()) return;
+  const summary = await appPrompt('New scene', '', {label:'One-line summary (optional)', compact:true}); if (summary===null) return;
+  const kw = await appPrompt('New scene', '', {label:'Keywords, comma-separated (optional)', compact:true}); if (kw===null) return;
+  const cast = await appPrompt('New scene', '', {label:'Characters, comma-separated (optional)', compact:true}); if (cast===null) return;
+  const keywords = kw.split(',').map(s=>s.trim()).filter(Boolean);
+  const characters = cast.split(',').map(s=>s.trim()).filter(Boolean);
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc)+'/scenes','POST',{title,summary,keywords,characters}); await refreshPlanPanel(); }
+  catch(e){ toast('Add scene failed: '+e.message,'error'); }
+}
+
+async function editScenePrompt(arc, sid) {
+  const s = _findScene(arc, sid); if (!s) return;
+  const title = await appPrompt('Edit scene', s.title||'', {label:'Scene title', compact:true}); if (title===null) return;
+  const summary = await appPrompt('Edit scene', s.summary||'', {label:'Summary', compact:true}); if (summary===null) return;
+  const kw = await appPrompt('Edit scene', (s.keywords||[]).join(', '), {label:'Keywords, comma-separated', compact:true}); if (kw===null) return;
+  const cast = await appPrompt('Edit scene', (s.characters||[]).join(', '), {label:'Characters, comma-separated', compact:true}); if (cast===null) return;
+  const bids = await appPrompt('Edit scene', (s.beat_ids||[]).join(', '), {label:'Beat ids, comma-separated', compact:true}); if (bids===null) return;
+  const keywords = kw.split(',').map(x=>x.trim()).filter(Boolean);
+  const characters = cast.split(',').map(x=>x.trim()).filter(Boolean);
+  const beat_ids = bids.split(',').map(x=>x.trim()).filter(Boolean);
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc)+'/scenes/'+encodeURIComponent(sid),'PUT',{title,summary,keywords,characters,beat_ids}); await refreshPlanPanel(); }
+  catch(e){ toast('Edit scene failed: '+e.message,'error'); }
+}
+
+async function deleteScene(arc, sid) {
+  if (!confirm('Delete scene '+sid+'?')) return;
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc)+'/scenes/'+encodeURIComponent(sid),'DELETE'); await refreshPlanPanel(); }
+  catch(e){ toast('Delete scene failed: '+e.message,'error'); }
+}
+
+async function genArcScenes(arc) {
+  const ans = await appPrompt('Generate scenes', '4', {label:'How many scenes to outline?', compact:true}); if (ans===null) return;
+  const count = Math.max(1, Math.min(parseInt(ans,10)||4, 50));
+  toast('Generating scenes…','info',2000);
+  try {
+    const r = await api('/api/plan/arcs/'+encodeURIComponent(arc)+'/generate-scenes','POST',{count},{silent:true});
+    _planExpandedArcs.add(arc);
+    await refreshPlanPanel();
+    toast(`Added ${(r.created||[]).length} scene(s) to ${arc}.`,'success');
+  } catch(e){ toast('Generate scenes failed: '+e.message,'error',6000); }
+}
+
+// Hand a planned scene off to the graph/chat: prefill arc + slug + direction
+// (summary, keywords, cast) so the author generates the real passage. On commit
+// the new passage id is linked back onto the scene.
+function sceneToGraph(arc, sid) {
+  const s = _findScene(arc, sid); if (!s) return;
+  switchLeftTab('graph');
+  document.getElementById('input-arc').value = arc;
+  const slug = _slugifyClient(s.title || s.id);
+  document.getElementById('input-slug').value = slug;
+  const parts = [];
+  if (s.summary) parts.push(s.summary);
+  if ((s.characters||[]).length) parts.push('Characters present: ' + s.characters.join(', ') + '.');
+  if ((s.keywords||[]).length) parts.push('Mood/imagery: ' + s.keywords.join(', ') + '.');
+  document.getElementById('chat-input').value = parts.join(' ');
+  _pendingSceneLink = { arc, sid };
+  document.getElementById('chat-input').focus();
+  toast('Scene loaded into the prompt. Generate, then Commit — it links back to this scene.','info',5000);
+}
+
+async function setArcStatus(arc, status) {
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc),'PUT',{status}); await refreshPlanPanel(); }
+  catch(e){ toast('Arc update failed: '+e.message,'error'); }
+}
+
+async function editArcGoal(arc) {
+  const a = (_planCache?.arcs||[]).find(x=>x.arc===arc);
+  const goal = await appPrompt('Arc goal', a?.goal||'', {label:'What this arc accomplishes', compact:true}); if (goal===null) return;
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc),'PUT',{goal}); await refreshPlanPanel(); }
+  catch(e){ toast('Arc update failed: '+e.message,'error'); }
+}
+
+async function editArcBeats(arc) {
+  const a = (_planCache?.arcs||[]).find(x=>x.arc===arc);
+  const ids = await appPrompt('Link beats', (a?.beat_ids||[]).join(','), {label:'Beat ids this arc advances (comma-separated, e.g. b1,b2)', compact:true}); if (ids===null) return;
+  const beat_ids = ids.split(',').map(s=>s.trim()).filter(Boolean);
+  try { await api('/api/plan/arcs/'+encodeURIComponent(arc),'PUT',{beat_ids}); await refreshPlanPanel(); }
+  catch(e){ toast('Arc update failed: '+e.message,'error'); }
+}
+
+async function importStoryPoints() {
+  const replace = confirm('Import beats from story_points.md.\n\nOK = replace existing structured beats.\nCancel = merge (keep existing, add new).');
+  try {
+    const data = await api('/api/plan/import-points','POST',{replace});
+    _planCache = data; renderPlanPanel(data);
+    toast(`Imported — ${(data.beats||[]).length} beats now in plan.`,'success');
+  } catch(e){ toast('Import failed: '+e.message,'error'); }
+}
+
+async function editPassagePlanBeats(pid) {
+  let cur = [];
+  try { const g = await api('/api/passage/'+encodeURIComponent(pid)); cur = g.plan_beats||[]; } catch {}
+  const ids = await appPrompt('Passage beats', cur.join(','), {label:'Plan beats this passage delivers (comma-separated ids, e.g. b1,b2)', compact:true});
+  if (ids===null) return;
+  const beat_ids = ids.split(',').map(s=>s.trim()).filter(Boolean);
+  try {
+    await api('/api/passages/'+encodeURIComponent(pid)+'/beats','PUT',{beat_ids});
+    if (currentPassageId) await focusPassage(currentPassageId);
+    toast('Passage beats updated.','success');
+  } catch(e){ toast('Update failed: '+e.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Utils
+// ═══════════════════════════════════════════════════════
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
+function closeIfOverlay(e,id){if(e.target===document.getElementById(id)) closeModal(id);}
+// Structured fetch wrapper. Server returns { error, detail } on non-2xx; we
+// expose those as fields on the thrown Error so callers can branch on `.code`.
+// Options:
+//   silent   — suppress automatic error toast (caller will handle)
+//   toastMsg — override the message shown in the auto-toast
+async function api(path, method='GET', body=null, opts={}) {
+  const init = {method, headers:{'Content-Type':'application/json'}};
+  if (body !== null) init.body = JSON.stringify(body);
+  let resp;
+  try {
+    resp = await fetch(path, init);
+  } catch (netErr) {
+    const e = new Error('Network error — is the harness server running?');
+    e.code = 'network'; e.status = 0;
+    if (!opts.silent) toast(opts.toastMsg || e.message, 'error', 5000);
+    throw e;
+  }
+  if (resp.ok) {
+    // 204 / empty body — return null.
+    if (resp.status === 204) return null;
+    return resp.json();
+  }
+  // Try structured error first; fall back to raw text.
+  let payload = null, text = '';
+  try { payload = await resp.json(); }
+  catch (_) { try { text = await resp.text(); } catch(__){} }
+  const detail = (payload && (payload.detail || payload.message))
+                 || text || `${resp.status} ${resp.statusText || ''}`.trim();
+  const code   = (payload && payload.error) || `http_${resp.status}`;
+  const err = new Error(detail);
+  err.code = code; err.status = resp.status; err.payload = payload;
+  if (!opts.silent) toast(opts.toastMsg || detail, 'error', 5500);
+  throw err;
+}
+function addMsg(role,text) {
+  const log=document.getElementById('chat-log');
+  const div=document.createElement('div'); div.className=`msg ${role}`;
+  const html=escHtml(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>');
+  div.innerHTML=`<div class="bubble">${html}</div>`;
+  log.appendChild(div); log.scrollTop=log.scrollHeight;
+}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escAttr(s){return String(s||'').replace(/'/g,"\\'");}
+function cssId(s){return String(s).replace(/[^a-zA-Z0-9]/g,'_');}
+function fmtAge(iso){
+  if(!iso) return 'unknown';
+  const sec=Math.round((new Date()-new Date(iso))/1000);
+  if(sec<60) return `${sec}s ago`;
+  if(sec<3600) return `${Math.round(sec/60)}m ago`;
+  if(sec<86400) return `${Math.round(sec/3600)}h ago`;
+  return `${Math.round(sec/86400)}d ago`;
+}
+</script>
+</body>
+</html>

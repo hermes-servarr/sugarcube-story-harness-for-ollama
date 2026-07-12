@@ -1,0 +1,22 @@
+embed_model: nomic-embed-text
+format_version: 2.36.1
+model_mode: compact
+num_ctx: 4096
+num_predict: 1024
+ollama_base_url: http://localhost:11434
+ollama_model: dolphin-llama3:8b-256k
+output_format: delimited
+rag_enabled: true
+rag_min_score: 0.3
+rag_top_k: 3
+repeat_penalty: 1.15
+story_format: SugarCube2
+story_ifid: 6FE86376-E020-4764-B88F-93BEF79DE8AA
+story_title: The Lost City of Atlantis
+sugarcube_path: ''
+temperature: 0.7
+tweego_head_file: ''
+tweego_log_stats: false
+tweego_module_dirs: []
+tweego_path: tweego
+tweego_test_mode: false

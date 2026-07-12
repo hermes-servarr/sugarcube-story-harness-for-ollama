@@ -1,0 +1,646 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from harness.compile import (
+    _build_tweego_argv,
+    _storydata_twee,
+    _storyinit_twee,
+    collect_passage_files,
+)
+from harness.models import (
+    HarnessConfig,
+    ModelOutput,
+    ParsedChoice,
+    PassageEntry,
+    StateVariable,
+    StoryGraph,
+)
+from harness.ollama import parse_model_output
+from harness.passage import create_passage, sync_manifest
+from harness.project import ProjectPaths, init_project, load_config
+from harness.validation import (
+    _iter_macro_tags,
+    _reachable_unset,
+    check_macro_pairing,
+    run_validation,
+)
+
+
+class ParserTests(unittest.TestCase):
+    def test_ignores_template_placeholders(self):
+        parsed = parse_model_output(
+            """PROSE:
+The corridor hums.
+
+CHOICES:
+- Listen | follow the sound
+- Leave | return outside
+
+MEDIA:
+(type): (keyword, keyword, keyword)
+
+NEW_CHARACTERS:
+(id) | (one paragraph prose sheet)
+
+SUMMARY:
+The corridor hums.
+"""
+        )
+
+        self.assertEqual(parsed.media, [])
+        self.assertEqual(parsed.new_characters, [])
+        self.assertEqual(len(parsed.choices), 2)
+
+
+class PassageCreationTests(unittest.TestCase):
+    def test_duplicate_slug_gets_unique_file(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            output = ModelOutput(
+                prose="A beginning.",
+                choices=[ParsedChoice(text="Go", hint="next")],
+                summary="A beginning.",
+            )
+
+            first_id, _ = create_passage(p, "intro", "01_start", output, None)
+            second_id, graph = create_passage(p, "intro", "01_start", output, first_id)
+
+            self.assertNotEqual(first_id, second_id)
+            self.assertNotEqual(graph.passages[first_id].file, graph.passages[second_id].file)
+
+            validation = run_validation(p)
+            duplicate_errors = [
+                issue for issue in validation.errors
+                if issue.code == "manifest_duplicate_file"
+            ]
+            self.assertEqual(duplicate_errors, [])
+
+
+class StoryDataTests(unittest.TestCase):
+    def test_init_generates_stable_ifid(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            cfg1 = load_config(p)
+            cfg2 = load_config(ProjectPaths(Path(tmp)))
+            self.assertTrue(cfg1.story_ifid)
+            self.assertEqual(cfg1.story_ifid, cfg2.story_ifid)
+
+    def test_storydata_twee_embeds_config(self):
+        cfg = HarnessConfig(
+            story_title="My Tale",
+            story_format="SugarCube2",
+            story_ifid="ABC-123",
+            format_version="2.37.0",
+        )
+        out = _storydata_twee(cfg, "intro__01_start")
+        self.assertIn(":: StoryData", out)
+        self.assertIn('"ifid": "ABC-123"', out)
+        self.assertIn('"format-version": "2.37.0"', out)
+        self.assertIn('"start": "intro__01_start"', out)
+        self.assertIn(":: StoryTitle\nMy Tale", out)
+
+
+class TweeExtensionTests(unittest.TestCase):
+    def test_collect_passage_files_picks_up_twee(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            arc_dir = p.arcs_dir / "intro"
+            arc_dir.mkdir(parents=True, exist_ok=True)
+            (arc_dir / "a.tw").write_text(":: a\nbody\n", encoding="utf-8")
+            (arc_dir / "b.twee").write_text(":: b\nbody\n", encoding="utf-8")
+            names = sorted(f.name for f in collect_passage_files(p))
+            self.assertEqual(names, ["a.tw", "b.twee"])
+
+    def test_sync_manifest_includes_twee_orphans(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            arc_dir = p.arcs_dir / "intro"
+            arc_dir.mkdir(parents=True, exist_ok=True)
+            orphan = arc_dir / "loose.twee"
+            orphan.write_text(":: loose\nbody\n", encoding="utf-8")
+            missing_from_json, _ = sync_manifest(p)
+            self.assertIn("arcs/intro/loose.twee", missing_from_json)
+
+
+class SugarCubeRenderTests(unittest.TestCase):
+    def test_passage_type_appears_as_tag_in_header(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Final scene.", choices=[], summary="End.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_end", out, None, passage_type="ending",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertIn(f":: {pid} [intro ending]", tw)
+
+    def test_normal_passage_header_omits_normal_tag(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Scene.", choices=[ParsedChoice(text="Go", hint="on")],
+                summary="On.",
+            )
+            pid, graph = create_passage(p, "intro", "01_a", out, None)
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertIn(f":: {pid} [intro]", tw)
+            self.assertNotIn("normal", tw.splitlines()[0])
+
+    def test_state_write_choice_uses_two_arg_link(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Scene.",
+                choices=[ParsedChoice(
+                    text="Take it",
+                    hint="grab the orb",
+                    state_writes={"$has_orb": True},
+                )],
+                summary="Scene.",
+            )
+            pid, graph = create_passage(p, "intro", "01_a", out, None)
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            # SugarCube two-arg <<link>> form, no inner <<goto>>
+            self.assertIn('<<link "Take it" "UNRESOLVED_choice0_', tw)
+            self.assertIn("<<set $has_orb to true>>", tw)
+            self.assertNotIn("<<goto", tw.split('<<link "Take it"')[1].split("<</link>>")[0])
+
+    def test_hub_choices_collapse_into_actions_macro(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Town square.",
+                choices=[
+                    ParsedChoice(text="Visit shop", hint="shop"),
+                    ParsedChoice(text="Talk to king", hint="king"),
+                ],
+                summary="Hub.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_hub", out, None, passage_type="hub",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertIn("<<actions ", tw)
+            self.assertIn("[[Visit shop|UNRESOLVED_choice0_", tw)
+            self.assertIn("[[Talk to king|UNRESOLVED_choice1_", tw)
+
+    def test_hub_with_state_write_falls_back_to_per_choice_links(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Town square.",
+                choices=[
+                    ParsedChoice(text="Visit shop", hint="shop"),
+                    ParsedChoice(
+                        text="Bribe guard", hint="bribe",
+                        state_writes={"$gold": 5},
+                    ),
+                ],
+                summary="Hub.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_hub", out, None, passage_type="hub",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertNotIn("<<actions ", tw)
+            # Both choices still rendered (one wikilink, one <<link>> macro).
+            self.assertIn("[[Visit shop|UNRESOLVED_choice0_", tw)
+            self.assertIn('<<link "Bribe guard" "UNRESOLVED_choice1_', tw)
+
+
+class ReachableUnsetTests(unittest.TestCase):
+    """Forward-reachability core of the undeclared-state-var check."""
+
+    @staticmethod
+    def _graph(edges: dict[str, list[str]], writers: dict[str, list[str]], start: str):
+        g = StoryGraph(start_passage=start)
+        for pid, children in edges.items():
+            g.passages[pid] = PassageEntry(
+                file=f"arcs/x/{pid}.tw", arc="x",
+                children=children, state_writes=writers.get(pid, []),
+            )
+        w = {pid: set(e.state_writes) for pid, e in g.passages.items()}
+        return g, w
+
+    def test_no_writer_all_reachable_unset(self):
+        g, w = self._graph({"a": ["b"], "b": ["c"], "c": []}, {}, "a")
+        self.assertEqual(_reachable_unset(g, w, "$v"), {"a", "b", "c"})
+
+    def test_writer_blocks_downstream(self):
+        g, w = self._graph({"a": ["b"], "b": ["c"], "c": []}, {"a": ["$v"]}, "a")
+        # a itself read-unsafe (own write doesn't satisfy own read); b,c safe.
+        self.assertEqual(_reachable_unset(g, w, "$v"), {"a"})
+
+    def test_diamond_one_branch_sets(self):
+        # a -> l,r ; l,r -> m. Only l sets $v, so m still reachable unset via r.
+        g, w = self._graph(
+            {"a": ["l", "r"], "l": ["m"], "r": ["m"], "m": []},
+            {"l": ["$v"]}, "a",
+        )
+        self.assertEqual(_reachable_unset(g, w, "$v"), {"a", "l", "r", "m"})
+
+    def test_diamond_both_branches_set(self):
+        g, w = self._graph(
+            {"a": ["l", "r"], "l": ["m"], "r": ["m"], "m": []},
+            {"l": ["$v"], "r": ["$v"]}, "a",
+        )
+        self.assertEqual(_reachable_unset(g, w, "$v"), {"a", "l", "r"})
+
+    def test_cycle_terminates(self):
+        g, w = self._graph({"a": ["b"], "b": ["a"]}, {}, "a")
+        self.assertEqual(_reachable_unset(g, w, "$v"), {"a", "b"})
+
+
+class UndeclaredStateVarValidationTests(unittest.TestCase):
+    def test_read_without_setter_is_error(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="The gate reads $has_key on entry.",
+                choices=[ParsedChoice(text="Go", hint="on")],
+                summary="Gate.",
+            )
+            create_passage(p, "intro", "01_gate", out, None)
+            result = run_validation(p)
+            self.assertTrue(any(e.code == "undeclared_state_var" for e in result.errors))
+
+    def test_declared_default_silences_error(self):
+        from harness.project import load_story, save_story
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="The gate reads $has_key on entry.",
+                choices=[ParsedChoice(text="Go", hint="on")],
+                summary="Gate.",
+            )
+            create_passage(p, "intro", "01_gate", out, None)
+            graph = load_story(p)
+            graph.state_variables["$has_key"] = StateVariable(type="bool", default=False)
+            save_story(p, graph)
+            result = run_validation(p)
+            self.assertFalse(any(e.code == "undeclared_state_var" for e in result.errors))
+
+
+class MacroPairingTests(unittest.TestCase):
+    @staticmethod
+    def _check(tmp, body):
+        p = init_project(Path(tmp), title="Test")
+        f = p.arcs_dir / "x" / "01.tw"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(":: x__01 [x]\n" + body + "\n", encoding="utf-8")
+        graph = StoryGraph()
+        graph.passages["x__01"] = PassageEntry(file="arcs/x/01.tw", arc="x")
+        return check_macro_pairing(p, graph)
+
+    def test_balanced_nesting_ok(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(
+                self._check(tmp, "<<if $x>><<for _i to 3>>hi<</for>><</if>>"), [])
+
+    def test_wrong_order_flagged(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<if $x>><<for _a>><</if>><</for>>")
+            self.assertTrue(issues)
+            self.assertEqual(issues[0].code, "macro_pairing")
+
+    def test_unclosed_flagged(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<if $x>>hi")
+            self.assertTrue(any("never closed" in i.message for i in issues))
+
+    def test_stray_close_flagged(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "hi <</if>>")
+            self.assertTrue(any("stray" in i.message for i in issues))
+
+    def test_quote_shielded_delimiter_ok(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(self._check(tmp, '<<if $x eq "a>>b">>yes<</if>>'), [])
+
+    def test_inline_print_macros_ignored(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(self._check(tmp, "<<= $x>><<- $y>><<if $z>>ok<</if>>"), [])
+
+    def test_if_elseif_else_chain_ok(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(
+                self._check(tmp, "<<if $x>>a<<elseif $y>>b<<else>>c<</if>>"), [])
+
+    def test_custom_widget_close_ignored(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(self._check(tmp, "<<myblock>>x<</myblock>>"), [])
+
+
+class IterMacroTagsTests(unittest.TestCase):
+    def test_quote_keeps_tag_whole(self):
+        tags = list(_iter_macro_tags('<<if $x eq "a>>b">>yes<</if>>'))
+        self.assertEqual(tags, [(False, "if", 1), (True, "if", 1)])
+
+    def test_unterminated_macro_stops_cleanly(self):
+        self.assertEqual(list(_iter_macro_tags("text <<if $x")), [])
+
+    def test_line_numbers_tracked(self):
+        tags = list(_iter_macro_tags("line1\n<<if $x>>\n<</if>>"))
+        self.assertEqual(tags, [(False, "if", 2), (True, "if", 3)])
+
+
+class GenerationAuditTests(unittest.TestCase):
+    def test_record_read_roundtrip(self):
+        from harness.audit import record_generation, read_generation
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            gid = record_generation(p, {
+                "label": "passage", "model": "m", "raw_output": "RAW PROSE",
+            }, kind="draft")
+            self.assertTrue(gid)
+            rec = read_generation(p, gid)
+            self.assertEqual(rec["raw_output"], "RAW PROSE")
+            self.assertEqual(rec["kind"], "draft")
+            self.assertEqual(rec["id"], gid)
+
+    def test_list_newest_first_with_preview(self):
+        from harness.audit import record_generation, list_generations
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            record_generation(p, {"raw_output": "first " * 100}, kind="draft")
+            second = record_generation(p, {"raw_output": "second"}, kind="commit")
+            rows = list_generations(p, limit=10)
+            self.assertEqual(rows[0]["id"], second)  # newest first
+            self.assertEqual(rows[0]["kind"], "commit")
+            self.assertLessEqual(len(rows[0]["raw_preview"]), 280)
+            self.assertEqual(rows[-1]["raw_chars"], len("first " * 100))
+
+    def test_prune_keeps_only_max(self):
+        from harness.audit import record_generation, list_generations
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            for i in range(5):
+                record_generation(p, {"raw_output": f"r{i}"}, kind="draft", max_keep=2)
+            self.assertEqual(len(list_generations(p, limit=99)), 2)
+
+    def test_read_rejects_traversal_and_missing(self):
+        from harness.audit import read_generation
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            self.assertIsNone(read_generation(p, "../../etc/passwd"))
+            self.assertIsNone(read_generation(p, "nope"))
+
+
+class StoryInitTests(unittest.TestCase):
+    def test_empty_when_no_declared_defaults(self):
+        graph = StoryGraph()
+        graph.state_variables["$x"] = StateVariable(type="bool", default=None)
+        self.assertEqual(_storyinit_twee(graph), "")
+
+    def test_emits_set_for_each_declared_default(self):
+        graph = StoryGraph()
+        graph.state_variables["$flag"] = StateVariable(type="bool", default=True)
+        graph.state_variables["$gold"] = StateVariable(type="int", default=10)
+        graph.state_variables["$name"] = StateVariable(type="str", default='Anna "the bold"')
+        out = _storyinit_twee(graph)
+        self.assertIn(":: StoryInit", out)
+        self.assertIn("<<set $flag to true>>", out)
+        self.assertIn("<<set $gold to 10>>", out)
+        # quote escaping
+        self.assertIn('<<set $name to "Anna \\"the bold\\"">>', out)
+
+
+class TweegoArgvTests(unittest.TestCase):
+    def test_argv_default_is_minimal(self):
+        cfg = HarnessConfig()
+        argv = _build_tweego_argv("tweego", cfg, Path("/src"), Path("/out.html"))
+        # tweego, -o, out, src
+        self.assertEqual(argv[0], "tweego")
+        self.assertIn("-o", argv)
+        self.assertNotIn("-l", argv)
+        self.assertNotIn("-t", argv)
+
+    def test_argv_threads_log_test_head_modules(self):
+        cfg = HarnessConfig(
+            tweego_log_stats=True,
+            tweego_test_mode=True,
+            tweego_head_file="extras/head.html",
+            tweego_module_dirs=["modA", "modB"],
+        )
+        argv = _build_tweego_argv("tweego", cfg, Path("/src"), Path("/out.html"))
+        self.assertIn("-l", argv)
+        self.assertIn("-t", argv)
+        self.assertIn("--head=extras/head.html", argv)
+        # two -m flags with their dirs
+        m_positions = [i for i, a in enumerate(argv) if a == "-m"]
+        self.assertEqual(len(m_positions), 2)
+        self.assertEqual(argv[m_positions[0] + 1], "modA")
+        self.assertEqual(argv[m_positions[1] + 1], "modB")
+
+
+class PassageDeleteTests(unittest.TestCase):
+    def test_delete_cleans_references_and_file(self):
+        from harness.passage import delete_passage
+        from harness.project import load_story
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(prose="Start.", choices=[ParsedChoice(text="Go", hint="next")], summary="Start.")
+            root, g = create_passage(p, "intro", "01_start", out, None)
+            child, g = create_passage(p, "intro", "02_next", out, root, choice_index=0)
+
+            child_file = p.root / g.passages[child].file
+            self.assertTrue(child_file.exists())
+
+            ok, _ = delete_passage(p, child)
+            self.assertTrue(ok)
+            g = load_story(p)
+            self.assertNotIn(child, g.passages)               # gone from manifest
+            self.assertFalse(child_file.exists())             # file removed
+            self.assertNotIn(child, g.passages[root].children) # parent detached
+            # parent's link to the deleted child is now an UNRESOLVED marker
+            parent_tw = (p.root / g.passages[root].file).read_text(encoding="utf-8")
+            self.assertNotIn(f"|{child}]]", parent_tw)
+            self.assertIn("UNRESOLVED_deleted_", parent_tw)
+
+    def test_delete_missing_returns_false(self):
+        from harness.passage import delete_passage
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            ok, msg = delete_passage(p, "nope__x")
+            self.assertFalse(ok)
+
+
+class MediaStagingTests(unittest.TestCase):
+    def _project_with_media(self, tmp):
+        """Project with one passage carrying one resolved image slot."""
+        from harness.models import ParsedMediaSlot
+        p = init_project(Path(tmp), title="Test")
+        # a real source image the slot resolves to
+        src = p.media_dir / "scene.png"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_bytes(b"\x89PNG\r\n\x1a\n")
+        output = ModelOutput(
+            prose="A scene.",
+            choices=[ParsedChoice(text="Go", hint="next")],
+            summary="A scene.",
+            media=[ParsedMediaSlot(type="image", keywords=["dusk"], description="dusk platform")],
+        )
+        pid, graph = create_passage(p, "intro", "01_start", output, None)
+        slot_id = graph.passages[pid].media_slots[0]
+        return p, pid, slot_id
+
+    def test_description_flows_to_slot(self):
+        with TemporaryDirectory() as tmp:
+            p, pid, slot_id = self._project_with_media(tmp)
+            from harness.media import get_slot
+            self.assertEqual(get_slot(p, slot_id).description, "dusk platform")
+
+    def test_stage_copies_into_build_media_with_relative_path(self):
+        with TemporaryDirectory() as tmp:
+            from harness.media import resolve_slot, stage_media_for_build
+            p, pid, slot_id = self._project_with_media(tmp)
+            ok, _ = resolve_slot(p, slot_id, "media/scene.png")
+            self.assertTrue(ok)
+            rel_map = stage_media_for_build(p, p.build_dir)
+            self.assertIn(slot_id, rel_map)
+            self.assertEqual(rel_map[slot_id]["src"], "media/scene.png")
+            # file physically copied next to where story.html lands
+            self.assertTrue((p.build_dir / "media" / "scene.png").exists())
+
+    def test_markup_uses_relative_path_alt_and_caption(self):
+        with TemporaryDirectory() as tmp:
+            from harness.media import media_markup, set_slot_meta, get_slot
+            p, pid, slot_id = self._project_with_media(tmp)
+            set_slot_meta(p, slot_id, alt="A rainy platform", caption="Ravenhold")
+            html = media_markup(get_slot(p, slot_id), "media/scene.png")
+            self.assertIn('src="media/scene.png"', html)
+            self.assertIn('alt="A rainy platform"', html)
+            self.assertIn("Ravenhold", html)
+            self.assertIn("loading=\"lazy\"", html)  # default lazy on images
+            self.assertNotIn(str(p.root), html)       # no absolute path leaks
+
+    def test_embed_leaves_pending_slot_as_comment(self):
+        with TemporaryDirectory() as tmp:
+            from harness.compile import _embed_media
+            p, pid, slot_id = self._project_with_media(tmp)
+            content = f"text\n<!-- media:{slot_id} -->\n"
+            # empty rel_map → pending/unstaged, comment preserved
+            self.assertIn(f"<!-- media:{slot_id} -->", _embed_media(p, content, {}))
+
+
+class PlanningTests(unittest.TestCase):
+    def _seed(self, tmp):
+        p = init_project(Path(tmp), title="Test")
+        output = ModelOutput(
+            prose="Start.", choices=[ParsedChoice(text="Go", hint="next")], summary="Start.",
+        )
+        pid, _ = create_passage(p, "intro", "01_start", output, None)
+        return p, pid
+
+    def test_add_beat_and_coverage(self):
+        with TemporaryDirectory() as tmp:
+            from harness import planning
+            p, pid = self._seed(tmp)
+            b = planning.add_beat(p, "Player reaches the city", act="Act 1")
+            ov = planning.plan_overview(p)
+            self.assertEqual(len(ov["beats"]), 1)
+            self.assertFalse(ov["beats"][0]["covered"])
+            self.assertIn(b.id, ov["gaps"]["open_beats"])
+
+            planning.set_passage_beats(p, pid, [b.id])
+            ov = planning.plan_overview(p)
+            self.assertTrue(ov["beats"][0]["covered"])
+            self.assertEqual(ov["beats"][0]["passages"], [pid])
+            self.assertNotIn(b.id, ov["gaps"]["open_beats"])
+
+    def test_focus_beat_prefers_arc_open_beat(self):
+        with TemporaryDirectory() as tmp:
+            from harness import planning
+            from harness.project import load_story
+            p, pid = self._seed(tmp)
+            b1 = planning.add_beat(p, "First beat")
+            b2 = planning.add_beat(p, "Arc-specific beat")
+            planning.set_arc_plan(p, "intro", beat_ids=[b2.id], goal="Establish the city")
+            focus = planning.next_focus_beat(load_story(p), "intro")
+            self.assertEqual(focus.id, b2.id)
+            txt = planning.plan_focus_text(p, "intro")
+            self.assertIn("Arc-specific beat", txt)
+            self.assertIn("Establish the city", txt)
+
+    def test_delete_beat_scrubs_references(self):
+        with TemporaryDirectory() as tmp:
+            from harness import planning
+            from harness.project import load_story
+            p, pid = self._seed(tmp)
+            b = planning.add_beat(p, "Beat")
+            planning.set_passage_beats(p, pid, [b.id])
+            planning.set_arc_plan(p, "intro", beat_ids=[b.id])
+            self.assertTrue(planning.delete_beat(p, b.id))
+            g = load_story(p)
+            self.assertEqual(g.passages[pid].plan_beats, [])
+            self.assertEqual(g.arcs["intro"].beat_ids, [])
+
+    def test_scene_crud_and_bulk(self):
+        from harness import planning
+        from harness.project import load_story
+        with TemporaryDirectory() as tmp:
+            p, pid = self._seed(tmp)
+            b = planning.add_beat(p, "Reach the harbor")
+            sc = planning.add_scene(p, "intro", title="Docks at dusk",
+                                    summary="Arrive at the harbor", keywords=["fog","rope"],
+                                    characters=["alice"], beat_ids=[b.id])
+            ov = planning.plan_overview(p)
+            arc = next(a for a in ov["arcs"] if a["arc"] == "intro")
+            self.assertEqual(len(arc["scenes"]), 1)
+            self.assertEqual(arc["scenes"][0]["beat_ids"], [b.id])
+
+            self.assertTrue(planning.update_scene(p, "intro", sc.id, passage_id=pid))
+            g = load_story(p)
+            scene = g.arcs["intro"].scenes[0]
+            self.assertEqual(scene.passage_id, pid)
+            self.assertEqual(scene.status, "drafted")
+
+            created = planning.add_scenes_bulk(p, "intro", [
+                {"title": "A", "summary": "s", "keywords": ["x"]},
+                {"title": "", "summary": ""},  # skipped — no content
+            ])
+            self.assertEqual(len(created), 1)
+            self.assertTrue(planning.delete_scene(p, "intro", sc.id))
+            self.assertFalse(planning.delete_scene(p, "intro", "nope"))
+
+    def test_import_story_points_parses_acts_and_questions(self):
+        with TemporaryDirectory() as tmp:
+            from harness import planning
+            p, _ = self._seed(tmp)
+            p.story_points_md.write_text(
+                "# Story Points\n\n## Act 1\n- Arrive in town\n- Meet the warden\n\n"
+                "## Open Questions\n- Who sent the letter\n",
+                encoding="utf-8",
+            )
+            ov = planning.import_story_points(p, replace=True)
+            texts = [b["text"] for b in ov["beats"]]
+            self.assertIn("Arrive in town", texts)
+            self.assertIn("Meet the warden", texts)
+            self.assertIn("Act 1", ov["acts"])
+            self.assertIn("Who sent the letter", ov["open_questions"])
+
+
+class PlanFocusPromptTests(unittest.TestCase):
+    def test_compact_prompt_includes_focus_when_set(self):
+        from harness.prompts import build_compact_passage_prompt
+        with_focus = build_compact_passage_prompt(
+            premise="p", story_points="sp", arc_notes="a", entities_text="e",
+            parent_prose="pp", snapshot_text="s", human_prompt="h",
+            plan_focus="Target beat: reach the city",
+        )
+        self.assertIn("PLAN FOCUS:", with_focus)
+        self.assertIn("reach the city", with_focus)
+
+    def test_compact_prompt_omits_focus_block_when_empty(self):
+        from harness.prompts import build_compact_passage_prompt
+        without = build_compact_passage_prompt(
+            premise="p", story_points="sp", arc_notes="a", entities_text="e",
+            parent_prose="pp", snapshot_text="s", human_prompt="h",
+        )
+        self.assertNotIn("PLAN FOCUS:", without)
+
+
+if __name__ == "__main__":
+    unittest.main()
