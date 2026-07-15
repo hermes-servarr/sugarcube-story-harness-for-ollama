@@ -4,11 +4,25 @@ A local, single-user harness for co-authoring branching SugarCube stories with a
 
 The harness owns the mechanical work: passage files, links, graph metadata, state variables, media slots, snapshots, validation, and Tweego compilation. The model is treated as a prose and beat generator, not a filesystem actor.
 
+## Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [Ollama](https://ollama.com) running locally with at least one model pulled (e.g. `ollama pull llama3.2`)
+- [Tweego](https://www.motoslave.net/tweego/) on your PATH (only needed for `compile`)
+
 ## Quick Start
 
 ```bash
-python3 -m harness.cli init my-story --title "My Story"
-python3 -m harness.cli serve my-story
+# Clone and install dependencies
+git clone https://github.com/hermes-servarr/sugarcube-story-harness-for-ollama.git
+cd sugarcube-story-harness-for-ollama
+uv sync
+
+# Create a new story project
+uv run harness init my-story --title "My Story"
+
+# Start the web UI
+uv run harness serve my-story
 ```
 
 Then open `http://127.0.0.1:8765`.
@@ -16,10 +30,18 @@ Then open `http://127.0.0.1:8765`.
 Useful commands:
 
 ```bash
-python3 -m harness.cli validate my-story
-python3 -m harness.cli compile my-story
-python3 -m harness.cli rag-reindex my-story
-python3 -m harness.cli rag-status my-story
+uv run harness validate my-story       # Run validation checks
+uv run harness compile my-story        # Compile to HTML via Tweego
+uv run harness rebuild my-story        # Rebuild story.json from .tw files
+uv run harness rag-reindex my-story    # Build inspiration vector index
+uv run harness rag-status my-story     # Show index stats
+uv run harness generations my-story    # List persisted model generations
+```
+
+## Running Tests
+
+```bash
+uv run pytest
 ```
 
 ## Project Shape
