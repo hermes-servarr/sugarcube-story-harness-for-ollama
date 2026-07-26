@@ -298,9 +298,12 @@ def run_e2e(config: E2EConfig) -> E2EReport:
             write_report(report, config.report_path)
             return report
 
-        # 4. Pre-checks (record availability, never fail)
+        # 4. Set server config (so pre-checks use the right Ollama URL/model)
         http = httpx.Client(base_url=base_url, timeout=10.0)
         try:
+            set_server_config(base_url, http, config.ollama_url, config.model)
+
+            # 4b. Pre-checks (record availability, never fail)
             t0 = time.monotonic()
             report.ollama_available = check_ollama(base_url, http)
             report.steps.append(E2EStepResult(
