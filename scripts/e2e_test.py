@@ -703,44 +703,59 @@ def run_generation_flow(base_url: str, http: httpx.Client, steps: list[E2EStepRe
                         ollama_url: str = "http://localhost:11434",
                         model: str = "llama3.2") -> list[E2EStepResult]:
     """Execute the full generation sequence (premise->world->opening->init->beats->arcs->scenes->passages)."""
-    def _step(name: str, fn, detail_fn=None):
+    def _step(name: str, fn, detail_fn=None, retries: int = 0):
+        """Run a step, optionally retrying on failure.
+        
+        When retries > 0, the step is retried up to that many times with a
+        short delay between attempts. This is critical for LLM generation
+        steps where the model may return malformed output that the parser
+        rejects on the first try.
+        """
         t0 = time.monotonic()
-        try:
-            result = fn()
-            detail = detail_fn(result) if detail_fn else "ok"
-            steps.append(E2EStepResult(
-                name=name, status=StepStatus.pass_,
-                duration_ms=int((time.monotonic() - t0) * 1000),
-                detail=detail,
-            ))
-            return result
-        except Exception as e:
-            steps.append(E2EStepResult(
-                name=name, status=StepStatus.fail,
-                duration_ms=int((time.monotonic() - t0) * 1000),
-                detail=f"{name} failed",
-                error=str(e),
-            ))
-            return None
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                result = fn()
+                detail = detail_fn(result) if detail_fn else "ok"
+                if attempt > 0:
+                    detail = f"{detail} (retry {attempt})"
+                steps.append(E2EStepResult(
+                    name=name, status=StepStatus.pass_,
+                    duration_ms=int((time.monotonic() - t0) * 1000),
+                    detail=detail,
+                ))
+                return result
+            except Exception as e:
+                last_error = e
+                if attempt < retries:
+                    time.sleep(2)
+                    continue
+        steps.append(E2EStepResult(
+            name=name, status=StepStatus.fail,
+            duration_ms=int((time.monotonic() - t0) * 1000),
+            detail=f"{name} failed",
+            error=str(last_error),
+        ))
+        return None
 
     # Set server config first
     _step("set-server-config", lambda: set_server_config(base_url, http, ollama_url, model))
 
-    # Generate premise
-    premise_data = _step("generate-premise", lambda: generate_premise_step(http))
+    # Generate premise (retry: LLM may return malformed JSON)
+    premise_data = _step("generate-premise", lambda: generate_premise_step(http), retries=2)
     if premise_data is None:
         return steps
     premise = premise_data.get("premise", "")
     title = premise_data.get("title", "E2E Test Story")
 
     # Generate world
-    world_data = _step("generate-world", lambda: generate_world_step(http, premise))
+    world_data = _step("generate-world", lambda: generate_world_step(http, premise), retries=2)
     if world_data is None:
         return steps
     world_overview = world_data.get("world_overview", "")
 
     # Generate opening
-    opening_data = _step("generate-opening", lambda: generate_opening_step(http, premise, world_overview))
+    opening_data = _step("generate-opening", lambda: generate_opening_step(http, premise, world_overview), retries=2)
     if opening_data is None:
         return steps
     opening_situation = opening_data.get("opening_situation", "")
@@ -749,10 +764,10 @@ def run_generation_flow(base_url: str, http: httpx.Client, steps: list[E2EStepRe
     _step("init-story", lambda: init_story_step(http, title, premise, world_overview, opening_situation))
 
     # Generate beats
-    _step("generate-beats", lambda: generate_beats_step(http, count=3))
+    _step("generate-beats", lambda: generate_beats_step(http, count=3), retries=2)
 
     # Generate arcs
-    arcs = _step("generate-arcs", lambda: generate_arcs_step(http, count=2))
+    arcs = _step("generate-arcs", lambda: generate_arcs_step(http, count=2), retries=2)
     if arcs is None or not arcs:
         return steps
 
@@ -761,11 +776,12 @@ def run_generation_flow(base_url: str, http: httpx.Client, steps: list[E2EStepRe
         scenes = _step(
             f"generate-scenes-{arc_name}",
             lambda an=arc_name: generate_scenes_step(http, an, count=2),
+            retries=2,
         )
         if scenes is None or not scenes:
             continue
 
-        # Generate first passage for the arc
+        # Generate first passage for the arc (retry: parser may reject malformed output)
         first_scene = scenes[0]
         scene_title = first_scene.get("title", "Opening")
         scene_summary = first_scene.get("summary", "")
@@ -773,6 +789,7 @@ def run_generation_flow(base_url: str, http: httpx.Client, steps: list[E2EStepRe
         _step(
             f"generate-passage-{arc_name}",
             lambda an=arc_name, sl=slug, p=scene_summary: generate_passage_step(http, an, sl, p),
+            retries=3,
         )
 
     return steps
