@@ -575,8 +575,14 @@ def check_tweego(base_url: str, http: httpx.Client) -> bool:
 # try/except ImportError; return True if importable, False otherwise
 def check_playwright() -> bool:
     """Return True if the playwright Python package is importable."""
-    # Ensure playwright can find the chromium binary
-    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/data/.playwright")
+    # Ensure playwright can find the chromium binary — use the env var if set,
+    # otherwise check common locations. Do NOT hardcode a path that only works
+    # in the Hermes container.
+    if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        for candidate in ("/opt/data/.playwright", os.path.expanduser("~/.cache/ms-playwright")):
+            if os.path.isdir(candidate):
+                os.environ["PLAYWRIGHT_BROWSERS_PATH"] = candidate
+                break
     try:
         import playwright.sync_api  # noqa: F401
         return True
