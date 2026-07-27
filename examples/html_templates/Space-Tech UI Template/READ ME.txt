@@ -1,0 +1,68 @@
+======== \*/ SPACE-TECH UI TEMPLATE \*/ ========
+
+Thank you for downloading this Template Asset pack! 
+I hope this template will be useful in your project(s).
+If you found use with it, please consider:
+- Rating it on the asset page
+- Leaving a comment
+- Sharing the asset pack with others!
+
+Consider tagging me in social platform or sending me a link to your project: I love to see what my template was used for!
+
+THANK YOU AGAIN! <3
+
+========Credits:
+This template is under the CC-BY license, which requires crediting for free use.
+As such, please include the asset page link in your project.
+
+========This Folder includes:
+- HTML ready-to-use file
+- .tw, .js and .css file for Tweego
+- Annotated passages, javascript and stylesheet
+
+========Template made by manonamora on Twine 2/Tweego with Sugarcube (v 2.37.3)
+Any use with older version will break the popups.
+
+/!\ WARNING /!\
+A New IFID should be generated before using the template. See the *IFID CHANGE* file.
+
+========Notes:
+This template is a bit of a two-in-one-deal, as you get two different sci-fi styling: one more space focused, one more CRT-tech. It also includes optional stats bars, which can be displayed on the main page (replacing a secondary menu). Each section includes notes and annotations on how to modify specific elements, in the different passages, JavaScript and StyleSheet.
+
+The CSS codes include a "Table of Content" to find different sections easier, ordered by types of elements and 'theme' (Space/Tech).
+
+I highly recommend W3 schools (for CSS Beginner) and MDN (for more advanced code) if you encounter an unknown CSS reference or are looking for a specific one.
+
+If you have any question about or any issue with the template, send me an ask over on Tumblr or comment on the asset page. 
+
+========Links
+Website:
+	https://manonamora.neocities.org
+Tumblr: 
+	https://manonamora-if.tumblr.com/
+Itch:
+	https://manonamora.itch.io/
+Asset Page:
+	https://manonamora.itch.io/twine-sugarcube-templates
+SugarCube Guide:
+	https://manonamora.itch.io/twine-sugarcube-guide
+
+Twinery (Twine):
+	https://twinery.org/
+Sugarcube 2 Documentation:
+	https://www.motoslave.net/sugarcube/2/docs/
+Twine Resources:
+	https://intfiction.org/t/twine-resource-masterlist-wiki/65903
+W3 School:
+	https://www.w3schools.com/css/default.asp
+	https://www.w3schools.com/cssref/default.asp
+(MDN)Mozilla Developer:
+	https://developer.mozilla.org/en-US/
+
+Assets from:
+- SVG Backgrounds
+	https://www.svgbackgrounds.com/
+- GoogleFonts
+	https://fonts.google.com
+- FontAwesome
+	https://fontawesome.com/

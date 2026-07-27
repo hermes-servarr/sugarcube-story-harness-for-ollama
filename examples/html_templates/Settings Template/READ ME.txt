@@ -1,0 +1,76 @@
+======== \*/ SETTINGS TEMPLATE \*/ ========
+
+Thank you for downloading this Template Asset pack! 
+I hope this template will be useful in your project(s).
+If you found use with it, please consider:
+- Rating it on the asset page
+- Leaving a comment
+- Sharing the asset pack with others!
+
+Consider tagging me in social platform or sending me a link to your project: I love to see what my template was used for!
+
+THANK YOU AGAIN! <3
+
+========Credits:
+This template is under the CC-BY license, which requires crediting for free use.
+As such, please include the asset page link in your project.
+
+========This Folder includes:
+- HTML ready-to-use file
+- .tw, .js and .css file for Tweego
+- Annotated passages, stylesheet and javascript
+- Chapel's Notify Macros
+
+========Template made by manonamora on Twine 2/Tweego with Sugarcube (v 2.37.3)
+Any use with older version will break some settings.
+
+/!\ WARNING /!\
+A New IFID should be generated before using the template. See the *IFID CHANGE* file.
+
+========Notes:
+This template provides basic Text Display, Save and Accessibility settings (most used/requested in IF circles). While the code is annotated, this template is not a guide on how to use Settings API (you should check my SugarCube Guide instead).
+
+Still I encourage you to use only the settings you want/need, as well as edit them to fit your project. For multiple settings, the required code is spread between the JavaScript and StyleSheet.
+
+The CSS code is organized in a way to separate the different settings, and only there to showcase what the different settings can do. You can edit more than what is coded.
+
+I highly recommend W3 schools (for CSS Beginner) and MDN (for more advanced code) if you encounter an unknown CSS reference or are looking for a specific one.
+
+If you have any question about or any issue with the template, send me an ask over on Tumblr or comment on the asset page. 
+
+========Links
+Website:
+	https://manonamora.neocities.org
+Tumblr: 
+	https://manonamora-if.tumblr.com/
+Itch:
+	https://manonamora.itch.io/
+Asset Page:
+	https://manonamora.itch.io/twine-sugarcube-templates
+SugarCube Guide:
+	https://manonamora.itch.io/twine-sugarcube-guide
+
+Twinery (Twine):
+	https://twinery.org/
+Sugarcube 2 Documentation:
+	https://www.motoslave.net/sugarcube/2/docs/
+Twine Resources:
+	https://intfiction.org/t/twine-resource-masterlist-wiki/65903
+W3 School:
+	https://www.w3schools.com/css/default.asp
+	https://www.w3schools.com/cssref/default.asp
+(MDN)Mozilla Developer:
+	https://developer.mozilla.org/en-US/
+
+Macros from:
+- Chapel: Notification
+	https://github.com/ChapelR/custom-macros-for-sugarcube-2
+
+Assets from:
+- GoogleFonts
+	https://fonts.google.com/
+- Canvas
+	https://www.canva.com
+- Freesound
+	https://freesound.org
+
