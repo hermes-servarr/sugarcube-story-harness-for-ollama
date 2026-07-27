@@ -157,11 +157,19 @@ def check_passage_file_links(p: ProjectPaths, graph: StoryGraph) -> list[Validat
 # macros (set, print, =, -, goto, link-less, etc.) and continuations
 # (else, elseif, case, default, next) are intentionally absent — they neither
 # open nor close a block.
+#
+# Sources: SugarCube v2.37.3 docs (docs/sugarcube2-analysis.md §1.3).
+#   - `silent` is the v2.37.0+ replacement for the deprecated `silently`.
+#   - `do`/`redo` are v2.37.0 dynamic-content macros; `<<do>>` is a container,
+#     `<<redo>>` is self-closing so it is correctly absent here.
+#   - `script` (v2.0.0) wraps JS/TwineScript: `<<script>>...<</script>>`.
+#   - `done` (v2.35.0) pairs with `<<timed>>`: `<<done>>...<</done>>`.
 MACRO_CONTAINERS: frozenset[str] = frozenset({
     "if", "for", "switch", "widget", "link", "button", "capture",
-    "silently", "nobr", "append", "prepend", "replace",
+    "silently", "silent", "nobr", "append", "prepend", "replace",
     "linkappend", "linkprepend", "linkreplace",
     "timed", "repeat", "type", "createplaylist", "createaudiogroup",
+    "do", "script", "done",
 })
 
 _MACRO_NAME_RE = re.compile(r'(/?)\s*([A-Za-z][\w-]*)')
@@ -255,6 +263,84 @@ def check_macro_pairing(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIs
             issues.append(_issue(
                 "error", "macro_pairing",
                 f"Passage {pid!r}: <<{name}>> opened at line {line} is never closed.",
+                pid,
+            ))
+    return issues
+
+
+# ── Deprecated SugarCube features (v2.37.x) ────────────────────────────────────
+#
+# Each entry: (macro/tag/passage name, deprecation version, recommended replacement).
+# Surfaced as warnings (not errors) so existing stories keep compiling while authors
+# are nudged toward forward-compatible patterns. Sources: docs/sugarcube2-analysis.md
+# §3.1, §3.2, §3.4, §3.15 and the SugarCube 2 migration notes.
+DEPRECATED_MACROS: tuple[tuple[str, str, str], ...] = (
+    # (name,              deprecated-in, replacement)
+    ("actions",  "v2.37.0", "<<link>> per choice (optionally with <<if hasVisited()>> to hide visited)"),
+    ("choice",   "v2.37.0", "<<link>> or [[wikilink]] with a setter"),
+    ("silently", "v2.37.0", "<<silent>> (same behaviour, current name)"),
+)
+DEPRECATED_TAGS: tuple[tuple[str, str, str], ...] = (
+    ("bookmark", "v2.37.0", "no replacement — bookmarks removed from SugarCube"),
+)
+DEPRECATED_SPECIAL_PASSAGES: tuple[tuple[str, str, str], ...] = (
+    ("StoryShare", "v2.37.0", "no replacement — sharing UI removed"),
+)
+
+
+def check_deprecated_features(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """Warn when generated passages use macros/tags/special passages deprecated
+    in SugarCube v2.37.0+. These still work against the harness's pinned
+    format-version but will break on upgrade — flagging them early keeps
+    generated stories forward-compatible. See docs/sugarcube2-analysis.md §3.15."""
+    issues: list[ValidationIssue] = []
+    dep_macros = {name for name, _, _ in DEPRECATED_MACROS}
+    dep_tags = {name for name, _, _ in DEPRECATED_TAGS}
+    dep_passages = {name for name, _, _ in DEPRECATED_SPECIAL_PASSAGES}
+    dep_lookup = {n: (v, repl) for n, v, repl in
+                  (*DEPRECATED_MACROS, *DEPRECATED_TAGS, *DEPRECATED_SPECIAL_PASSAGES)}
+
+    for pid, entry in graph.passages.items():
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+
+        # Deprecated macros — scan opening tags only (<<name ...>>, not <</name>>).
+        seen_here: set[str] = set()
+        for is_close, name, _line in _iter_macro_tags(content):
+            if is_close:
+                continue
+            if name in dep_macros and name not in seen_here:
+                seen_here.add(name)
+                ver, repl = dep_lookup[name]
+                issues.append(_issue(
+                    "warning", "deprecated_macro",
+                    f"Passage {pid!r} uses <<{name}>> (deprecated {ver}); "
+                    f"replace with {repl}.",
+                    pid,
+                ))
+
+        # Deprecated passage tags — from the :: header line.
+        header_match = re.search(r'^::\s*\S+\s*\[([^\]]*)\]', content, re.MULTILINE)
+        if header_match:
+            tags = header_match.group(1).split()
+            for tag in tags:
+                if tag in dep_tags and tag not in seen_here:
+                    seen_here.add(tag)
+                    ver, repl = dep_lookup[tag]
+                    issues.append(_issue(
+                        "warning", "deprecated_tag",
+                        f"Passage {pid!r} has [{tag}] tag (deprecated {ver}); {repl}.",
+                        pid,
+                    ))
+
+        # Deprecated special passages — exact passage-id match.
+        if pid in dep_passages and pid not in seen_here:
+            ver, repl = dep_lookup[pid]
+            issues.append(_issue(
+                "warning", "deprecated_passage",
+                f"Special passage {pid!r} is deprecated ({ver}); {repl}.",
                 pid,
             ))
     return issues
@@ -464,6 +550,7 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_manifest_drift(p, graph),
         check_passage_file_links(p, graph),
         check_macro_pairing(p, graph),
+        check_deprecated_features(p, graph),
         check_undeclared_state_vars(p, graph),
         check_unresolved_media(p),
         check_pending_media(p),

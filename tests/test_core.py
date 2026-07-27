@@ -167,7 +167,10 @@ class SugarCubeRenderTests(unittest.TestCase):
             self.assertIn("<<set $has_orb to true>>", tw)
             self.assertNotIn("<<goto", tw.split('<<link "Take it"')[1].split("<</link>>")[0])
 
-    def test_hub_choices_collapse_into_actions_macro(self):
+    def test_hub_choices_render_as_visited_gated_links(self):
+        """Hub plain choices render as <<link>> wrapped in <<if not hasVisited>>,
+        replacing the deprecated <<actions>> macro (SugarCube v2.37.0). See
+        docs/sugarcube2-analysis.md §3.1."""
         with TemporaryDirectory() as tmp:
             p = init_project(Path(tmp), title="Test")
             out = ModelOutput(
@@ -182,9 +185,13 @@ class SugarCubeRenderTests(unittest.TestCase):
                 p, "intro", "01_hub", out, None, passage_type="hub",
             )
             tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
-            self.assertIn("<<actions ", tw)
-            self.assertIn("[[Visit shop|UNRESOLVED_choice0_", tw)
-            self.assertIn("[[Talk to king|UNRESOLVED_choice1_", tw)
+            # No deprecated <<actions>> macro should appear.
+            self.assertNotIn("<<actions ", tw)
+            # Each plain choice is a <<link>> inside an <<if not hasVisited()>> gate.
+            self.assertIn('<<if not hasVisited("UNRESOLVED_choice0_shop")>>', tw)
+            self.assertIn('<<link "Visit shop" "UNRESOLVED_choice0_shop">><</link>>', tw)
+            self.assertIn('<<if not hasVisited("UNRESOLVED_choice1_king")>>', tw)
+            self.assertIn('<<link "Talk to king" "UNRESOLVED_choice1_king">><</link>>', tw)
 
     def test_hub_with_state_write_falls_back_to_per_choice_links(self):
         with TemporaryDirectory() as tmp:
@@ -205,9 +212,13 @@ class SugarCubeRenderTests(unittest.TestCase):
             )
             tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
             self.assertNotIn("<<actions ", tw)
-            # Both choices still rendered (one wikilink, one <<link>> macro).
-            self.assertIn("[[Visit shop|UNRESOLVED_choice0_", tw)
-            self.assertIn('<<link "Bribe guard" "UNRESOLVED_choice1_', tw)
+            # Plain choice still gets a visited-gated <<link>>; state-write
+            # choice gets a <<link>> with the setter (no visit gate, since it
+            # carries side-effects).
+            self.assertIn('<<if not hasVisited("UNRESOLVED_choice0_shop")>>', tw)
+            self.assertIn('<<link "Visit shop" "UNRESOLVED_choice0_shop">><</link>>', tw)
+            self.assertIn('<<link "Bribe guard" "UNRESOLVED_choice1_bribe">>', tw)
+            self.assertIn("<<set $gold to 5>>", tw)
 
 
 class ReachableUnsetTests(unittest.TestCase):

@@ -5,6 +5,13 @@ from pydantic import BaseModel, Field
 
 
 # All recognised passage types. Renderer + validation branch on this.
+#
+# `widget` and `include` are SugarCube-template-aware types added so the
+# harness can generate the reusable-macro and shared-content passages that the
+# studied HTML templates lean on (Character Creator's <<widget>> grid,
+# Space-Tech's <<widget "statsformat">>, Title Page's <<include "Menu
+# Elements">>). See examples/html_templates/TEMPLATE_VERIFICATION_REPORT.md
+# §2.3 and docs/sugarcube2-analysis.md §3.7-3.8.
 PASSAGE_TYPES = (
     "normal",         # plain choice node
     "hub",            # central node players return to
@@ -15,6 +22,8 @@ PASSAGE_TYPES = (
     "event",          # one-shot scripted scene (uses <<once>>)
     "random_event",   # triggers only if random roll <= event_odds
     "ending",         # terminal; no choices required
+    "widget",         # widget definition passage (tagged [widget]); not navigated to
+    "include",        # shared-content passage meant to be <<include>>d, not navigated to
 )
 
 

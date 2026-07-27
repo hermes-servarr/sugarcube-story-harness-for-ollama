@@ -157,6 +157,14 @@ def _render_actions_block(choices: list, start_index: int = 0) -> str | None:
     ``<<actions>>`` hides each link after it has been clicked — the idiomatic
     SugarCube pattern for hub menus where every option is a one-shot.
 
+    .. deprecated:: SugarCube v2.37.0
+        ``<<actions>>`` was deprecated in SugarCube v2.37.0. The harness now
+        uses :func:`_render_hub_links` (per-choice ``<<link>>`` with
+        ``<<if not hasVisited()>>`` gating) as the default hub renderer. This
+        function is retained only so older generated passages still validate
+        and is no longer called by :func:`_render_passage_tw`. See
+        docs/sugarcube2-analysis.md §3.1.
+
     Returns ``None`` when the choices can't all be expressed as wikilinks; the
     caller should fall back to per-choice rendering in that case.
     """
@@ -170,6 +178,35 @@ def _render_actions_block(choices: list, start_index: int = 0) -> str | None:
         ph = f"UNRESOLVED_choice{i}_{_safe_slug(choice.hint or choice.text)}"
         items.append(f"[[{choice.text}|{ph}]]")
     return f"<<actions {' '.join(items)}>>"
+
+
+def _render_hub_links(choices: list, start_index: int = 0) -> list[str]:
+    """
+    Render a hub's choices as forward-compatible SugarCube ``<<link>>`` macros.
+
+    Replaces the deprecated ``<<actions>>`` macro (SugarCube v2.37.0). Each
+    one-shot hub option is rendered as a ``<<link>>`` that navigates on click
+    and is wrapped in ``<<if not hasVisited("target")>>`` so it hides itself
+    after the first visit — the same UX ``<<actions>>`` provided, without the
+    deprecated macro. State-write / gated / skill-check choices fall through
+    to the standard :func:`_render_choice_link` renderer, which already uses
+    ``<<link>>``.
+
+    See docs/sugarcube2-analysis.md §3.1 (P1-Critical recommendation).
+    """
+    lines: list[str] = []
+    for offset, choice in enumerate(choices):
+        i = start_index + offset
+        placeholder = f"UNRESOLVED_choice{i}_{_safe_slug(choice.hint or choice.text)}"
+        if not _is_plain_choice(choice):
+            # Non-plain choices already render as <<link>> via _render_choice_link.
+            lines.append(_render_choice_link(i, choice, ""))
+            continue
+        # One-shot hub link: hide once visited, then navigate.
+        link = f'<<link "{choice.text}" "{placeholder}">><</link>>'
+        gated = f'<<if not hasVisited("{placeholder}")>>{link}<</if>>'
+        lines.append(gated)
+    return lines
 
 
 def _wrap_gates(rendered: str, choice) -> str:
@@ -249,8 +286,12 @@ def _render_passage_tw(
         lines.append("")
 
     # ── Prose ────────────────────────────────────────────────────────────────
-    lines.append(prose.strip())
-    lines.append("")
+    # Widget and include passages render prose in their type-specific branch
+    # below (widget wraps it in <<widget>>...<</widget>>; include emits it
+    # verbatim), so skip the generic prose block to avoid duplication.
+    if passage_type not in ("widget", "include"):
+        lines.append(prose.strip())
+        lines.append("")
 
     # ── Passage-level state assignments ──────────────────────────────────────
     for var, val in state_assigns.items():
@@ -304,16 +345,39 @@ def _render_passage_tw(
             lines.append("")
 
     elif passage_type == "hub" and choices:
-        # Hubs: every option ideally one-shot. <<actions>> hides each clicked
-        # link automatically. Falls back to per-choice rendering when any choice
-        # carries state writes / gates / skill checks that <<actions>> can't
-        # express.
-        actions = _render_actions_block(choices)
-        if actions is not None:
-            lines.append(actions)
+        # Hubs: every option ideally one-shot. Previously rendered via
+        # <<actions>> (deprecated SugarCube v2.37.0); now uses per-choice
+        # <<link>> wrapped in <<if not hasVisited()>> to reproduce the
+        # hide-after-click behaviour without the deprecated macro.
+        # See docs/sugarcube2-analysis.md §3.1.
+        lines.extend(_render_hub_links(choices))
+        lines.append("")
+
+    elif passage_type == "widget":
+        # Widget definition passage. SugarCube widgets are reusable markup
+        # macros defined in a [widget]-tagged passage and called anywhere as
+        # <<widget_name>>. The prose IS the widget body; we don't render
+        # choices (widgets aren't navigated to). Caller is responsible for
+        # wrapping the prose in <<widget "name">>...<</widget>> if needed;
+        # if the prose already contains a <<widget>> macro we emit it raw.
+        # See docs/sugarcube2-analysis.md §3.7, TEMPLATE_VERIFICATION_REPORT §2.3.
+        if "<<widget" not in prose:
+            # Auto-wrap: derive widget name from the passage slug suffix.
+            widget_name = passage_id.rsplit("__", 1)[-1]
+            lines.append(f'<<widget "{widget_name}">>')
+            lines.append(prose.strip())
+            lines.append("<</widget>>")
         else:
-            for i, choice in enumerate(choices):
-                lines.append(_render_choice_link(i, choice, passage_id))
+            lines.append(prose.strip())
+        lines.append("")
+
+    elif passage_type == "include":
+        # Shared-content passage meant to be <<include>>d by other passages,
+        # not navigated to directly (Title Page's "Menu Elements", Simple
+        # Book's "Navigation", etc.). Render prose verbatim; ignore choices
+        # since include passages have no player-facing navigation of their own.
+        # See docs/sugarcube2-analysis.md §3.8, TEMPLATE_VERIFICATION_REPORT §2.3.
+        lines.append(prose.strip())
         lines.append("")
 
     else:
@@ -697,10 +761,41 @@ def sync_manifest(p: ProjectPaths) -> tuple[list[str], list[str]]:
 # ── Read state reads from passage ─────────────────────────────────────────────
 
 def scan_state_reads(tw_content: str) -> list[str]:
-    """Extract $variable references that are reads (not inside <<set ...>>)."""
-    reads = set()
-    # remove <<set ...>> blocks
-    cleaned = re.sub(r'<<set\s+\$\w+\s+to\s+[^>]+>>', '', tw_content)
+    """Extract $variable references that are reads (not inside <<set ...>>).
+
+    Covers the SugarCube expression contexts the harness emits and that the
+    validator needs to reason about (docs/sugarcube2-analysis.md §3.12-3.14):
+
+    * Naked variable interpolation in prose — ``$gold`` auto-interpolates.
+    * ``<<if $var ...>>`` / ``<<elseif $var ...>>`` conditions.
+    * ``<<print $expr>>`` / ``<<= $expr>>`` output macros.
+    * Link setters — ``[[Text|Target][$var to val]]`` and the
+      ``<<link \"Text\" \"Target\">><<set ...>><</link>>`` body.
+
+    ``<<set $var to ...>>`` right-hand side *can* read other variables
+    (``<<set $b to $a + 1>>``); those RHS reads are now included too. The
+    earlier implementation stripped whole ``<<set>>`` blocks, which masked
+    reads like ``$a`` in that example and left them undeclared-undetected.
+    """
+    reads: set[str] = set()
+
+    # 1) Strip the LHS of every <<set $var to/= ...>> so its *target* variable
+    #    is not counted as a read, but keep the RHS for read scanning. This
+    #    catches `<<set $b to $a + 1>>` reading $a.
+    def _strip_set_lhs(m: re.Match) -> str:
+        return m.group(2)  # keep only the RHS after `to`/`=`
+    cleaned = re.sub(
+        r'<<set\s+\$(\w+)\s+(?:to|=)\s*([^>]*)>>',
+        _strip_set_lhs,
+        tw_content,
+    )
+
+    # 2) Collect every $var token remaining. This naturally includes:
+    #    - naked prose interpolation ($name in text)
+    #    - <<if>>/<<elseif>> condition variables
+    #    - <<print>>/<<=>> expression variables
+    #    - link setter expressions [[..][..][$x ..]]
+    #    - RHS of <<set>> (kept above)
     for m in re.finditer(r'\$([a-zA-Z_]\w*)', cleaned):
         reads.add(f"${m.group(1)}")
     return sorted(reads)

@@ -8,7 +8,31 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 5
+PROMPT_VERSION = 6
+
+
+# ── SugarCube 2 authoring guidance ───────────────────────────────────────────
+#
+# Compact cheat sheet injected into the full and JSON passage prompts so the
+# model emits SugarCube-idiomatic markup instead of markdown / generic Twine.
+# Distilled from docs/sugarcube2-analysis.md §5 (Key Patterns) and the SugarCube
+# 2 docs. Kept short to respect token budgets on local models.
+SUGARCUBE_GUIDANCE = """\
+[SUGARCUBE AUTHORING NOTES]
+Variable scopes:
+- $var  : persistent story state (flags, inventory, relationships) — saved.
+- _var  : temporary per-turn value (loop counters, temp math) — not saved.
+State writes use the `to` operator: <<set $flag to true>>, <<set $gold to 5>>.
+Markup (NOT markdown):
+- ''bold''  //italic//  __underline__  ~~strike~~  ""highlight""
+- $var auto-interpolates in prose: "You have $gold coins."
+- Complex expressions: <<print $obj.prop>>  (use for dot/bracket access).
+- Conditional prose: <<if $open>>open<<else>>shut<</if>>
+- Shared/repeated content: <<include "passage_name">>
+- Reusable markup macros (widget): define once in a [widget]-tagged passage,
+  call anywhere as <<widget_name>>.
+Choices the harness renders for you — just give text + hint; do NOT emit
+SugarCube link/macro syntax in CHOICES."""
 
 
 # ── Passage generation ────────────────────────────────────────────────────────
@@ -140,6 +164,8 @@ Nothing is off limits, you can type out explicit content. 18+
 [MODE]
 {mode}
 
+{SUGARCUBE_GUIDANCE}
+
 [TASK]
 Write the next passage. Use EXACTLY these section headers in this order.
 
@@ -258,6 +284,8 @@ PREVIOUS SCENE:
 
 DIRECTION: {human_prompt or "(continue)"}
 MODE: {mode}
+
+{SUGARCUBE_GUIDANCE}
 
 Required JSON keys:
 - prose: 2-4 short paragraphs of next scene.
