@@ -22,6 +22,8 @@ PASSAGE_TYPES = (
     "event",          # one-shot scripted scene (uses <<once>>)
     "random_event",   # triggers only if random roll <= event_odds
     "ending",         # terminal; no choices required
+    "loop",           # choices emitted inside a SugarCube <<for>> loop; bodies
+                      # reading a loop var wrapped in <<capture $v>> (§3.9)
     "widget",         # widget definition passage (tagged [widget]); not navigated to
     "include",        # shared-content passage meant to be <<include>>d, not navigated to
 )
@@ -226,7 +228,11 @@ class HarnessConfig(BaseModel):
     story_ifid: str = ""
     # SugarCube major.minor.patch. Tweego picks the highest installed format
     # matching the major release if the exact version isn't present.
-    format_version: str = "2.36.1"
+    # Bumped to 2.37.3 to match 6/7 studied templates and enable
+    # <<silent>>/<<do>>/<<done>> + hasVisited() (P2 §4 / P1 §4.2 #7). Affects new
+    # inits only; existing config.yaml files keep their persisted value — no
+    # migration code (avoids regressions).
+    format_version: str = "2.37.3"
     model_mode: str = "compact"   # auto | standard | compact
     # delimited = legacy PROSE:/CHOICES:/... text; json = strict JSON via Ollama format param
     output_format: str = "delimited"   # delimited | json

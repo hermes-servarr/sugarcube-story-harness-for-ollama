@@ -32,6 +32,11 @@ def check_broken_links(graph: StoryGraph) -> list[ValidationIssue]:
 def check_orphan_passages(graph: StoryGraph) -> list[ValidationIssue]:
     issues = []
     for pid, entry in graph.passages.items():
+        # Widget and include passages are non-navigable by design — they are
+        # invoked as macros (<<widget>>) or embedded (<<include>>), not linked
+        # from other passages, so a parentless one is expected, not an error.
+        if entry.passage_type in ("widget", "include"):
+            continue
         if not entry.parents and pid != graph.start_passage:
             issues.append(_issue(
                 "error", "orphan_passage",
@@ -346,6 +351,83 @@ def check_deprecated_features(p: ProjectPaths, graph: StoryGraph) -> list[Valida
     return issues
 
 
+# ── <<capture>> guardrail for async macros inside <<for>> loops ────────────────
+#
+# SugarCube <<link>>/<<button>>/<<timed>>/<<linkreplace>>/<<linkappend>>/
+# <<linkprepend>> bodies run asynchronously (at click/firing time, not render
+# time). Inside a <<for>> loop every iteration shares one closure over the loop
+# variable, so without <<capture $v>> each link sees the *final* value when
+# clicked. This check surfaces that as a warning so authors fix it before it
+# bites at runtime. See docs/sugarcube2-analysis.md §3.9.
+
+_ASYNC_MACROS_FOR_CAPTURE = frozenset({
+    "link", "button", "timed", "linkreplace", "linkappend", "linkprepend",
+})
+
+
+def check_capture_in_loops(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """Warn when an async macro (``<<link>>``/``<<button>>``/``<<timed>>`` …)
+    appears inside a ``<<for>>`` loop without an enclosing ``<<capture>>``.
+
+    Uses the quote-aware :func:`_iter_macro_tags` iterator and a stack to
+    track nesting. A ``<<capture>>`` anywhere on the stack between the
+    ``<<for>>`` and the async macro satisfies the requirement (SugarCube
+    snapshots all captured vars at the ``<<capture>>``'s render point).
+    Reports at most one warning per ``(passage, async-macro)`` occurrence so a
+    single passage with several offending links gets one warning each.
+    """
+    issues: list[ValidationIssue] = []
+    for pid, entry in graph.passages.items():
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # Stack of (macro_name, line). We track `for` and `capture` depths.
+        stack: list[tuple[str, int]] = []
+        reported: set[int] = set()  # line numbers already reported in this passage
+        for is_close, name, line in _iter_macro_tags(content):
+            if not is_close:
+                if name in MACRO_CONTAINERS:
+                    stack.append((name, line))
+                continue
+            # closing tag
+            if name not in MACRO_CONTAINERS:
+                continue
+            # If this close is an async macro, check whether a `for` is open
+            # WITHOUT an enclosing `capture` between the for and this macro.
+            if name in _ASYNC_MACROS_FOR_CAPTURE:
+                # Walk the open-stack from innermost (top) outward. We want the
+                # nearest enclosing <<for>>; a <<capture>> anywhere between it
+                # and this macro satisfies the requirement.
+                for_depth = None
+                capture_between = False
+                for mname, mline in reversed(stack):
+                    if mname == "capture":
+                        capture_between = True
+                    elif mname == "for":
+                        for_depth = mline
+                        break
+                if for_depth is not None and not capture_between and line not in reported:
+                    reported.add(line)
+                    issues.append(_issue(
+                        "warning", "capture_missing",
+                        f"Passage {pid!r}: <</{name}>> at line {line} is inside a "
+                        f"<<for>> loop (opened line {for_depth}) but no <<capture>> "
+                        f"wraps it — the click handler will see the loop variable's "
+                        f"final value, not its per-iteration value. Wrap in "
+                        f"<<capture $loopvar>>…<</capture>> (§3.9).",
+                        pid,
+                    ))
+            # pop the matching open from the stack (best-effort, mirroring
+            # check_macro_pairing's recovery so an unbalanced close doesn't
+            # corrupt the stack for the rest of the passage).
+            for idx in range(len(stack) - 1, -1, -1):
+                if stack[idx][0] == name:
+                    del stack[idx:]
+                    break
+    return issues
+
+
 def check_undeclared_state_vars(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
     """
     A read of $var is an error if:
@@ -551,6 +633,7 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_passage_file_links(p, graph),
         check_macro_pairing(p, graph),
         check_deprecated_features(p, graph),
+        check_capture_in_loops(p, graph),
         check_undeclared_state_vars(p, graph),
         check_unresolved_media(p),
         check_pending_media(p),

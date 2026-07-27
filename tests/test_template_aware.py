@@ -30,7 +30,7 @@ from harness.models import (
     StoryGraph,
 )
 from harness.passage import create_passage, scan_state_reads
-from harness.project import ProjectPaths, init_project, load_story, save_story
+from harness.project import ProjectPaths, init_project, load_story, save_config, save_story
 from harness.validation import (
     MACRO_CONTAINERS,
     check_deprecated_features,
@@ -727,6 +727,129 @@ class HarnessConfigTemplateFieldTests(unittest.TestCase):
         raw = "template_id: one-page\n"
         cfg = HarnessConfig.model_validate(yaml.safe_load(raw))
         self.assertEqual(cfg.template_id, "one-page")
+
+
+# ── Orphan-check exemption for widget/include (INV-4) ────────────────────────
+# These are the load-bearing tests for the P4 TODO-1 site
+# (check_orphan_passages widget/include exemption). The existing
+# test_widget_passage_not_orphan_without_parent / test_include_passage_*
+# tests are NON-load-bearing: create_passage assigns the first passage
+# created as the start passage (passage.py "if not graph.start_passage:
+# graph.start_passage = passage_id"), so in those tests the widget/include
+# passage IS the start passage and the orphan check's
+# "pid != graph.start_passage" clause already exempts it — the type-based
+# exemption is never reached. These tests create a normal start passage
+# FIRST, then a parentless widget/include passage, so the type exemption
+# is the only thing preventing the orphan error. (P5 D4.5; P6 INV-4.)
+
+class OrphanExemptionMockTests(unittest.TestCase):
+    """Load-bearing coverage for the widget/include orphan exemption (INV-4).
+    A parentless widget or include passage that is NOT the start passage
+    must not be flagged as an orphan, because it is non-navigable by
+    design (invoked via <<widget>> / <<include>>, not linked from other
+    passages). A parentless normal passage that is not the start must
+    still be flagged (regression guard)."""
+
+    @staticmethod
+    def _start_first(tmp, passage_type):
+        """Create a normal start passage first, then a parentless
+        widget/include passage, so the type exemption is the only thing
+        standing between the passage and an orphan_passage error.
+        Returns (graph, widget_pid)."""
+        p = init_project(Path(tmp), title="Test")
+        # First passage becomes the start passage (create_passage sets
+        # graph.start_passage when none exists).
+        start_out = ModelOutput(prose="The story begins.", summary="start")
+        create_passage(p, "intro", "start", start_out, None, passage_type="normal")
+        # Second passage: parentless widget/include, NOT the start.
+        out = ModelOutput(prose="<<if $x>>y<</if>>", summary="aux")
+        aux_pid, graph = create_passage(
+            p, "intro", "aux", out, None, passage_type=passage_type,
+        )
+        return p, graph, aux_pid
+
+    def test_parentless_widget_not_orphan_when_not_start(self):
+        with TemporaryDirectory() as tmp:
+            p, graph, wid_pid = self._start_first(tmp, "widget")
+            issues = check_orphan_passages(graph)
+            self.assertFalse(
+                any(i.code == "orphan_passage" and wid_pid in i.message
+                    for i in issues),
+                f"parentless widget {wid_pid!r} (not start) should be exempt, "
+                f"got {[i.message for i in issues]}",
+            )
+
+    def test_parentless_include_not_orphan_when_not_start(self):
+        with TemporaryDirectory() as tmp:
+            p, graph, inc_pid = self._start_first(tmp, "include")
+            issues = check_orphan_passages(graph)
+            self.assertFalse(
+                any(i.code == "orphan_passage" and inc_pid in i.message
+                    for i in issues),
+                f"parentless include {inc_pid!r} (not start) should be exempt, "
+                f"got {[i.message for i in issues]}",
+            )
+
+    def test_normal_parentless_still_flagged_as_orphan(self):
+        """Regression guard: a parentless NORMAL passage that is not the
+        start passage is still flagged. Ensures the exemption does not
+        over-broaden to all parentless passages."""
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            start_out = ModelOutput(prose="The story begins.", summary="start")
+            create_passage(p, "intro", "start", start_out, None, passage_type="normal")
+            out = ModelOutput(prose="A dead end with no parent.", summary="orphan")
+            orphan_pid, graph = create_passage(
+                p, "intro", "orphan", out, None, passage_type="normal",
+            )
+            issues = check_orphan_passages(graph)
+            self.assertTrue(
+                any(i.code == "orphan_passage" and orphan_pid in i.message
+                    for i in issues),
+                f"parentless normal passage {orphan_pid!r} (not start) should "
+                f"still be flagged as orphan, got {[i.message for i in issues]}",
+            )
+
+
+# ── format_version default bump + StoryData pass-through (INV-10/INV-11) ──────
+# These are the load-bearing tests for the P4 TODO-2 site
+# (HarnessConfig.format_version default bump 2.36.1 -> 2.37.3). INV-10
+# pins the new default; the round-trip test ensures no migration coercion
+# silently rewrites existing configs; INV-11 ties the default to the
+# StoryData format-version emitted by _storydata_twee (verbatim pass-through,
+# no clamping).
+
+class FormatVersionDefaultMockTests(unittest.TestCase):
+    """Load-bearing coverage for the format_version default bump (INV-10)
+    and the StoryData pass-through (INV-11)."""
+
+    def test_default_format_version_is_2_37_3(self):
+        cfg = HarnessConfig()
+        self.assertEqual(cfg.format_version, "2.37.3")
+
+    def test_explicit_format_version_round_trips(self):
+        """An explicit format_version='2.36.1' round-trips through YAML
+        without being coerced to the new default (no migration)."""
+        import yaml
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            cfg = HarnessConfig(format_version="2.36.1")
+            save_config(p, cfg)
+            raw = p.config_yaml.read_text(encoding="utf-8")
+            self.assertIn("2.36.1", raw)
+            reloaded = HarnessConfig.model_validate(yaml.safe_load(raw))
+            self.assertEqual(reloaded.format_version, "2.36.1",
+                             "explicit 2.36.1 must survive YAML round-trip "
+                             "(no migration coercion)")
+
+    def test_storydata_uses_default_version(self):
+        """A default HarnessConfig emits format-version '2.37.3' in the
+        StoryData passage via _storydata_twee (INV-11 verbatim pass-through)."""
+        cfg = HarnessConfig()
+        twee = _storydata_twee(cfg, start_passage="Start")
+        self.assertIn('"format-version": "2.37.3"', twee,
+                      "default config StoryData must carry the bumped "
+                      "format-version verbatim")
 
 
 if __name__ == "__main__":

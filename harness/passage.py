@@ -109,9 +109,128 @@ def _is_plain_choice(choice) -> bool:
     )
 
 
-def _render_choice_link(i: int, choice, passage_id: str) -> str:
+# ── <<capture>> wrapping for async macros inside <<for>> loops ─────────────────
+#
+# SugarCube <<link>> (and <<button>>/<<timed>>/<<linkreplace>> etc.) bodies run
+# *asynchronously* — at click time, not at render time. Inside a <<for>> loop
+# every iteration shares one closure over the loop variable, so without
+# <<capture>> every link created in the loop sees the *final* value of the loop
+# variable when clicked. <<capture $v>>…<</capture>> snapshots $v per iteration
+# so each link's click handler sees the value it had when that link was rendered.
+#
+# See docs/sugarcube2-analysis.md §3.9.
+#
+# The harness currently emits ZERO <<for>> loops — choice lists are iterated in
+# Python and emitted as flat <<link>> lines with literal values baked in — so
+# no existing code path needs <<capture>> today. The helpers below are
+# *preventive / forward-looking*: they let the link renderers wrap in
+# <<capture>> when a loop context is active, and remain a no-op otherwise so
+# existing output is byte-identical.
+
+_ASYNC_MACROS = ("link", "button", "timed", "linkreplace", "linkappend", "linkprepend")
+
+_VAR_REF_RE = re.compile(r"\$([a-zA-Z_]\w*)")
+
+
+def _vars_in_set_rhs(state_writes: dict) -> list[str]:
+    """Return $variable names read on the RHS of ``<<set $x to $y>>`` writes.
+
+    ``_format_sc_value`` only emits literals (bool/str/int) today, so this is
+    empty for current data. But ``state_writes`` is typed ``dict[str, Any]``;
+    if a future code path passes a string like ``"$y"`` (a variable reference),
+    ``_format_sc_value`` emits it bare (``<<set $x to $y>>``) and that read of
+    ``$y`` becomes a capture candidate when a loop variable may mutate it.
+    """
+    out: list[str] = []
+    for val in state_writes.values():
+        if isinstance(val, str):
+            out.extend(f"${n}" for n in _VAR_REF_RE.findall(val))
+    # dedupe, preserve order
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for v in out:
+        if v not in seen:
+            seen.add(v)
+            uniq.append(v)
+    return uniq
+
+
+def _capture_vars_for_choice(choice, loop_vars: list[str] | None) -> list[str]:
+    """Determine which $variables a choice's link body reads that are at risk of
+    changing between link creation and click, given an active loop context.
+
+    Two sources of mutable reads:
+      * ``skill_check.stat`` — read in the ``<<if $stat gte N>>`` condition.
+      * RHS variable references in ``state_writes`` (``<<set $x to $y>>``).
+
+    When ``loop_vars`` is None/empty the harness is not inside a <<for>> loop,
+    so nothing is wrapped — the no-op that keeps current output identical.
+    """
+    if not loop_vars:
+        return []
+    at_risk = set(loop_vars)
+    capture: list[str] = []
+    seen: set[str] = set()
+    # skill-check path: the condition reads sc.stat (e.g. "$strength").
+    if choice.skill_check is not None and choice.skill_check.stat:
+        stat = choice.skill_check.stat
+        if stat not in seen and stat in at_risk:
+            seen.add(stat)
+            capture.append(stat)
+    # state-writes RHS reads.
+    for v in _vars_in_set_rhs(choice.state_writes or {}):
+        if v not in seen and v in at_risk:
+            seen.add(v)
+            capture.append(v)
+    return capture
+
+
+def _capture_wrap(capture_vars: list[str], body: str) -> str:
+    """Wrap ``body`` in ``<<capture $v1 $v2 ...>>…<</capture>>`` when
+    ``capture_vars`` is non-empty; return ``body`` unchanged otherwise.
+
+    Idempotent: if ``body`` is already wrapped in a ``<<capture>>`` whose
+    variable list is a superset of ``capture_vars``, it is returned unchanged
+    (no double-wrap). A bare ``<<capture>>`` that doesn't cover the requested
+    vars is left in place and a *new* outer capture is added for the missing
+    ones, so no requested variable is silently dropped.
+    """
+    if not capture_vars:
+        return body
+    # Normalise to $-prefixed names for consistent comparison.
+    requested = {_ensure_dollar(v) for v in capture_vars}
+    # Detect an existing <<capture ...>> wrapper around the whole body.
+    m = re.match(r"^<<capture\s+(.+?)>>(.*)<</capture>>$", body, re.DOTALL)
+    if m:
+        existing = {f"${n}" for n in _VAR_REF_RE.findall(m.group(1))}
+        if requested <= existing:
+            return body  # already captured — idempotent no-op
+        missing = [v for v in capture_vars if _ensure_dollar(v) not in existing]
+        if missing:
+            # Outer-wrap the already-captured body with the missing vars.
+            vars_str = " ".join(missing)
+            return f"<<capture {vars_str}>>{body}<</capture>>"
+    vars_str = " ".join(capture_vars)
+    return f"<<capture {vars_str}>>{body}<</capture>>"
+
+
+def _ensure_dollar(v: str) -> str:
+    """Return ``v`` with a leading ``$`` if it lacks one."""
+    return v if v.startswith("$") else f"${v}"
+
+
+def _render_choice_link(
+    i: int, choice, passage_id: str, loop_vars: list[str] | None = None,
+) -> str:
     """
     Render one choice as a SugarCube link / link macro.
+
+    When ``loop_vars`` is a non-empty list of ``$var`` names active in an
+    enclosing ``<<for>>`` loop, link bodies that *read* a loop variable are
+    wrapped in ``<<capture $v>>…<</capture>>`` so each iteration's click
+    handler sees its own value (docs/sugarcube2-analysis.md §3.9). With an
+    empty/None ``loop_vars`` (the default — no SugarCube loop, the current
+    harness behaviour), output is byte-identical to the pre-capture renderer.
 
     Idioms used (per SugarCube docs):
       • Plain navigation                → ``[[text|target]]`` wikilink.
@@ -122,6 +241,7 @@ def _render_choice_link(i: int, choice, passage_id: str) -> str:
       • Gated (requires/blocks)         → wrapped in outer ``<<if expr>>…<</if>>``.
     """
     placeholder = f"UNRESOLVED_choice{i}_{_safe_slug(choice.hint or choice.text)}"
+    capture_vars = _capture_vars_for_choice(choice, loop_vars)
 
     # Skill check overrides normal rendering — target depends on roll.
     if choice.skill_check is not None:
@@ -133,7 +253,7 @@ def _render_choice_link(i: int, choice, passage_id: str) -> str:
             f'<<if {sc.stat} gte {sc.dc}>><<goto "{succ_ph}">>'
             f'<<else>><<goto "{fail_ph}">><</if>><</link>>'
         )
-        return _wrap_gates(check, choice)
+        return _wrap_gates(_capture_wrap(capture_vars, check), choice)
 
     # State writes → SugarCube's two-arg <<link>> form: body runs, then auto-goto.
     if choice.state_writes:
@@ -142,9 +262,10 @@ def _render_choice_link(i: int, choice, passage_id: str) -> str:
             for var, val in choice.state_writes.items()
         )
         link = f'<<link "{choice.text}" "{placeholder}">>{sets}<</link>>'
-        return _wrap_gates(link, choice)
+        return _wrap_gates(_capture_wrap(capture_vars, link), choice)
 
-    # Plain wikilink — most idiomatic SugarCube navigation.
+    # Plain wikilink — most idiomatic SugarCube navigation. No deferred body,
+    # so <<capture>> is never needed here (the target resolves at render time).
     link = f"[[{choice.text}|{placeholder}]]"
     return _wrap_gates(link, choice)
 
@@ -180,7 +301,9 @@ def _render_actions_block(choices: list, start_index: int = 0) -> str | None:
     return f"<<actions {' '.join(items)}>>"
 
 
-def _render_hub_links(choices: list, start_index: int = 0) -> list[str]:
+def _render_hub_links(
+    choices: list, start_index: int = 0, loop_vars: list[str] | None = None,
+) -> list[str]:
     """
     Render a hub's choices as forward-compatible SugarCube ``<<link>>`` macros.
 
@@ -190,7 +313,11 @@ def _render_hub_links(choices: list, start_index: int = 0) -> list[str]:
     after the first visit — the same UX ``<<actions>>`` provided, without the
     deprecated macro. State-write / gated / skill-check choices fall through
     to the standard :func:`_render_choice_link` renderer, which already uses
-    ``<<link>>``.
+    ``<<link>>`` and which honours ``loop_vars`` for ``<<capture>>`` wrapping.
+
+    The plain hub links emitted here have *empty* ``<<link>>`` bodies (no
+    deferred ``<<set>>``), so they never need ``<<capture>>`` themselves — the
+    ``loop_vars`` is only forwarded to the non-plain fallthrough path.
 
     See docs/sugarcube2-analysis.md §3.1 (P1-Critical recommendation).
     """
@@ -200,7 +327,7 @@ def _render_hub_links(choices: list, start_index: int = 0) -> list[str]:
         placeholder = f"UNRESOLVED_choice{i}_{_safe_slug(choice.hint or choice.text)}"
         if not _is_plain_choice(choice):
             # Non-plain choices already render as <<link>> via _render_choice_link.
-            lines.append(_render_choice_link(i, choice, ""))
+            lines.append(_render_choice_link(i, choice, "", loop_vars=loop_vars))
             continue
         # One-shot hub link: hide once visited, then navigate.
         link = f'<<link "{choice.text}" "{placeholder}">><</link>>'
@@ -237,7 +364,18 @@ def _render_passage_tw(
     exits: dict[str, str] | None = None,
     event_odds: int = 100,
     dialogue_npc: str = "",
+    loop_vars: list[str] | None = None,
+    loop_collection: str = "",
 ) -> str:
+    """Render a passage to SugarCube twee source.
+
+    ``loop_vars`` / ``loop_collection`` — when set, the choices are emitted
+    inside a SugarCube ``<<for $v in ...>>`` loop over ``loop_collection``
+    (e.g. ``$npcs``), and link bodies that read a loop variable are wrapped
+    in ``<<capture $v>>…<</capture>>`` per §3.9. This is the one passage_type
+    that genuinely generates a SugarCube-side loop; all other types iterate
+    choices in Python and emit flat links (no capture needed).
+    """
     exits = exits or {}
     lines: list[str] = []
     # Passage tags: arc + type. SugarCube hooks on tags (CSS `body.tag-ending`,
@@ -317,7 +455,7 @@ def _render_passage_tw(
             target_id = target or f"UNRESOLVED_choice{i}_{_safe_slug(direction)}"
             lines.append(f"[[{direction.title()}|{target_id}]]")
         for i, choice in enumerate(choices):
-            lines.append(_render_choice_link(i + len(exits), choice, passage_id))
+            lines.append(_render_choice_link(i + len(exits), choice, passage_id, loop_vars=loop_vars))
         if exits or choices:
             lines.append("")
 
@@ -334,13 +472,15 @@ def _render_passage_tw(
                 for var, val in (choice.state_writes or {}).items()
             )
             link = f'<<link "{choice.text}">>{sets}<<goto "{placeholder}">><</link>>'
-            lines.append(_wrap_gates(link, choice))
+            # Wrap in <<capture>> when a loop variable the body reads is at risk.
+            capture_vars = _capture_vars_for_choice(choice, loop_vars)
+            lines.append(_wrap_gates(_capture_wrap(capture_vars, link), choice))
         lines.append("")
 
     elif passage_type == "ending":
         # Terminal — render any choices as restart links, but allow zero.
         for i, choice in enumerate(choices):
-            lines.append(_render_choice_link(i, choice, passage_id))
+            lines.append(_render_choice_link(i, choice, passage_id, loop_vars=loop_vars))
         if choices:
             lines.append("")
 
@@ -350,7 +490,7 @@ def _render_passage_tw(
         # <<link>> wrapped in <<if not hasVisited()>> to reproduce the
         # hide-after-click behaviour without the deprecated macro.
         # See docs/sugarcube2-analysis.md §3.1.
-        lines.extend(_render_hub_links(choices))
+        lines.extend(_render_hub_links(choices, loop_vars=loop_vars))
         lines.append("")
 
     elif passage_type == "widget":
@@ -383,10 +523,30 @@ def _render_passage_tw(
         lines.append(prose.strip())
         lines.append("")
 
+    elif passage_type == "loop" and choices and loop_vars and loop_collection:
+        # Render choices inside a genuine SugarCube <<for>> loop over an
+        # arbitrary collection (e.g. one link per NPC in $npcs). Each link
+        # that reads a loop variable is wrapped in <<capture $v>> so its
+        # click handler sees the iteration value, not the final one
+        # (docs/sugarcube2-analysis.md §3.9). When a single choice template
+        # is given, it is repeated per element; otherwise the choice list
+        # is emitted once per iteration (the LLM conventionally supplies a
+        # single templated choice whose text/state reference $loopvar).
+        loop_head = (
+            f"<<for {loop_vars[0]} in {loop_collection}>>"
+            if len(loop_vars) == 1
+            else f"<<for _i, {loop_vars[0]} in {loop_collection}>>"
+        )
+        lines.append(loop_head)
+        for i, choice in enumerate(choices):
+            lines.append(_render_choice_link(i, choice, passage_id, loop_vars=loop_vars))
+        lines.append("<</for>>")
+        lines.append("")
+
     else:
         # normal / conditional / event / random_event default rendering
         for i, choice in enumerate(choices):
-            lines.append(_render_choice_link(i, choice, passage_id))
+            lines.append(_render_choice_link(i, choice, passage_id, loop_vars=loop_vars))
         if choices:
             lines.append("")
 
@@ -441,6 +601,8 @@ def create_passage(
     event_odds: int = 100,
     dialogue_npc: str = "",
     skill_branch: str = "",           # "success"/"fail" if parent choice was a skill check
+    loop_vars: list[str] | None = None,       # <<for>> loop vars (for "loop" passage_type)
+    loop_collection: str = "",                # SugarCube collection expr to iterate
 ) -> tuple[str, StoryGraph]:
     """
     Commit a model-proposed passage to disk and update story.json.
@@ -517,6 +679,8 @@ def create_passage(
             exits=exits or {},
             event_odds=event_odds,
             dialogue_npc=dialogue_npc,
+            loop_vars=loop_vars,
+            loop_collection=loop_collection,
         )
         rendered_state_reads = scan_state_reads(tw_content)
         write_passage_file(tw_path, tw_content)

@@ -8,7 +8,7 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 6
+PROMPT_VERSION = 7
 
 
 # ── SugarCube 2 authoring guidance ───────────────────────────────────────────
@@ -32,7 +32,11 @@ Markup (NOT markdown):
 - Reusable markup macros (widget): define once in a [widget]-tagged passage,
   call anywhere as <<widget_name>>.
 Choices the harness renders for you — just give text + hint; do NOT emit
-SugarCube link/macro syntax in CHOICES."""
+SugarCube link/macro syntax in CHOICES.
+<<capture>> rule: any <<link>>/<<button>>/<<timed>> inside a <<for>> loop,
+or whose <<set>> body references a loop variable, MUST be wrapped in
+<<capture $loopvar>>…<</capture>> so each iteration's click handler sees
+its own value (docs/sugarcube2-analysis.md §3.9)."""
 
 
 # ── Template style guidance (optional) ────────────────────────────────────────
