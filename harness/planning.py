@@ -181,13 +181,82 @@ def add_beats_bulk(p: ProjectPaths, beats: list[dict]) -> list[Beat]:
     return created
 
 
+_ARC_NAME_RE = re.compile(r"^\d{2}_([a-z0-9_]+)$")
+_MAX_ARC_NAME_LEN = 60
+
+
+def normalize_arc_name(name: str, existing_arcs: list[str] | None = None) -> str:
+    """Normalize an arc name to the canonical NN_short_name format.
+
+    Rules:
+    - Lowercase, underscores only, no leading/trailing underscores.
+    - If the name already starts with NN_, keep it (after stripping
+      a literal "nn_" prefix the model sometimes emits).
+    - If no numeric prefix, auto-assign the next available two-digit number.
+    - Max 60 characters.
+    - Returns empty string for blank input.
+    """
+    raw = (name or "").strip().lower()
+    # Strip a literal "nn_" prefix the model sometimes emits (e.g. "nn_01_atlantis")
+    if raw.startswith("nn_"):
+        raw = raw[3:]
+    # Keep only valid chars
+    raw = re.sub(r"[^a-z0-9_]", "_", raw).strip("_")
+    # Collapse consecutive underscores
+    raw = re.sub(r"_{2,}", "_", raw).strip("_")
+    if not raw:
+        return ""
+
+    existing = set(existing_arcs or [])
+
+    # Check if it already has a NN_ prefix
+    m = re.match(r"^(\d{2})_(.+)$", raw)
+    if m:
+        short_name = m.group(2).strip("_")
+        if not short_name:
+            return ""
+        norm = f"{m.group(1)}_{short_name}"[:_MAX_ARC_NAME_LEN]
+        return norm
+
+    # No numeric prefix — auto-assign the next available number
+    used_nums: set[int] = set()
+    for arc in existing:
+        m2 = re.match(r"^(\d{2})_", arc)
+        if m2:
+            used_nums.add(int(m2.group(1)))
+    n = 1
+    while n in used_nums:
+        n += 1
+    norm = f"{n:02d}_{raw}"[:_MAX_ARC_NAME_LEN]
+    return norm
+
+
 def create_arc(p: ProjectPaths, name: str, goal: str = "") -> tuple[str, ArcPlan] | None:
     """Create a new (empty) arc plan under a normalised name. Returns
-    (normalised_name, ArcPlan), or None if the name is blank."""
-    norm = re.sub(r"[^a-z0-9_]", "_", (name or "").strip().lower()).strip("_")
+    (normalised_name, ArcPlan), or None if the name is blank.
+
+    Arc names are normalized to NN_short_name format (e.g. "01_atlantis").
+    """
+    graph = load_story(p)
+    norm = normalize_arc_name(name, list(graph.arcs.keys()))
     if not norm:
         return None
-    graph = load_story(p)
+    # If normalization produced a name that already exists (e.g. same number
+    # different short name), bump to next available number.
+    if norm in graph.arcs:
+        # Try to find a free slot
+        used_nums = set()
+        for arc in graph.arcs:
+            m = re.match(r"^(\d{2})_", arc)
+            if m:
+                used_nums.add(int(m.group(1)))
+        # Extract short name from norm
+        m = re.match(r"^\d{2}_(.+)$", norm)
+        short_name = m.group(1) if m else norm
+        n = 1
+        while n in used_nums:
+            n += 1
+        norm = f"{n:02d}_{short_name}"[:_MAX_ARC_NAME_LEN]
     ap = graph.arcs.get(norm) or ArcPlan()
     if goal.strip():
         ap.goal = goal.strip()

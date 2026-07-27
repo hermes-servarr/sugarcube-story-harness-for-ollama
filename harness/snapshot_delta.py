@@ -42,6 +42,7 @@ from .models import (
     ListSectionDelta,
     Snapshot,
     SnapshotDelta,
+    StoryGraph,
 )
 
 
@@ -317,3 +318,44 @@ def is_empty_delta(delta: SnapshotDelta) -> bool:
         and not delta.open_threads.added
         and not delta.open_threads.removed
     )
+
+
+def reconstruct_passage_snapshot(
+    graph: StoryGraph, passage_id: str
+) -> Snapshot:
+    """Reconstruct a passage's snapshot from the root down its delta chain."""
+    if passage_id not in graph.passages:
+        raise KeyError(passage_id)
+
+    # Walk parents to root, collecting the chain (root → ... → passage_id).
+    chain: list[str] = []
+    seen: set[str] = set()
+    current = passage_id
+    while True:
+        if current in seen:
+            break  # cycle guard (Invariant #4)
+        seen.add(current)
+        entry = graph.passages.get(current)
+        if entry is None:
+            break  # dangling parent — treat as root
+        chain.append(current)
+        if not entry.parents:
+            break  # root passage
+        current = entry.parents[0]
+
+    chain.reverse()  # root-first
+
+    # Determine the base snapshot (root's own snapshot).
+    root_id = chain[0]
+    root_entry = graph.passages[root_id]
+    base = root_entry.snapshot
+
+    # Collect non-None deltas from root → passage (excluding root's own delta,
+    # which is relative to an empty Snapshot — Invariant #2).
+    deltas: list[SnapshotDelta] = []
+    for pid in chain[1:]:
+        entry = graph.passages[pid]
+        if entry.snapshot_delta is not None:
+            deltas.append(entry.snapshot_delta)
+
+    return reconstruct_snapshot_from_deltas(base, deltas)

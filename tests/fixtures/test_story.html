@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Test Story</title>
+<script>
+// Minimal SugarCube mock for testing
+window.SugarCube = {
+    State: {
+        passage: "start",
+        variables: {}
+    }
+};
+</script>
+</head>
+<body class="tag-normal">
+<div id="passages">
+<div class="passage" data-passage="start">
+<h1>Start Passage</h1>
+<p>This is the start passage. Choose your path:</p>
+<ul>
+<li><a href="javascript:void(0)" class="link-internal" data-passage="passage2">Go to passage 2</a></li>
+<li><a href="javascript:void(0)" class="link-internal" data-passage="passage3">Go to passage 3</a></li>
+</ul>
+</div>
+</div>
+<script>
+// Simulate SugarCube passage navigation via JS (no browser history)
+document.querySelectorAll('.passage a.link-internal').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var target = this.getAttribute('data-passage');
+        if (window.SugarCube && window.SugarCube.State) {
+            window.SugarCube.State.passage = target;
+        }
+    });
+});
+</script>
+</body>
+</html>

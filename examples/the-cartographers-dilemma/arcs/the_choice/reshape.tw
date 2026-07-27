@@ -1,0 +1,28 @@
+:: the_choice__reshape [the_choice]
+<!-- harness:meta
+location: salt_wastes
+-->
+
+You draw.
+
+Not with intent to control. Not with the need to command. You draw because the world is broken and you have ink in your hands and the blankness of the Salt Wastes is an invitation that has been waiting for three hundred years.
+
+You draw the river first. The Serpentine, but *right* this time. It flows through the Veilwood where it belongs, not through the old quarter. It feeds the farmlands. It reaches the sea at a natural harbor you can feel in the salt beneath your knees.
+
+Maren draws the forests. You draw the roads. She draws a city in the wastes, small, defensible, with a wall that follows the natural contour of the land. You draw the old quarter rebuilt, not as it was, but as it should have been: lower, wider, with foundations that go deep.
+
+The world groans. The salt splits. The ground heaves. And then, slowly, like a held breath releasing, it settles.
+
+You open your eyes. The Salt Wastes are gone. There is grass. There is a river. There are trees in the distance. And the sky is not white anymore. It is blue, the blue-black of ink, and it is beautiful.
+
+Maren is lying on her back beside you, breathing hard, her hands clean. The ink has left her eyes. She is crying.
+
+"Is it done?" she whispers.
+
+<<if $guild_trust lt 3>>You hear the Collectors in the distance, but they are not coming for you. They are standing at the edge of the new world, at the place where the salt meets the grass, and they are not moving.<<else>>The Collectors have stopped. They stand at the edge of the new world and do not enter.<</if>>
+
+"It's done," you say.
+
+**THE END: Reshaped**
+
+[[Begin again|Start]]

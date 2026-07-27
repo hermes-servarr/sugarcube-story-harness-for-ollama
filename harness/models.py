@@ -272,6 +272,13 @@ class ParsedMediaSlot(BaseModel):
 class ParsedCharacter(BaseModel):
     id: str
     prose_sheet: str
+    # Enrichment fields (optional — not all models provide them)
+    physical: str = ""
+    personality: str = ""
+    motivation: str = ""
+    backstory: str = ""
+    relationships: str = ""
+    speech: str = ""
 
 
 class ParsedLore(BaseModel):

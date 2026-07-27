@@ -1,0 +1,16 @@
+:: the_frontier__departure [the_frontier]
+<!-- harness:meta
+location: city_gate
+-->
+
+You leave before dawn with a pack full of blank parchment and three bottles of blue-black ink. The Guild will send Collectors. You have maybe two days before they pick up your trail.
+
+The frontier lies east: the Salt Wastes, where nothing grows and the ground is white as bone. No one lives there. No one maps it. It is the one place in the world where you might draw without anyone watching.
+
+But first you have to get through the Veilwood. The Serpentine, the river you wrote into being, now cuts through the old trade road. You will have to cross it. And the Veilwood has changed since you drew the map. The trees are darker. The paths are different.
+
+<<set $frontier_reached to false>>
+<<set $maps_drawn to $maps_drawn + 1>>
+
+[[Take the old trade road through the Veilwood|the_frontier__veilwood]]
+[[Blaze a new path cross-country|the_frontier__cross_country]]

@@ -1,0 +1,26 @@
+:: the_betrayal__confrontation [the_betrayal]
+<!-- harness:meta
+location: salt_wastes
+-->
+
+You find Maren in the center of the Salt Wastes, kneeling on the white ground with a map spread before her. She is drawing. Not with a nib. With her finger. And the salt beneath her finger cracks and splits and where she draws, water rises. Blue-black water, the color of ink.
+
+She has already drawn a river. And a forest. And the outline of something that might be a city.
+
+"Maren!" you shout across the flat silence. Your voice carries strangely, as if the air is thinner than it should be.
+
+She looks up. Her eyes are ink-stained, the whites gone blue-black. She is smiling, but the smile is wrong. It is the smile of someone who has discovered they are a god.
+
+"I found it," she says. "The blank place. The place where the world is *thinnest*. You were right to bring me here."
+
+"I didn't bring you," you say. "You stole the ink."
+
+She shrugs. "You would have wasted it. Binding. Caution. The Guild's fear. I'm going to finish what you started. I'm going to draw the world *right*."
+
+<<set $apprentice_loyalty to 0>>
+
+She is still drawing. The ground is splitting. And you can feel it: the world bending around her strokes.
+
+[[Try to stop her|the_choice__reshape]]
+[[Join her|the_choice__council]]
+[[Draw a map that erases hers|the_choice__destroy]]

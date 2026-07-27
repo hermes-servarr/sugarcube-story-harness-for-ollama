@@ -576,13 +576,17 @@ async def generate_arcs(
     data = parse_json_object(raw)
     if not isinstance(data, dict) or not isinstance(data.get("arcs"), list):
         return []
+    # Import normalize_arc_name for consistent NN_short_name formatting
+    from .planning import normalize_arc_name
     out: list[dict] = []
+    existing_names: list[str] = []
     for raw_arc in data["arcs"][:max(1, min(count, 50))]:
         if not isinstance(raw_arc, dict):
             continue
-        name = re.sub(r"[^a-z0-9_]", "_", str(raw_arc.get("name", "")).strip().lower())
+        name = normalize_arc_name(str(raw_arc.get("name", "")).strip(), existing_names)
         if not name:
             continue
+        existing_names.append(name)
         out.append({"name": name, "goal": str(raw_arc.get("goal", "")).strip()})
     return out
 
@@ -753,6 +757,12 @@ _SKETCH_ITEM = {
         "id": {"type": "string"},
         "name": {"type": "string"},
         "description": {"type": "string"},
+        "physical": {"type": "string"},
+        "personality": {"type": "string"},
+        "motivation": {"type": "string"},
+        "backstory": {"type": "string"},
+        "relationships": {"type": "string"},
+        "speech": {"type": "string"},
     },
     "required": ["id", "name", "description"],
 }
@@ -795,6 +805,8 @@ def _normalise_sketch_list(items, count: int) -> list[dict]:
     seen_ids: set[str] = set()
     if not isinstance(items, list):
         return out
+    # Enrichment fields that are passed through if the model provided them.
+    enrichment_fields = ("physical", "personality", "motivation", "backstory", "relationships", "speech")
     for raw in items[: max(1, min(count, 12))]:
         if not isinstance(raw, dict):
             continue
@@ -804,7 +816,12 @@ def _normalise_sketch_list(items, count: int) -> list[dict]:
         if not rid or not name or not desc or rid in seen_ids:
             continue
         seen_ids.add(rid)
-        out.append({"id": rid, "name": name, "description": desc})
+        entry = {"id": rid, "name": name, "description": desc}
+        for field in enrichment_fields:
+            val = str(raw.get(field, "")).strip()
+            if val:
+                entry[field] = val
+        out.append(entry)
     return out
 
 

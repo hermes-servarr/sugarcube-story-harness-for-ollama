@@ -1,0 +1,23 @@
+:: the_choice__council [the_choice]
+<!-- harness:meta
+location: salt_wastes
+-->
+
+You kneel across from Maren on the salt. Between you, the map she is drawing spreads and spreads. The world is bending. You can feel it in your teeth, in the soles of your feet, in the way the light has begun to curve.
+
+"If we do this together," you say, "we have to agree on the shape. Every line. Every river. Every city. One mistake and we could unmake everything."
+
+Maren stops drawing. Her ink-stained eyes study you. "You want a council," she says. "You want to *vote* on the world."
+
+"I want us to not destroy it by accident."
+
+She thinks about this. The cracked salt beneath her is silent. Somewhere very far away, or very close, you hear the Collectors. They have found the trail.
+
+"All right," she says. "We draw it together. But I want the river. The Serpentine. I want it to run all the way to the sea."
+
+You close your eyes. You can see it: the world as it could be. Not perfect. Not healed. But *drawn*, deliberately, by two hands that know the cost.
+
+<<set $maps_drawn to $maps_drawn + 1>>
+
+[[Draw the new world together|the_choice__reshape]]
+[[Refuse and try to destroy the maps|the_choice__destroy]]

@@ -105,6 +105,7 @@ from ..project import (
     write_lore_entity,
 )
 from ..validation import run_validation
+from ..snapshot_delta import reconstruct_passage_snapshot
 
 # Project root is resolved at startup — either from env var or cwd
 _PROJECT_ROOT = Path(os.environ.get("HARNESS_PROJECT", ".")).resolve()
@@ -393,6 +394,31 @@ async def get_passage(passage_id: str):
     tw_path = p.root / entry.file
     prose = tw_path.read_text(encoding="utf-8") if tw_path.exists() else ""
     return {**entry.model_dump(), "raw": prose}
+
+
+@app.get("/api/passage/{passage_id}/snapshot")
+async def get_reconstructed_snapshot(passage_id: str) -> dict:
+    """Return the reconstructed snapshot for a passage (deltas applied from root)."""
+    p = _p()
+    graph = load_story(p)
+    if passage_id not in graph.passages:
+        raise HTTPException(404, f"Passage {passage_id!r} not found.")
+    snapshot = reconstruct_passage_snapshot(graph, passage_id)
+    return snapshot.model_dump()
+
+
+@app.get("/api/passage/{passage_id}/delta")
+async def get_passage_delta(passage_id: str) -> dict:
+    """Return the stored snapshot_delta for a passage (or null if none)."""
+    p = _p()
+    graph = load_story(p)
+    if passage_id not in graph.passages:
+        raise HTTPException(404, f"Passage {passage_id!r} not found.")
+    entry = graph.passages[passage_id]
+    return {
+        "passage_id": passage_id,
+        "snapshot_delta": entry.snapshot_delta.model_dump() if entry.snapshot_delta else None,
+    }
 
 
 # ── Session / mode ─────────────────────────────────────────────────────────────
@@ -965,11 +991,17 @@ async def commit(req: CommitRequest):
     # write new character/lore sheets
     pending_facts: list[dict] = []
     for nc in output.new_characters:
-        pending_facts.append({
+        fact = {
             "type": "character",
             "id": nc.id,
             "prose_sheet": nc.prose_sheet,
-        })
+        }
+        # Pass through enrichment fields if the model provided them
+        for field in ("physical", "personality", "motivation", "backstory", "relationships", "speech"):
+            val = getattr(nc, field, "").strip()
+            if val:
+                fact[field] = val
+        pending_facts.append(fact)
     for nl in output.new_lore:
         pending_facts.append({
             "type": "lore",
@@ -1006,6 +1038,13 @@ class FactApproval(BaseModel):
     id: str
     category: Optional[str] = None
     prose_sheet: str = ""
+    # Enrichment fields for characters
+    physical: str = ""
+    personality: str = ""
+    motivation: str = ""
+    backstory: str = ""
+    relationships: str = ""
+    speech: str = ""
 
 
 @app.post("/api/facts/approve")
@@ -1013,8 +1052,27 @@ async def approve_fact(body: FactApproval):
     p = _p()
     if body.action == "accept":
         if body.type == "character":
-            # Build YAML frontmatter + prose
-            sheet = f"---\nid: {body.id}\ntags: []\n---\n# {body.id}\n\n{body.prose_sheet}\n"
+            # Build YAML frontmatter + prose, with enrichment sections if present
+            sheet_parts = [f"---\nid: {body.id}\nname: {body.id}\ntags: []\n---", f"# {body.id}\n"]
+            if body.prose_sheet:
+                sheet_parts.append(body.prose_sheet)
+            field_labels = {
+                "physical": "Physical Description",
+                "personality": "Personality Traits",
+                "motivation": "Motivation",
+                "backstory": "Backstory",
+                "relationships": "Key Relationships",
+                "speech": "Speech Mannerisms",
+            }
+            has_enrichment = False
+            for field_key, field_label in field_labels.items():
+                val = getattr(body, field_key, "").strip()
+                if val:
+                    if not has_enrichment:
+                        sheet_parts.append("")
+                        has_enrichment = True
+                    sheet_parts.append(f"## {field_label}\n\n{val}")
+            sheet = "\n".join(sheet_parts) + "\n"
             write_character(p, body.id, sheet)
         elif body.type == "lore" and body.category:
             sheet = f"---\nid: {body.id}\ncategory: {body.category}\n---\n# {body.id}\n\n{body.prose_sheet}\n"
@@ -1213,10 +1271,28 @@ async def init_story(body: StoryInitRequest):
         desc = ch.get("description", "")
         if not cid:
             continue
-        sheet = (
-            f"---\nid: {cid}\nname: {name}\ntags: []\n---\n"
-            f"# {name}\n\n{desc}\n"
-        )
+        # Build a structured character sheet with enrichment fields when present.
+        sheet_sections = [f"---\nid: {cid}\nname: {name}\ntags: []\n---", f"# {name}\n"]
+        if desc:
+            sheet_sections.append(desc)
+        # Enrichment fields rendered as labelled sections for readability
+        field_labels = {
+            "physical": "Physical Description",
+            "personality": "Personality Traits",
+            "motivation": "Motivation",
+            "backstory": "Backstory",
+            "relationships": "Key Relationships",
+            "speech": "Speech Mannerisms",
+        }
+        has_enrichment = False
+        for field_key, field_label in field_labels.items():
+            val = ch.get(field_key, "").strip()
+            if val:
+                if not has_enrichment:
+                    sheet_sections.append("")  # blank line before enrichment
+                    has_enrichment = True
+                sheet_sections.append(f"## {field_label}\n\n{val}")
+        sheet = "\n".join(sheet_sections) + "\n"
         write_character(p, cid, sheet)
         created_chars.append(cid)
 

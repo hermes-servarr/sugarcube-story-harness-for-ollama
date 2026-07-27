@@ -467,6 +467,7 @@ def create_passage(
             summary=output.summary,
             beats=list(output.beats),
             snapshot=new_snapshot,
+            snapshot_delta=snapshot_delta,
             passage_type=passage_type,
             entry_condition=entry_condition,
             fallback_passage=fallback_passage,

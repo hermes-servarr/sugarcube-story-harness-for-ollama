@@ -7,389 +7,24 @@
 <script src="https://unpkg.com/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
 <link rel="stylesheet" href="/static/css/app.css">
 <script src="/static/js/app.js" defer></script>
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
-  --text: #d4d8e8; --muted: #6b7080; --accent: #7c8cf8;
-  --warn: #f5a623; --err: #e05555; --ok: #4caf7d;
-  --font: 'Segoe UI', system-ui, sans-serif;
-}
-body { background:var(--bg); color:var(--text); font-family:var(--font);
-       font-size:14px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
-
-/* ── Top bar ── */
-#topbar { background:var(--surface); border-bottom:1px solid var(--border);
-          padding:6px 12px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
-#topbar h1 { font-size:15px; font-weight:600; color:var(--accent); white-space:nowrap; }
-#branch-indicator { background:var(--border); border-radius:4px; padding:2px 8px;
-                    font-size:12px; color:var(--muted); white-space:nowrap; }
-#validation-bar { flex:1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.vbadge { font-size:11px; padding:2px 6px; border-radius:3px; cursor:default; }
-.vbadge.err  { background:rgba(224,85,85,.2);  color:var(--err); }
-.vbadge.warn { background:rgba(245,166,35,.15);color:var(--warn); }
-.vbadge.ok   { background:rgba(76,175,125,.15);color:var(--ok); }
-.topbar-btn { background:var(--border); border:1px solid var(--border); color:var(--text);
-              border-radius:4px; padding:4px 10px; cursor:pointer; font-size:12px; white-space:nowrap; }
-.topbar-btn:hover { border-color:var(--accent); color:var(--accent); }
-#btn-compile { background:var(--accent); color:#fff; border:none; border-radius:4px;
-               padding:4px 12px; cursor:pointer; font-size:13px; white-space:nowrap; }
-#btn-compile:hover { opacity:.85; }
-
-/* ── Main layout ── */
-#main { display:flex; flex:1; overflow:hidden; }
-
-/* ── Left pane ── */
-#pane-left { width:300px; flex-shrink:0; border-right:1px solid var(--border);
-             display:flex; flex-direction:column; }
-.left-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
-.left-tab { flex:1; padding:7px; text-align:center; font-size:12px; font-weight:500;
-            color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
-.left-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
-.left-tab:hover:not(.active) { color:var(--text); }
-#cy { flex:1; }
-
-/* World panel */
-#world-panel { flex:1; overflow-y:auto; display:none; flex-direction:column; }
-.world-section { border-bottom:1px solid var(--border); }
-.world-section-hdr { padding:8px 12px; display:flex; align-items:center; cursor:pointer;
-                     user-select:none; }
-.world-section-hdr span { flex:1; font-size:12px; font-weight:600; color:var(--text); }
-.world-section-hdr .wsh-meta { font-size:10px; color:var(--muted); margin-right:6px; }
-.world-section-toggle { font-size:11px; color:var(--muted); }
-.world-section-body { padding:0 8px 8px; display:none; }
-.world-section-body.open { display:block; }
-.world-item { display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:4px;
-              cursor:pointer; }
-.world-item:hover { background:var(--border); }
-.world-item .wi-label { flex:1; font-size:12px; color:var(--text); }
-.world-item .wi-sub   { font-size:10px; color:var(--muted); }
-.world-item .wi-tag   { font-size:10px; padding:1px 5px; border-radius:10px;
-                        background:rgba(124,140,248,.15); color:var(--accent); }
-.world-add-btn { display:flex; align-items:center; gap:5px; padding:5px 6px; border-radius:4px;
-                 cursor:pointer; color:var(--muted); font-size:12px; margin-top:2px; }
-.world-add-btn:hover { color:var(--accent); }
-
-/* ── Center pane ── */
-#pane-passage { flex:1; border-right:1px solid var(--border);
-                display:flex; flex-direction:column; overflow:hidden; min-width:0; }
-#passage-header { padding:10px 14px; border-bottom:1px solid var(--border);
-                  display:flex; gap:10px; align-items:center; flex-shrink:0; }
-#passage-id { font-size:12px; color:var(--accent); font-family:monospace; flex:1; }
-#passage-body { flex:1; overflow-y:auto; padding:14px; }
-.passage-section { margin-bottom:18px; }
-.passage-section h3 { font-size:11px; text-transform:uppercase; color:var(--muted);
-                       letter-spacing:.08em; margin-bottom:6px; }
-.prose { white-space:pre-wrap; line-height:1.7; }
-.choice-item { background:var(--border); border-radius:4px; padding:4px 8px;
-               margin-bottom:4px; font-size:13px; }
-.state-item  { font-family:monospace; font-size:12px; color:var(--accent); }
-.snapshot-item { font-size:12px; color:var(--muted); margin-bottom:3px; }
-.media-slot { display:flex; gap:8px; align-items:center; padding:6px 8px;
-              background:var(--border); border-radius:4px; margin-bottom:6px; }
-.media-slot .keywords { flex:1; font-size:11px; color:var(--muted); }
-.media-slot .status { font-size:11px; padding:1px 6px; border-radius:3px; }
-.media-slot .status.pending  { background:rgba(245,166,35,.2); color:var(--warn); }
-.media-slot .status.resolved { background:rgba(76,175,125,.2); color:var(--ok); }
-.media-slot .caption { font-size:10px; color:var(--muted); font-style:italic; }
-
-/* ── Plan panel ── */
-#plan-panel { flex:1; overflow:hidden; display:none; flex-direction:column; }
-.plan-group h4 { font-size:11px; text-transform:uppercase; letter-spacing:.08em;
-                 color:var(--muted); margin:0 0 6px; }
-.beat-row { display:flex; gap:6px; align-items:flex-start; padding:5px 6px;
-            border-radius:4px; background:var(--border); margin-bottom:5px; font-size:12px; }
-.beat-row .beat-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; flex-shrink:0; }
-.beat-row .beat-dot.covered { background:var(--ok); }
-.beat-row .beat-dot.open    { background:var(--warn); }
-.beat-row .beat-text { flex:1; }
-.beat-row .beat-meta { font-size:10px; color:var(--muted); }
-.beat-row .beat-act  { font-size:10px; color:var(--accent); }
-.arc-row { padding:6px; border:1px solid var(--border); border-radius:4px; margin-bottom:6px; }
-.arc-row .arc-name { font-size:12px; font-weight:600; }
-.arc-row .arc-status { font-size:10px; padding:1px 6px; border-radius:10px; margin-left:6px; }
-.arc-row .arc-status.planned { background:rgba(124,140,248,.15); color:var(--accent); }
-.arc-row .arc-status.active  { background:rgba(245,166,35,.2);  color:var(--warn); }
-.arc-row .arc-status.done    { background:rgba(76,175,125,.2);  color:var(--ok); }
-.plan-gap { font-size:11px; color:var(--warn); margin-bottom:3px; }
-.plan-input { width:100%; background:var(--surface); border:1px solid var(--border);
-              color:var(--text); border-radius:4px; padding:4px 6px; font-size:12px; }
-.media-meta-field { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
-.media-meta-field label { font-size:11px; color:var(--muted); }
-.media-opts { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; margin-bottom:8px; }
-.media-opts label { display:flex; align-items:center; gap:3px; color:var(--text); }
-.media-opts input { width:auto; }
-.file-pick { display:flex; gap:6px; }
-.btn-sm { background:var(--surface); border:1px solid var(--border); color:var(--text);
-          border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
-.btn-sm:hover { border-color:var(--accent); color:var(--accent); }
-
-/* Editor overlay in center pane */
-#editor-panel { flex:1; overflow-y:auto; padding:16px; display:none; flex-direction:column; gap:12px; }
-#editor-panel.visible { display:flex; }
-#editor-title-row { display:flex; align-items:center; gap:10px; }
-#editor-label { font-size:13px; font-weight:600; color:var(--accent); flex:1; }
-#editor-textarea { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text);
-                   border-radius:6px; padding:10px; font-size:13px; font-family:monospace;
-                   resize:none; line-height:1.7; min-height:300px; }
-#editor-textarea:focus { outline:none; border-color:var(--accent); }
-#editor-actions { display:flex; gap:8px; flex-shrink:0; }
-
-/* ── Right pane ── */
-#pane-chat { width:360px; flex-shrink:0; display:flex; flex-direction:column; }
-#chat-header { padding:8px 12px; border-bottom:1px solid var(--border);
-               display:flex; gap:8px; align-items:center; flex-shrink:0; }
-#mode-select { background:var(--surface); border:1px solid var(--border); color:var(--text);
-               border-radius:4px; padding:3px 6px; font-size:12px; }
-#chat-log { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
-.msg { max-width:100%; }
-.msg.human .bubble { background:var(--accent); color:#fff; border-radius:10px 10px 2px 10px; }
-.msg.bot   .bubble { background:var(--surface); border:1px solid var(--border);
-                     border-radius:10px 10px 10px 2px; }
-.msg .bubble { padding:8px 12px; white-space:pre-wrap; font-size:13px; line-height:1.6; }
-.msg.human { align-self:flex-end; }
-.msg.bot   { align-self:flex-start; }
-#chat-input-area { padding:10px 12px; border-top:1px solid var(--border); flex-shrink:0; }
-#arc-slug-row { display:flex; gap:4px; margin-bottom:6px; align-items:center; }
-#arc-slug-row input { flex:1; background:var(--surface); border:1px solid var(--border);
-                      color:var(--text); border-radius:4px; padding:4px 8px; font-size:12px; min-width:0; }
-#arc-slug-row input:focus { outline:none; border-color:var(--accent); }
-#btn-names { background:var(--border); border:none; color:var(--muted); border-radius:4px;
-             padding:4px 8px; cursor:pointer; font-size:13px; flex-shrink:0; }
-#btn-names:hover { color:var(--accent); }
-#chat-input { width:100%; background:var(--surface); border:1px solid var(--border);
-              color:var(--text); border-radius:6px; padding:8px 10px; font-size:13px;
-              resize:none; min-height:70px; font-family:inherit; }
-#chat-input:focus { outline:none; border-color:var(--accent); }
-#chat-btn-row { display:flex; gap:6px; margin-top:6px; }
-#btn-generate { flex:1; background:var(--surface); border:1px solid var(--accent);
-                color:var(--accent); border-radius:4px; padding:5px 10px; cursor:pointer; font-size:12px; }
-#btn-generate:hover { background:var(--accent); color:#fff; }
-#btn-commit { background:var(--ok); color:#fff; border:none; border-radius:4px;
-              padding:5px 14px; cursor:pointer; font-size:12px; display:none; }
-#btn-commit:hover { opacity:.85; }
-#facts-queue { border-top:1px solid var(--border); padding:8px 12px; max-height:200px; overflow-y:auto; }
-#facts-queue h4 { font-size:11px; text-transform:uppercase; color:var(--muted);
-                   letter-spacing:.06em; margin-bottom:6px; }
-.fact-item { background:var(--surface); border:1px solid var(--border); border-radius:5px;
-             padding:6px 8px; margin-bottom:6px; font-size:12px; }
-.fact-item .fact-id    { font-weight:600; color:var(--accent); }
-.fact-item .fact-prose { color:var(--muted); margin:4px 0; white-space:pre-wrap;
-                          max-height:60px; overflow-y:auto; font-size:11px; }
-.fact-item .fact-btns  { display:flex; gap:6px; }
-.fact-accept { background:rgba(76,175,125,.2); color:var(--ok);  border:1px solid var(--ok);
-               border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
-.fact-reject { background:rgba(224,85,85,.15); color:var(--err); border:1px solid var(--err);
-               border-radius:3px; padding:2px 8px; cursor:pointer; font-size:11px; }
-
-/* ── Modal base ── */
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65);
-                 display:flex; align-items:center; justify-content:center; z-index:100; }
-.modal-overlay.hidden { display:none; }
-.modal { background:var(--surface); border:1px solid var(--border); border-radius:10px;
-         padding:20px; width:560px; max-width:95vw; max-height:88vh;
-         overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
-.modal.wide { width:700px; }
-.modal h2 { font-size:15px; font-weight:600; color:var(--text); }
-.modal-close { margin-left:auto; background:none; border:none; color:var(--muted);
-               font-size:18px; cursor:pointer; line-height:1; }
-.modal-close:hover { color:var(--text); }
-.modal-title-row { display:flex; align-items:center; }
-.field-row { display:flex; flex-direction:column; gap:4px; }
-.field-row label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
-.field-row input,.field-row select,.field-row textarea {
-  background:var(--bg); border:1px solid var(--border); color:var(--text);
-  border-radius:5px; padding:6px 10px; font-size:13px; font-family:inherit; width:100%; }
-.field-row input:focus,.field-row select:focus,.field-row textarea:focus {
-  outline:none; border-color:var(--accent); }
-.field-hint { font-size:11px; color:var(--muted); }
-.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
-.btn-primary   { background:var(--accent); color:#fff; border:none; border-radius:5px;
-                 padding:7px 18px; cursor:pointer; font-size:13px; }
-.btn-primary:hover { opacity:.85; }
-.btn-secondary { background:var(--border); color:var(--text); border:none; border-radius:5px;
-                 padding:7px 14px; cursor:pointer; font-size:13px; }
-.btn-secondary:hover { border:1px solid var(--accent); color:var(--accent); }
-.divider { border:none; border-top:1px solid var(--border); }
-
-/* ── Settings modal ── */
-.model-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
-.model-chip { background:var(--border); border:1px solid var(--border); color:var(--muted);
-              border-radius:14px; padding:3px 10px; font-size:12px; cursor:pointer;
-              display:inline-flex; align-items:center; gap:5px; }
-.model-chip:hover { border-color:var(--accent); color:var(--accent); }
-.model-chip.active    { border-color:var(--accent); color:var(--accent); background:rgba(124,140,248,.12); }
-.model-chip.test-ok   { border-color:var(--ok); }
-.model-chip.test-fail { border-color:var(--err); color:var(--err); }
-.model-chip.test-oom  { border-color:var(--warn); color:var(--warn); }
-.chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.chip-dot.spin { background:var(--warn); animation:pulse .8s infinite alternate; }
-.chip-dot.ok   { background:var(--ok); }
-.chip-dot.fail { background:var(--err); }
-@keyframes pulse { from{opacity:.3} to{opacity:1} }
-.chip-retest { font-size:10px; color:var(--muted); margin-left:2px; opacity:.5; }
-.chip-retest:hover { opacity:1; color:var(--accent); }
-.chip-del { font-size:10px; margin-left:2px; opacity:.45; }
-.chip-del:hover { opacity:1; }
-.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
-.status-dot.ok       { background:var(--ok); }
-.status-dot.err      { background:var(--err); }
-.status-dot.checking { background:var(--warn); }
-
-/* ── Names modal ── */
-#names-arc-list { display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; }
-.arc-item { background:var(--bg); border:1px solid var(--border); border-radius:5px;
-            padding:6px 10px; cursor:pointer; }
-.arc-item:hover { border-color:var(--accent); }
-.arc-item.selected { border-color:var(--accent); background:rgba(124,140,248,.08); }
-.arc-item .arc-name  { font-size:13px; font-weight:500; }
-.arc-item .arc-count { font-size:11px; color:var(--muted); }
-#names-passage-list { display:flex; flex-direction:column; gap:3px; max-height:120px; overflow-y:auto; }
-.passage-chip { background:var(--bg); border:1px solid var(--border); border-radius:4px;
-                padding:4px 8px; font-size:12px; cursor:pointer; font-family:monospace; color:var(--muted); }
-.passage-chip:hover { border-color:var(--accent); color:var(--accent); }
-#names-suggest-result { background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:8px 10px; }
-.sug-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
-.sug-value { font-family:monospace; font-size:13px; color:var(--accent); }
-.sug-use { font-size:11px; color:var(--ok); cursor:pointer; margin-left:8px; }
-.sug-use:hover { text-decoration:underline; }
-
-/* ── World init / new-entity modals ── */
-.dyn-list { display:flex; flex-direction:column; gap:6px; }
-.dyn-row { display:flex; gap:6px; align-items:flex-start; }
-.dyn-row input,.dyn-row textarea {
-  background:var(--bg); border:1px solid var(--border); color:var(--text);
-  border-radius:4px; padding:5px 8px; font-size:12px; font-family:inherit; }
-.dyn-row .ri { width:110px; flex-shrink:0; }
-.dyn-row .rn { flex:1; }
-.dyn-row .rd { flex:2; }
-.dyn-row .rm { background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px;
-               padding:2px 4px; flex-shrink:0; }
-.dyn-row .rm:hover { color:var(--err); }
-.add-row-btn { font-size:12px; color:var(--accent); background:none; border:none; cursor:pointer;
-               padding:2px 0; text-align:left; }
-.add-row-btn:hover { text-decoration:underline; }
-.init-steps { display:flex; gap:6px; margin-bottom:4px; }
-.init-step { flex:1; padding:5px; text-align:center; font-size:11px; border-radius:4px;
-             background:var(--border); color:var(--muted); cursor:pointer; }
-.init-step.active { background:rgba(124,140,248,.2); color:var(--accent); font-weight:600; }
-.init-step.done   { background:rgba(76,175,125,.15); color:var(--ok); }
-.step-page { display:none; flex-direction:column; gap:12px; }
-.step-page.visible { display:flex; }
-
-/* Passage type toggle buttons */
-.ptype-btn { background:var(--border); border:1px solid var(--border); color:var(--muted);
-             border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
-.ptype-btn:hover { border-color:var(--accent); color:var(--accent); }
-.ptype-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(124,140,248,.12); }
-.ptype-btn[data-type="hub"].active  { border-color:var(--ok);   color:var(--ok);   background:rgba(76,175,125,.12); }
-.ptype-btn[data-type="random"].active { border-color:var(--warn); color:var(--warn); background:rgba(245,166,35,.12); }
-
-/* Scrollbar */
-::-webkit-scrollbar { width:5px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
-::-webkit-scrollbar-thumb:hover { background:var(--accent); }
-
-/* ── Visual polish ── */
-:root {
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
-  --shadow-md: 0 4px 16px rgba(0,0,0,.35);
-  --radius: 6px;
-  --ease: cubic-bezier(.2,.7,.2,1);
-}
-button, .topbar-btn, .btn-sm, #btn-compile {
-  transition: background-color .15s var(--ease), border-color .15s var(--ease),
-              color .15s var(--ease), transform .12s var(--ease), box-shadow .15s var(--ease);
-}
-button:focus-visible, .topbar-btn:focus-visible, .btn-sm:focus-visible,
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 1px;
-}
-button:active:not(:disabled), .topbar-btn:active:not(:disabled),
-.btn-sm:active:not(:disabled) { transform: translateY(1px); }
-button:disabled, .topbar-btn:disabled, .btn-sm:disabled, #btn-compile:disabled {
-  opacity: .55; cursor: not-allowed; transform: none;
-}
-.vbadge { transition: transform .12s var(--ease), filter .12s var(--ease); }
-.vbadge[data-target] { cursor: pointer; }
-.vbadge[data-target]:hover { transform: translateY(-1px); filter: brightness(1.2); }
-
-/* Graph node focus pulse — triggered by .focus-pulse on a node element */
-@keyframes node-pulse {
-  0%   { box-shadow: 0 0 0 0    rgba(124,140,248,.6); }
-  70%  { box-shadow: 0 0 0 14px rgba(124,140,248,0); }
-  100% { box-shadow: 0 0 0 0    rgba(124,140,248,0); }
-}
-
-/* ── Toast container ── */
-#toast-stack {
-  position: fixed; top: 14px; right: 14px; z-index: 9999;
-  display: flex; flex-direction: column; gap: 8px;
-  pointer-events: none; max-width: 360px;
-}
-.toast {
-  pointer-events: auto;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-left: 3px solid var(--accent);
-  border-radius: var(--radius); padding: 9px 12px;
-  font-size: 13px; line-height: 1.45; box-shadow: var(--shadow-md);
-  display: flex; gap: 10px; align-items: flex-start;
-  animation: toast-in .18s var(--ease);
-}
-.toast.success { border-left-color: var(--ok); }
-.toast.error   { border-left-color: var(--err); }
-.toast.warn    { border-left-color: var(--warn); }
-.toast.info    { border-left-color: var(--accent); }
-.toast .t-body { flex: 1; word-wrap: break-word; }
-.toast .t-close {
-  background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px;
-}
-.toast .t-close:hover { color: var(--text); }
-.toast.leaving { animation: toast-out .16s var(--ease) forwards; }
-@keyframes toast-in  { from { opacity: 0; transform: translateX(20px); }
-                       to   { opacity: 1; transform: translateX(0); } }
-@keyframes toast-out { from { opacity: 1; transform: translateX(0); }
-                       to   { opacity: 0; transform: translateX(20px); } }
-
-/* ── Busy spinner (inline button) ── */
-.spin {
-  display: inline-block; width: 11px; height: 11px;
-  border: 2px solid currentColor; border-right-color: transparent;
-  border-radius: 50%; animation: spin .7s linear infinite;
-  vertical-align: -2px; margin-right: 5px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Shortcuts help overlay ── */
-#shortcuts-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 9998;
-  display: none; align-items: center; justify-content: center;
-  animation: fade-in .15s var(--ease);
-}
-#shortcuts-overlay.visible { display: flex; }
-#shortcuts-overlay .panel {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px 24px;
-  max-width: 480px; box-shadow: var(--shadow-md);
-}
-#shortcuts-overlay h2 { font-size: 14px; color: var(--accent); margin-bottom: 12px; }
-#shortcuts-overlay table { width: 100%; border-collapse: collapse; font-size: 13px; }
-#shortcuts-overlay td { padding: 5px 0; }
-#shortcuts-overlay td.k { width: 130px; }
-#shortcuts-overlay kbd {
-  background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px;
-  border-radius: 3px; padding: 1px 6px; font-family: monospace; font-size: 11px;
-  color: var(--text);
-}
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-</style>
+<link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
 <!-- Toast container (managed via window.toast()) -->
 <div id="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Mobile navigation toggle -->
+<button id="nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation">☰</button>
+
+<!-- Generation overlay (shown during AI generation) -->
+<div id="gen-overlay" class="gen-overlay">
+  <div class="gen-overlay-card">
+    <div class="gen-spinner"></div>
+    <div class="gen-label" id="gen-overlay-label">Generating…</div>
+    <div class="gen-sub" id="gen-overlay-sub">Calling Ollama model</div>
+  </div>
+</div>
 
 <!-- Keyboard shortcuts overlay (toggled via ? key) -->
 <div id="shortcuts-overlay" role="dialog" aria-label="Keyboard shortcuts" onclick="if(event.target===this)closeShortcuts()">
@@ -409,7 +44,9 @@ button:disabled, .topbar-btn:disabled, .btn-sm:disabled, #btn-compile:disabled {
 
 <!-- ── Top bar ── -->
 <div id="topbar">
+  <button id="nav-toggle-left" onclick="toggleMobileNav('left')" class="topbar-btn" style="display:none;font-size:16px;padding:4px 8px">☰</button>
   <h1>Story Harness</h1>
+  <button id="nav-toggle-right" onclick="toggleMobileNav('right')" class="topbar-btn" style="display:none;font-size:16px;padding:4px 8px">💬</button>
   <span id="branch-indicator">branch: —</span>
   <div id="validation-bar"><span class="vbadge ok">valid</span></div>
   <button class="topbar-btn" onclick="openStoryInit()">+ New Story</button>
@@ -423,6 +60,11 @@ button:disabled, .topbar-btn:disabled, .btn-sm:disabled, #btn-compile:disabled {
 
   <!-- Left pane: Graph + World tabs -->
   <div id="pane-left">
+    <!-- Mobile close button -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--surface)" id="mobile-left-header">
+      <span style="font-size:13px;font-weight:600">Navigation</span>
+      <button class="btn-sm" onclick="closeMobileNav('left')" style="min-width:32px">✕</button>
+    </div>
     <div class="left-tabs">
       <div class="left-tab active" id="tab-graph" onclick="switchLeftTab('graph')">Graph</div>
       <div class="left-tab"        id="tab-world" onclick="switchLeftTab('world')">World</div>
@@ -565,6 +207,11 @@ button:disabled, .topbar-btn:disabled, .btn-sm:disabled, #btn-compile:disabled {
 
   <!-- Right pane: chat -->
   <div id="pane-chat">
+    <!-- Mobile close button -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--surface)" id="mobile-right-header">
+      <button class="btn-sm" onclick="closeMobileNav('right')" style="min-width:32px">✕</button>
+      <span style="font-size:13px;font-weight:600">Chat</span>
+    </div>
     <div id="chat-header">
       <span style="font-size:13px;font-weight:600">Chat</span>
       <select id="mode-select" onchange="setMode(this.value)">
@@ -1219,6 +866,77 @@ async function busy(btn, fn, pendingLabel=null) {
 function openShortcuts()  { document.getElementById('shortcuts-overlay').classList.add('visible'); }
 function closeShortcuts() { document.getElementById('shortcuts-overlay').classList.remove('visible'); }
 
+// ── Generation overlay ──
+function showGenOverlay(label, sub) {
+  const ov = document.getElementById('gen-overlay');
+  if (!ov) return;
+  if (label) document.getElementById('gen-overlay-label').textContent = label;
+  if (sub) document.getElementById('gen-overlay-sub').textContent = sub;
+  ov.classList.add('visible');
+}
+function hideGenOverlay() {
+  const ov = document.getElementById('gen-overlay');
+  if (ov) ov.classList.remove('visible');
+}
+
+// ── Error banner ──
+function showGenError(message, code) {
+  // Show error banner at the top of the chat log
+  const log = document.getElementById('chat-log');
+  if (!log) return;
+  const existing = log.querySelector('.error-banner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.className = 'error-banner';
+  banner.innerHTML = `<span class="err-icon">⚠</span><div class="err-body">${escHtml(message)}</div><button class="err-close" aria-label="Dismiss">✕</button>`;
+  banner.querySelector('.err-close').addEventListener('click', () => banner.remove());
+  log.insertBefore(banner, log.firstChild);
+  // Also toast for visibility
+  toast(message, 'error', 6000);
+}
+
+// ── Mobile navigation ──
+function toggleMobileNav(side) {
+  // side='left' opens the left pane, side='right' opens chat
+  if (side === 'left') {
+    const pane = document.getElementById('pane-left');
+    pane.classList.toggle('mobile-open');
+    // Close the other pane
+    document.getElementById('pane-chat')?.classList.remove('mobile-open');
+  } else if (side === 'right') {
+    const pane = document.getElementById('pane-chat');
+    pane.classList.toggle('mobile-open');
+    document.getElementById('pane-left')?.classList.remove('mobile-open');
+  } else {
+    // No side specified — toggle left
+    document.getElementById('pane-left').classList.toggle('mobile-open');
+    document.getElementById('pane-chat')?.classList.remove('mobile-open');
+  }
+}
+function closeMobileNav(side) {
+  if (side === 'left') document.getElementById('pane-left')?.classList.remove('mobile-open');
+  else if (side === 'right') document.getElementById('pane-chat')?.classList.remove('mobile-open');
+}
+
+// Show/hide mobile nav toggle buttons based on screen width
+function updateMobileNavVisibility() {
+  const show = window.innerWidth <= 900;
+  const left = document.getElementById('nav-toggle-left');
+  const right = document.getElementById('nav-toggle-right');
+  if (left) left.style.display = show ? 'inline-block' : 'none';
+  if (right) right.style.display = show ? 'inline-block' : 'none';
+  // Hide mobile headers on desktop
+  const lh = document.getElementById('mobile-left-header');
+  const rh = document.getElementById('mobile-right-header');
+  if (lh) lh.style.display = show ? 'flex' : 'none';
+  if (rh) rh.style.display = show ? 'flex' : 'none';
+  // If switching to desktop, close mobile panes
+  if (!show) {
+    document.getElementById('pane-left')?.classList.remove('mobile-open');
+    document.getElementById('pane-chat')?.classList.remove('mobile-open');
+  }
+}
+
 // Drop-in replacement for window.alert — non-blocking, integrates with toast stack.
 window.alert = (msg) => toast(String(msg), 'warn', 4500);
 
@@ -1304,6 +1022,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   setInterval(refreshValidation, 15000);
   await loadTemplates();
   document.addEventListener('keydown', _onGlobalKey);
+  // Mobile nav
+  updateMobileNavVisibility();
+  window.addEventListener('resize', updateMobileNavVisibility);
   // show init wizard if project is empty
   const status = await api('/api/project-status', 'GET', null, {silent:true}).catch(()=>null);
   if (status?.is_empty) openStoryInit();
@@ -1391,13 +1112,18 @@ async function refreshChars() {
   const r = await api('/api/characters').catch(()=>({characters:[]}));
   const chars = r.characters || [];
   document.getElementById('chars-count').textContent = chars.length;
-  document.getElementById('chars-list').innerHTML = chars.map(c =>
-    `<div class="world-item" onclick="editCharacter('${escAttr(c.id)}')">
-       <span class="wi-label">${escHtml(c.name||c.id)}</span>
-       <span class="wi-sub">${escHtml(c.id)}</span>
-       ${(c.tags||[]).map(t=>`<span class="wi-tag">${escHtml(t)}</span>`).join('')}
-     </div>`
-  ).join('');
+  document.getElementById('chars-list').innerHTML = chars.map(c => {
+    const tags = (c.tags||[]).map(t=>`<span class="wi-tag">${escHtml(t)}</span>`).join('');
+    const desc = c.summary || c.description || '';
+    return `<div class="char-card" onclick="editCharacter('${escAttr(c.id)}')">
+      <div class="char-card-header">
+        <span class="char-card-name">${escHtml(c.name||c.id)}</span>
+        <span class="char-card-id">${escHtml(c.id)}</span>
+      </div>
+      ${desc ? `<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px">${escHtml(desc.slice(0,120))}${desc.length>120?'…':''}</div>` : ''}
+      ${tags ? `<div class="char-card-tags">${tags}</div>` : ''}
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:12px;padding:8px">No characters yet. Click + New character.</div>';
 }
 
 async function refreshLore() {
@@ -1411,14 +1137,14 @@ async function refreshLore() {
     by_cat[l.category].push(l);
   }
   document.getElementById('lore-list').innerHTML = Object.entries(by_cat).map(([cat,items])=>
-    `<div style="margin-bottom:4px">
-       <div style="font-size:10px;color:var(--muted);padding:3px 6px;text-transform:uppercase;letter-spacing:.05em">${escHtml(cat)}</div>
-       ${items.map(l=>`<div class="world-item" onclick="editLore('${escAttr(l.category)}','${escAttr(l.id)}')">
-           <span class="wi-label">${escHtml(l.title||l.id)}</span>
-           <span class="wi-sub">${escHtml(l.summary||'')}</span>
+    `<div style="margin-bottom:6px">
+       <div class="lore-category-header">${escHtml(cat)}</div>
+       ${items.map(l=>`<div class="lore-card" onclick="editLore('${escAttr(l.category)}','${escAttr(l.id)}')">
+           <div class="lore-card-title">${escHtml(l.title||l.id)}</div>
+           ${l.summary?`<div class="lore-card-summary">${escHtml(l.summary.slice(0,150))}${l.summary.length>150?'…':''}</div>`:''}
          </div>`).join('')}
      </div>`
-  ).join('');
+  ).join('') || '<div style="color:var(--muted);font-size:12px;padding:8px">No lore entries yet. Click + New lore entry.</div>';
 }
 
 async function refreshNotes() {
@@ -1765,11 +1491,13 @@ async function genInitPremise(btn) {
   const dir = _askDirection('premise');
   if (dir === null) return;
   _setButtonBusy(btn, true);
+  showGenOverlay('Generating premise…', 'Calling Ollama model');
   try {
     const r = await api('/api/init/generate-premise', 'POST', {seed, direction: dir, inspiration_files: getWizardInspFiles()});
     if (r.title)   document.getElementById('init-title').value   = r.title;
     if (r.premise) document.getElementById('init-premise').value = r.premise;
   } catch(e) { addMsg('bot', `Premise gen error: ${e.message}`); }
+  hideGenOverlay();
   _setButtonBusy(btn, false);
 }
 
@@ -1921,6 +1649,7 @@ async function generateStoryActs() {
   if (dir === null) return;
   const btn = document.getElementById('btn-gen-acts');
   btn.textContent = 'Generating…'; btn.disabled = true;
+  showGenOverlay('Generating story acts…', 'Calling Ollama model');
   try {
     const numActs = parseInt(document.getElementById('init-num-acts').value)||3;
     const body = {
@@ -1941,6 +1670,7 @@ async function generateStoryActs() {
   } catch(e) {
     addMsg('bot',`Generate error: ${e.message}`);
   } finally {
+    hideGenOverlay();
     btn.textContent='✦ Generate with AI'; btn.disabled=false;
   }
 }
@@ -2182,6 +1912,7 @@ async function focusPassage(pid) {
       ${(snap.world_state||[]).map(f=>`<div class="snapshot-item">• ${escHtml(f)}</div>`).join('')
         ||'<span style="color:var(--muted);font-size:12px">none</span>'}
     </div>
+    ${await renderPassageDelta(pid)}
     <div class="passage-section">
       <div style="display:flex;align-items:center;gap:6px">
         <h3 style="margin:0">Media slots</h3>
@@ -2211,6 +1942,38 @@ function renderPlanBeatTags(beats) {
 function extractProse(raw) {
   if (!raw) return '';
   return raw.replace(/^::.*$/m,'').replace(/<!--[\s\S]*?-->/g,'').replace(/<<[^>]+>>/g,'').trim();
+}
+
+async function renderPassageDelta(pid) {
+  let deltaData = null;
+  try {
+    const r = await api(`/api/passage/${encodeURIComponent(pid)}/delta`);
+    deltaData = r.snapshot_delta;
+  } catch {}
+  if (!deltaData) return '';
+  const sections = [
+    {key: 'characters_present', label: 'Characters present', type: 'char'},
+    {key: 'characters_offscreen', label: 'Characters offscreen', type: 'char'},
+    {key: 'world_state', label: 'World state', type: 'list'},
+    {key: 'open_threads', label: 'Open threads', type: 'list'},
+  ];
+  let items = '';
+  for (const sec of sections) {
+    const d = deltaData[sec.key] || {};
+    if (sec.type === 'char') {
+      for (const a of (d.added||[])) items += `<div class="snapshot-item" style="color:var(--ok)">+ ${escHtml(a.id||'')} ${a.status?`(${escHtml(a.status)})`:''}</div>`;
+      for (const [id, mod] of Object.entries(d.modified||{})) items += `<div class="snapshot-item" style="color:var(--warn)">~ ${escHtml(id)} ${Object.entries(mod).map(([k,v])=>`${escHtml(k)}=${escHtml(String(v))}`).join(', ')}</div>`;
+      for (const r of (d.removed||[])) items += `<div class="snapshot-item" style="color:var(--err)">− ${escHtml(r)}</div>`;
+    } else {
+      for (const a of (d.added||[])) items += `<div class="snapshot-item" style="color:var(--ok)">+ ${escHtml(a)}</div>`;
+      for (const r of (d.removed||[])) items += `<div class="snapshot-item" style="color:var(--err)">− ${escHtml(r)}</div>`;
+    }
+  }
+  if (!items) return '';
+  return `<div class="passage-section">
+    <h3 style="margin:0">Snapshot delta</h3>
+    ${items}
+  </div>`;
 }
 
 async function renderMediaSlots(slot_ids) {
@@ -2368,19 +2131,23 @@ async function generate() {
   addMsg('human',document.getElementById('chat-input').value.trim());
   document.getElementById('chat-input').value='';
   addMsg('bot','Generating…');
+  showGenOverlay('Generating passage…', `Arc: ${arc} · Slug: ${slug}`);
   const sendBtn = document.getElementById('btn-send');
+  const genBtn = document.getElementById('btn-generate');
   try{
     if (sendBtn) sendBtn.disabled = true;
+    if (genBtn) genBtn.disabled = true;
     const r=await api('/api/generate','POST',{prompt,arc_name:arc,passage_slug:slug,
       parent_passage_id:currentPassageId,mode,branch_name:'main',
       extra_ideas:extraIdeas,inspiration_files:inspFiles,inspiration_text:inspText}, {silent:true});
     lastGenerateResp=r;
+    hideGenOverlay();
     document.getElementById('chat-log').lastChild.remove();
     const p=r.parsed;
     let preview=`**${slug}**\n\n${p.prose||''}`;
     if(p.choices?.length) preview+='\n\nChoices:\n'+p.choices.map(c=>`• ${c.text} → ${c.hint}`).join('\n');
     if(p.summary) preview+=`\n\n_${p.summary}_`;
-    if(r.warnings?.length) preview+=`\n\nWarnings: ${r.warnings.join('; ')}`;
+    if(r.warnings?.length) preview+=`\n\n⚠ Warnings: ${r.warnings.join('; ')}`;
     addMsg('bot',preview);
     document.getElementById('btn-commit').style.display='block';
     // Populate the parsed-JSON editor so a reviewer can tweak before committing.
@@ -2398,8 +2165,12 @@ async function generate() {
     renderPendingFacts();
     applyPendingMediaToParsed();
   }catch(e){
+    hideGenOverlay();
     document.getElementById('chat-log').lastChild.remove();
+    showGenError(`Generation failed: ${e.message}`, e.code || 'error');
     addMsg('bot',`Error: ${e.message}`);
+  } finally {
+    if (genBtn) genBtn.disabled = false;
   }
 }
 

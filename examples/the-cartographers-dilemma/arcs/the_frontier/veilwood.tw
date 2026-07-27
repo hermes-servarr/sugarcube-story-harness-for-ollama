@@ -1,0 +1,20 @@
+:: the_frontier__veilwood [the_frontier]
+<!-- harness:meta
+location: veilwood
+-->
+
+The Veilwood is wrong.
+
+The trees you remember from your mapping expeditions are gone, replaced by darker growth: bark like wet leather, leaves that hang in spirals. The Serpentine runs through the center of the wood now, wide and slow, and its water is the same blue-black as your ink.
+
+You stop to fill your canteen. The water tastes of parchment and ozone. You can feel it in your teeth.
+
+And then you notice: the trees on the far bank are growing in rows. Not naturally. In the pattern of your map's ink grain. The forest is becoming your map.
+
+You hear something moving through the undergrowth. Not an animal. The sound is rhythmic, deliberate. Footsteps.
+
+<<set $frontier_reached to false>>
+
+[[Hide and watch|the_frontier__cross_country]]
+[[Call out|the_betrayal__first_secret]]
+[[Draw the forest path ahead of you|the_frontier__cross_country]]

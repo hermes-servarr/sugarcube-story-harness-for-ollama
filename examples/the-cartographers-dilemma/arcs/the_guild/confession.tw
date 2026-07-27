@@ -1,0 +1,22 @@
+:: the_guild__confession [the_guild]
+<!-- harness:meta
+location: guild_hall
+-->
+
+"I did it," you say. "The ink bled on its own. I didn't mean to write anything true. I was sleeping."
+
+Voss nods. "They never mean to. That is what makes it dangerous. The gift does not require intent. It requires conviction, and conviction comes from the deepest parts of you, the parts that do not ask permission."
+
+He stands and walks to the window. Below, the city spreads out in the grey morning. You can see the old quarter from here, the sunken foundations, the memorial stones.
+
+"You have three choices," he says without turning. "We bind your hands. You never draw again, not a map, not a sketch, not a grocery list. The gift fades in most people within a year of binding. Or you join us. We teach you control. You draw only what we permit. Or you run."
+
+He turns. His eyes are very old.
+
+"If you run, we send Collectors. And the Collectors do not bind hands. They remove them."
+
+<<set $guild_trust to $guild_trust - 2>>
+
+[[Accept binding|the_guild__binding]]
+[[Join the Guild|the_choice__council]]
+[[Run for the frontier|the_frontier__departure]]

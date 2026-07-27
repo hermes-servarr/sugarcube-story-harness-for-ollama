@@ -1,0 +1,18 @@
+:: awakening__front_door [awakening]
+<!-- harness:meta
+location: cartography_shop
+-->
+
+You open the door to find no one there. The street is empty, pre-dawn grey. But nailed to your door frame is a brass plaque stamped with the Guild's seal: a compass rose inside a clenched fist. The edges are still hot to the touch.
+
+This is a summons. The Guild does not send letters. They brand your door, and you have three days to present yourself or they send Collectors.
+
+You know what this means. Someone has reported you. Perhaps the ink-bleed was visible through the window. Perhaps a neighbor heard the sound the parchment made when it rewrote itself, a sound like tearing silk played backward.
+
+<<set $guild_trust to $guild_trust - 2>>
+
+You need to act before the three days run out.
+
+[[Go to the Guild and face them|the_guild__guild_hall]]
+[[Flee the city for the frontier|the_frontier__departure]]
+[[Investigate who reported you|awakening__hide_map]]

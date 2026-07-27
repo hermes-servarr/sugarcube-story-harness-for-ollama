@@ -1,0 +1,21 @@
+:: the_guild__denial [the_guild]
+<!-- harness:meta
+location: guild_hall
+-->
+
+"I don't know what you're talking about," you say. Your voice is steady. You are proud of that.
+
+Voss stares at you for a long time. Then he sighs and pulls a second map from his desk. This one is old, the vellum cracked and dark. It shows the city as it was two hundred years ago, before the river was filled in, before the old quarter was built over.
+
+He sets it beside your Veilwood map. The ink on both maps is the same blue. Both wet. Both warm.
+
+"We have been making maps for three hundred years," Voss says. "Some of us learn to *write true*. The Guild exists to stop that. Do you understand? Every map that is written true adds a river, moves a mountain, births a road where none existed. And the world bends to accommodate it. Do you know what happens when too many maps are written true?"
+
+He taps the old city map. "The old quarter collapsed. Fourteen thousand people. Because some cartographer three hundred years ago thought a river looked better where the tenements stood."
+
+<<set $guild_trust to 0>>
+
+Your denial is meaningless. He has the proof. He has the history.
+
+[[Ask what happens now|the_guild__written_true]]
+[[Try to leave|the_guild__confession]]

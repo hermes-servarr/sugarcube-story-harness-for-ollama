@@ -1,0 +1,19 @@
+:: Start [awakening hub]
+<!-- harness:meta
+location: cartography_shop
+type: hub
+-->
+
+You wake at your drafting table, cheek pressed against a half-finished map of the Veilwood. Ink has bled across the parchment in the night, pooling into shapes that should not exist, a river where no river flows, a pass through mountains you have never seen.
+
+Your hands are stained black to the wrist.
+
+<<set $has_discovered_power to false>>
+<<set $guild_trust to 5>>
+<<set $apprentice_loyalty to 8>>
+<<set $maps_drawn to 0>>
+<<set $frontier_reached to false>>
+
+You smell ozone and old paper. Something has changed. The maps are not describing the world anymore. They are *prescribing* it.
+
+<<actions [[Examine the bleeding ink|awakening__examine_ink]] [[Check the front door|awakening__front_door]] [[Go back to sleep|awakening__sleep_again]]>>

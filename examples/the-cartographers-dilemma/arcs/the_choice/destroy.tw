@@ -1,0 +1,29 @@
+:: the_choice__destroy [the_choice]
+<!-- harness:meta
+location: salt_wastes
+-->
+
+You cannot let this continue. The gift is too dangerous. Maren's hands move too fast, and your own itch to join her, and if either of you finishes the map the world will be rewritten by people who are too tired and too angry to be careful.
+
+You pull out your own parchment. Not to draw a new world. To draw *nothing*.
+
+You draw a blank space. You draw the absence of ink. You draw the Salt Wastes as they were before anyone came: white, flat, featureless, a place where nothing can be written true because there is nothing to write on.
+
+"Maren, stop!" you shout, and you press your blank map against hers.
+
+The two maps touch. The ink on hers hisses. The ground beneath you buckles. Maren screams, not in pain but in loss, and you feel it too: the river un-rivering, the forest un-growing, the city un-building. Everything she drew is being swallowed by the blankness.
+
+When it is over, you are alone on the salt. Maren is gone. Not dead, you think, but *unwritten*. The door she drew was the first thing to go, and without it she had no way back.
+
+Your hands are clean. The ink is gone. Not just from your skin, from the world. You reach for a bottle in your pack and it is full of water. Clear water, the kind that has never been ink.
+
+<<set $has_discovered_power to false>>
+<<set $apprentice_loyalty to 0>>
+
+You stand in the silence of the Salt Wastes and you know that you will never draw again. Not because you are bound. Because you have seen what drawing costs.
+
+The Collectors arrive at dawn. They find you sitting on the salt with empty hands. They do not take you in. There is nothing to take.
+
+**THE END: Destroyed**
+
+[[Begin again|Start]]

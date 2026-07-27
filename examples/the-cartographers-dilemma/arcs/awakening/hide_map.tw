@@ -1,0 +1,20 @@
+:: awakening__hide_map [awakening]
+<!-- harness:meta
+location: cartography_shop
+-->
+
+You roll the bleeding map and shove it into the stove. The parchment catches fast, the ink burning an unnatural blue. But as the map burns you feel something tear behind your eyes, and from outside comes the sound of water rushing over stone.
+
+The Serpentine. You just burned the river into existence by destroying the map of it.
+
+Your apprentice, Maren, appears in the stairwell, nightclothes dark with soot. She is staring at the stove, at your hands, at the blue light pouring from the iron door.
+
+"What did you do?" she whispers.
+
+<<set $apprentice_loyalty to $apprentice_loyalty - 2>>
+
+You have three days before the Guild comes. And Maren has seen too much.
+
+[[Confess everything to Maren|the_betrayal__first_secret]]
+[[Lie to Maren and go to the Guild|the_guild__guild_hall]]
+[[Say nothing and flee to the frontier|the_frontier__departure]]

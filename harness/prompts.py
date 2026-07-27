@@ -8,7 +8,7 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 4
+PROMPT_VERSION = 5
 
 
 # ── Passage generation ────────────────────────────────────────────────────────
@@ -167,6 +167,7 @@ image: keyword, keyword, keyword | one-line description of the shot
 
 NEW_CHARACTERS:
 character_id | One paragraph describing this new character.
+Include: physical appearance, personality, motivation, backstory, key relationships, and speech mannerisms if space allows.
 (omit this section entirely if no new characters appear)
 
 NEW_LORE:
@@ -267,7 +268,7 @@ Required JSON keys:
 Optional JSON keys (omit or empty if unused):
 - state: {{"$var": value}} pairs the choice/scene sets.
 - media: [{{"type": "image|audio|video", "keywords": [...], "description": "one-line shot description"}}]
-- new_characters: [{{"id": "lowercase_id", "prose_sheet": "..."}}]
+- new_characters: [{{"id": "lowercase_id", "prose_sheet": "...", "physical": "...", "personality": "...", "motivation": "...", "backstory": "...", "relationships": "...", "speech": "..."}}]
 - new_lore: [{{"category", "id", "prose_sheet"}}]
 - threads_open / threads_close: arrays of plot-thread strings.
 - world_state_add / world_state_remove: arrays of world fact strings.
@@ -325,8 +326,12 @@ ARCS ALREADY IN THE PLAN (do not repeat):
 
 Reply with a single JSON object:
 - arcs: array of {n} objects, each with keys:
-  - name: arc id, lowercase, format NN_short_name (e.g. "02_ravenhold"). Two-digit prefix, underscores.
+  - name: arc id, lowercase, format NN_short_name (e.g. "02_ravenhold"). Two-digit number prefix, underscores, no spaces.
   - goal: one sentence — what this arc accomplishes in the story.
+
+IMPORTANT: The name MUST start with a two-digit number followed by an underscore.
+Do NOT use "nn" literally. Use actual numbers like 01, 02, 03, etc.
+Do NOT include the word "arc" in the name.
 
 No preamble. No code fences.
 """

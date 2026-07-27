@@ -17,6 +17,19 @@ dependencies = [
     "pytest>=9.0.3",
 ]
 
+# Optional dependencies for the playtester
+[project.optional-dependencies]
+playtest = ["playwright>=1.40"]
+
+# TODO(e2e-test-runner): add e2e optional-dependency group for playwright (browser check)
+# e2e = ["playwright>=1.40"]
+
+# TODO(e2e-test-runner): register the "e2e" pytest marker to suppress unknown-marker warnings
+[tool.pytest.ini_options]
+markers = [
+    "e2e: end-to-end tests that exercise the full stack (server + Ollama + Tweego)",
+]
+
 [project.scripts]
 harness = "harness.cli:main"
 

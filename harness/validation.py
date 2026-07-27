@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .models import PASSAGE_TYPES, StoryGraph, ValidationIssue, ValidationResult
+from .models import PASSAGE_TYPES, StoryGraph, Snapshot, ValidationIssue, ValidationResult
 from .planning import recompute_beat_status
 from .project import ProjectPaths, load_slots, load_story
 from .passage import extract_links, scan_state_reads
+from .snapshot_delta import apply_delta
 
 
 def _issue(level: str, code: str, msg: str, passage: str | None = None) -> ValidationIssue:
@@ -415,6 +416,41 @@ def check_snapshot_bloat(graph: StoryGraph) -> list[ValidationIssue]:
     return issues
 
 
+def check_delta_round_trip(graph: StoryGraph) -> list[ValidationIssue]:
+    """Verify apply_delta(parent.snapshot, passage.snapshot_delta) == passage.snapshot for every non-root passage."""
+    issues: list[ValidationIssue] = []
+    for pid, entry in graph.passages.items():
+        # Skip root passages (no parents) — Invariant #2 covers root deltas.
+        if not entry.parents:
+            # Root with non-None delta: verify against empty Snapshot (Invariant #2).
+            if entry.snapshot_delta is not None:
+                reconstructed = apply_delta(Snapshot(), entry.snapshot_delta)
+                if reconstructed != entry.snapshot:
+                    issues.append(_issue(
+                        "error", "delta_round_trip",
+                        f"Passage {pid!r} root delta does not round-trip to its stored snapshot.",
+                        pid,
+                    ))
+            continue
+        # Non-root passage — Invariant #1: use first parent (Invariant #5).
+        parent_id = entry.parents[0]
+        # Skip if parent missing — handled by check_broken_links.
+        if parent_id not in graph.passages:
+            continue
+        # Skip if delta is None — backward compat (Invariant #3).
+        if entry.snapshot_delta is None:
+            continue
+        parent_snapshot = graph.passages[parent_id].snapshot
+        reconstructed = apply_delta(parent_snapshot, entry.snapshot_delta)
+        if reconstructed != entry.snapshot:
+            issues.append(_issue(
+                "error", "delta_round_trip",
+                f"Passage {pid!r} snapshot_delta does not round-trip to its stored snapshot.",
+                pid,
+            ))
+    return issues
+
+
 # ── Run all checks ─────────────────────────────────────────────────────────────
 
 def run_validation(p: ProjectPaths) -> ValidationResult:
@@ -433,6 +469,7 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_pending_media(p),
         check_snapshot_bloat(graph),
         check_plan_gaps(graph),
+        check_delta_round_trip(graph),
     ]
 
     for check_list in checks:

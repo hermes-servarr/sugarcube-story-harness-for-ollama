@@ -1,0 +1,763 @@
+{
+  "version": 1,
+  "start_passage": "Start",
+  "passages": {
+    "awakening__examine_ink": {
+      "file": "arcs/awakening/examine_ink.tw",
+      "arc": "awakening",
+      "parents": [
+        "awakening__sleep_again",
+        "Start"
+      ],
+      "children": [
+        "awakening__front_door",
+        "awakening__hide_map"
+      ],
+      "state_writes": [
+        "$has_discovered_power",
+        "$maps_drawn"
+      ],
+      "state_reads": [
+        "$has_discovered_power"
+      ],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "awakening__front_door": {
+      "file": "arcs/awakening/front_door.tw",
+      "arc": "awakening",
+      "parents": [
+        "awakening__examine_ink",
+        "awakening__sleep_again",
+        "Start"
+      ],
+      "children": [
+        "the_guild__guild_hall",
+        "the_frontier__departure",
+        "awakening__hide_map"
+      ],
+      "state_writes": [
+        "$guild_trust"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "awakening__hide_map": {
+      "file": "arcs/awakening/hide_map.tw",
+      "arc": "awakening",
+      "parents": [
+        "awakening__examine_ink",
+        "awakening__front_door"
+      ],
+      "children": [
+        "the_betrayal__first_secret",
+        "the_guild__guild_hall",
+        "the_frontier__departure"
+      ],
+      "state_writes": [
+        "$apprentice_loyalty"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "awakening__sleep_again": {
+      "file": "arcs/awakening/sleep_again.tw",
+      "arc": "awakening",
+      "parents": [
+        "Start"
+      ],
+      "children": [
+        "awakening__front_door",
+        "awakening__examine_ink"
+      ],
+      "state_writes": [
+        "$guild_trust",
+        "$has_discovered_power"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Start": {
+      "file": "arcs/awakening/start.tw",
+      "arc": "awakening",
+      "parents": [],
+      "children": [
+        "awakening__examine_ink",
+        "awakening__front_door",
+        "awakening__sleep_again"
+      ],
+      "state_writes": [
+        "$apprentice_loyalty",
+        "$frontier_reached",
+        "$guild_trust",
+        "$has_discovered_power",
+        "$maps_drawn"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": ["b1"],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "hub",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_betrayal__apprentice_learning": {
+      "file": "arcs/the_betrayal/apprentice_learning.tw",
+      "arc": "the_betrayal",
+      "parents": [
+        "the_betrayal__first_secret"
+      ],
+      "children": [
+        "the_frontier__cross_country",
+        "the_guild__confession",
+        "the_betrayal__confrontation"
+      ],
+      "state_writes": [
+        "$apprentice_loyalty",
+        "$frontier_reached"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_betrayal__confrontation": {
+      "file": "arcs/the_betrayal/confrontation.tw",
+      "arc": "the_betrayal",
+      "parents": [
+        "the_betrayal__apprentice_learning",
+        "the_frontier__cross_country"
+      ],
+      "children": [
+        "the_choice__reshape",
+        "the_choice__council",
+        "the_choice__destroy"
+      ],
+      "state_writes": [
+        "$apprentice_loyalty"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "salt_wastes",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_betrayal__first_secret": {
+      "file": "arcs/the_betrayal/first_secret.tw",
+      "arc": "the_betrayal",
+      "parents": [
+        "awakening__hide_map",
+        "the_frontier__veilwood"
+      ],
+      "children": [
+        "the_betrayal__apprentice_learning",
+        "the_guild__guild_hall",
+        "the_frontier__departure"
+      ],
+      "state_writes": [
+        "$apprentice_loyalty"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "cartography_shop",
+      "summary": "",
+      "beats": [],
+      "plan_beats": ["b4"],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_choice__council": {
+      "file": "arcs/the_choice/council.tw",
+      "arc": "the_choice",
+      "parents": [
+        "the_betrayal__confrontation",
+        "the_frontier__cross_country",
+        "the_guild__confession",
+        "the_guild__written_true"
+      ],
+      "children": [
+        "the_choice__reshape",
+        "the_choice__destroy"
+      ],
+      "state_writes": [
+        "$maps_drawn"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "salt_wastes",
+      "summary": "",
+      "beats": [],
+      "plan_beats": ["b5"],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_choice__destroy": {
+      "file": "arcs/the_choice/destroy.tw",
+      "arc": "the_choice",
+      "parents": [
+        "the_betrayal__confrontation",
+        "the_choice__council"
+      ],
+      "children": [],
+      "state_writes": [
+        "$apprentice_loyalty",
+        "$has_discovered_power"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "salt_wastes",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_choice__reshape": {
+      "file": "arcs/the_choice/reshape.tw",
+      "arc": "the_choice",
+      "parents": [
+        "the_betrayal__confrontation",
+        "the_choice__council",
+        "the_frontier__cross_country"
+      ],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$guild_trust"
+      ],
+      "media_slots": [],
+      "location": "salt_wastes",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_frontier__cross_country": {
+      "file": "arcs/the_frontier/cross_country.tw",
+      "arc": "the_frontier",
+      "parents": [
+        "the_betrayal__apprentice_learning",
+        "the_frontier__departure",
+        "the_frontier__veilwood"
+      ],
+      "children": [
+        "the_choice__council",
+        "the_betrayal__confrontation",
+        "the_choice__reshape"
+      ],
+      "state_writes": [
+        "$frontier_reached"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "salt_wastes",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_frontier__departure": {
+      "file": "arcs/the_frontier/departure.tw",
+      "arc": "the_frontier",
+      "parents": [
+        "awakening__front_door",
+        "awakening__hide_map",
+        "the_betrayal__first_secret",
+        "the_guild__confession",
+        "the_guild__written_true"
+      ],
+      "children": [
+        "the_frontier__veilwood",
+        "the_frontier__cross_country"
+      ],
+      "state_writes": [
+        "$frontier_reached",
+        "$maps_drawn"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "city_gate",
+      "summary": "",
+      "beats": [],
+      "plan_beats": ["b3"],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_frontier__veilwood": {
+      "file": "arcs/the_frontier/veilwood.tw",
+      "arc": "the_frontier",
+      "parents": [
+        "the_frontier__departure"
+      ],
+      "children": [
+        "the_frontier__cross_country",
+        "the_betrayal__first_secret"
+      ],
+      "state_writes": [
+        "$frontier_reached"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "veilwood",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_guild__binding": {
+      "file": "arcs/the_guild/binding.tw",
+      "arc": "the_guild",
+      "parents": [
+        "the_guild__confession",
+        "the_guild__written_true"
+      ],
+      "children": [],
+      "state_writes": [
+        "$has_discovered_power"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "guild_hall",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_guild__confession": {
+      "file": "arcs/the_guild/confession.tw",
+      "arc": "the_guild",
+      "parents": [
+        "the_betrayal__apprentice_learning",
+        "the_guild__denial",
+        "the_guild__guild_hall"
+      ],
+      "children": [
+        "the_guild__binding",
+        "the_choice__council",
+        "the_frontier__departure"
+      ],
+      "state_writes": [
+        "$guild_trust"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "guild_hall",
+      "summary": "",
+      "beats": [],
+      "plan_beats": ["b2"],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_guild__denial": {
+      "file": "arcs/the_guild/denial.tw",
+      "arc": "the_guild",
+      "parents": [
+        "the_guild__guild_hall"
+      ],
+      "children": [
+        "the_guild__written_true",
+        "the_guild__confession"
+      ],
+      "state_writes": [
+        "$guild_trust"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "guild_hall",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_guild__guild_hall": {
+      "file": "arcs/the_guild/guild_hall.tw",
+      "arc": "the_guild",
+      "parents": [
+        "awakening__front_door",
+        "awakening__hide_map",
+        "the_betrayal__first_secret"
+      ],
+      "children": [
+        "the_guild__denial",
+        "the_guild__confession",
+        "the_guild__written_true"
+      ],
+      "state_writes": [
+        "$guild_trust"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "guild_hall",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "the_guild__written_true": {
+      "file": "arcs/the_guild/written_true.tw",
+      "arc": "the_guild",
+      "parents": [
+        "the_guild__denial",
+        "the_guild__guild_hall"
+      ],
+      "children": [
+        "the_guild__binding",
+        "the_choice__council",
+        "the_frontier__departure"
+      ],
+      "state_writes": [
+        "$maps_drawn"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "guild_hall",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    }
+  },
+  "state_variables": {
+    "$apprentice_loyalty": {
+      "type": "int",
+      "default": 8,
+      "declared_in": "Start"
+    },
+    "$frontier_reached": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$guild_trust": {
+      "type": "int",
+      "default": 5,
+      "declared_in": "Start"
+    },
+    "$has_discovered_power": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$maps_drawn": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    }
+  },
+  "branches": {},
+  "plan": {
+    "acts": ["Act 1: Awakening", "Act 2: The Guild", "Act 3: The Frontier", "Act 4: The Betrayal", "Act 5: The Choice"],
+    "beats": [
+      {"id": "b1", "text": "The cartographer discovers their maps shape reality", "act": "Act 1: Awakening", "status": "covered"},
+      {"id": "b2", "text": "The Guild summons and confronts the cartographer", "act": "Act 2: The Guild", "status": "covered"},
+      {"id": "b3", "text": "The cartographer flees to the uncharted Salt Wastes", "act": "Act 3: The Frontier", "status": "covered"},
+      {"id": "b4", "text": "Maren the apprentice betrays the cartographer's trust", "act": "Act 4: The Betrayal", "status": "covered"},
+      {"id": "b5", "text": "The final choice: reshape, destroy, or surrender the power", "act": "Act 5: The Choice", "status": "covered"}
+    ],
+    "open_questions": []
+  },
+  "arcs": {
+    "awakening": {
+      "goal": "The cartographer discovers that their maps are reshaping reality",
+      "beat_ids": ["b1"],
+      "status": "done",
+      "summary": "The cartographer wakes to find ink bleeding across a map, forming features that now exist in the world. The Guild brands their door with a summons.",
+      "scenes": [
+        {"id": "sc1", "title": "The Bleeding Ink", "summary": "The cartographer examines the map that drew itself", "keywords": ["discovery", "ink", "magic"], "characters": [], "beat_ids": ["b1"], "passage_id": "awakening__examine_ink", "status": "drafted"},
+        {"id": "sc2", "title": "The Guild Summons", "summary": "The Guild brands the door with a summons", "keywords": ["guild", "summons", "danger"], "characters": [], "beat_ids": ["b1"], "passage_id": "awakening__front_door", "status": "drafted"},
+        {"id": "sc3", "title": "Burning the Map", "summary": "The cartographer tries to destroy evidence but makes things worse", "keywords": ["fire", "river", "consequence"], "characters": ["maren"], "beat_ids": ["b1"], "passage_id": "awakening__hide_map", "status": "drafted"}
+      ]
+    },
+    "the_guild": {
+      "goal": "The Cartographers' Guild confronts the cartographer about their power",
+      "beat_ids": ["b2"],
+      "status": "done",
+      "summary": "Hallmaster Voss reveals the Guild's history with mapmakers who write true. The cartographer faces binding, recruitment, or flight.",
+      "scenes": [
+        {"id": "sc1", "title": "The Hallmaster", "summary": "Voss confronts the cartographer with the recovered map", "keywords": ["guild", "interrogation", "truth"], "characters": ["voss"], "beat_ids": ["b2"], "passage_id": "the_guild__guild_hall", "status": "drafted"},
+        {"id": "sc2", "title": "Written True", "summary": "Voss explains what writing true means and the Guild's purpose", "keywords": ["lore", "history", "power"], "characters": ["voss"], "beat_ids": ["b2"], "passage_id": "the_guild__written_true", "status": "drafted"},
+        {"id": "sc3", "title": "Binding", "summary": "The cartographer accepts binding and loses the gift forever", "keywords": ["sacrifice", "loss", "ending"], "characters": ["voss"], "beat_ids": ["b2"], "passage_id": "the_guild__binding", "status": "drafted"}
+      ]
+    },
+    "the_frontier": {
+      "goal": "The cartographer flees to the Salt Wastes to escape the Collectors",
+      "beat_ids": ["b3"],
+      "status": "done",
+      "summary": "The cartographer flees through the changed Veilwood to the blank Salt Wastes, seeking a place to draw without consequence.",
+      "scenes": [
+        {"id": "sc1", "title": "Departure", "summary": "The cartographer flees the city before Collectors arrive", "keywords": ["flight", "ink", "frontier"], "characters": [], "beat_ids": ["b3"], "passage_id": "the_frontier__departure", "status": "drafted"},
+        {"id": "sc2", "title": "The Changed Veilwood", "summary": "The forest has become the map the cartographer drew", "keywords": ["forest", "transformation", "danger"], "characters": [], "beat_ids": ["b3"], "passage_id": "the_frontier__veilwood", "status": "drafted"},
+        {"id": "sc3", "title": "The Salt Wastes", "summary": "The cartographer reaches the blank canvas of the wastes", "keywords": ["waste", "blank", "canvas"], "characters": [], "beat_ids": ["b3"], "passage_id": "the_frontier__cross_country", "status": "drafted"}
+      ]
+    },
+    "the_betrayal": {
+      "goal": "Maren the apprentice learns the gift and betrays the cartographer",
+      "beat_ids": ["b4"],
+      "status": "done",
+      "summary": "The cartographer confides in their apprentice Maren, who learns the gift too fast and flees to the Salt Wastes to reshape the world herself.",
+      "scenes": [
+        {"id": "sc1", "title": "The First Secret", "summary": "Maren discovers the cartographer's power", "keywords": ["confession", "apprentice", "trust"], "characters": ["maren"], "beat_ids": ["b4"], "passage_id": "the_betrayal__first_secret", "status": "drafted"},
+        {"id": "sc2", "title": "Teaching the Gift", "summary": "The cartographer teaches Maren to write true, with consequences", "keywords": ["teaching", "magic", "betrayal"], "characters": ["maren"], "beat_ids": ["b4"], "passage_id": "the_betrayal__apprentice_learning", "status": "drafted"},
+        {"id": "sc3", "title": "Confrontation", "summary": "The cartographer finds Maren reshaping the world in the Salt Wastes", "keywords": ["confrontation", "power", "godhood"], "characters": ["maren"], "beat_ids": ["b4"], "passage_id": "the_betrayal__confrontation", "status": "drafted"}
+      ]
+    },
+    "the_choice": {
+      "goal": "The cartographer must decide how to use or surrender the power to write the world true",
+      "beat_ids": ["b5"],
+      "status": "done",
+      "summary": "Three endings: reshape the world with Maren, destroy all maps and lose the gift, or join the Guild council.",
+      "scenes": [
+        {"id": "sc1", "title": "The Council", "summary": "The cartographer and Maren agree to draw the world together", "keywords": ["agreement", "creation", "collaboration"], "characters": ["maren"], "beat_ids": ["b5"], "passage_id": "the_choice__council", "status": "drafted"},
+        {"id": "sc2", "title": "Reshape", "summary": "A new world is drawn into existence on the Salt Wastes", "keywords": ["creation", "healing", "ending"], "characters": ["maren"], "beat_ids": ["b5"], "passage_id": "the_choice__reshape", "status": "drafted"},
+        {"id": "sc3", "title": "Destroy", "summary": "The cartographer un-writes the world's changes and loses everything", "keywords": ["sacrifice", "erasure", "ending"], "characters": [], "beat_ids": ["b5"], "passage_id": "the_choice__destroy", "status": "drafted"}
+      ]
+    }
+  }
+}

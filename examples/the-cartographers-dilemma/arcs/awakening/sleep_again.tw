@@ -1,0 +1,20 @@
+:: awakening__sleep_again [awakening]
+<!-- harness:meta
+location: cartography_shop
+-->
+
+You tell yourself it is a dream. You close your eyes against the lamplight and the smell of ozone and you will yourself back to sleep.
+
+But the ink does not care if you are awake.
+
+When you next open your eyes the map has changed again. The river now has a name written in a hand that is almost yours: *The Serpentine*. And outside, through the window, you can hear water where no water has ever been.
+
+You hear it. And then you hear the knocking.
+
+<<set $has_discovered_power to false>>
+<<set $guild_trust to $guild_trust - 1>>
+
+You cannot ignore this anymore.
+
+[[Answer the door|awakening__front_door]]
+[[Examine the map now|awakening__examine_ink]]

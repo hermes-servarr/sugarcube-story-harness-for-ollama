@@ -1,0 +1,24 @@
+:: the_guild__written_true [the_guild]
+<!-- harness:meta
+location: guild_hall
+-->
+
+"What does 'written true' mean?" you ask.
+
+Voss leans back. For the first time he looks like a teacher, not an inquisitor.
+
+"Every map is a lie," he says. "That is the first thing we teach apprentices. A map selects, it simplifies, it distorts. But some maps, some rare maps, are drawn with such conviction, such *need*, that the lie becomes true. The map does not describe the world. It *commands* it."
+
+He looks at your hands. The ink stains.
+
+"You have the gift. Or the curse. The Guild was founded to find people like you and stop them before they break the world. We have two methods. We can bind your hands, prevent you from ever drawing again. Or we can take you in, teach you discipline, and use your gift under our control."
+
+He pauses. "There is a third option. Some of us believe the gift should be used. The world is broken in places. Old wounds. The collapsed quarter. The Salt Wastes. A map written true could *heal* those places. But it could also destroy them."
+
+<<set $maps_drawn to $maps_drawn + 1>>
+
+You feel the weight of the maps in your bag. The blank parchment. The ink that burns blue.
+
+[[Accept Guild binding|the_guild__binding]]
+[[Join the Guild|the_choice__council]]
+[[Refuse both and flee|the_frontier__departure]]

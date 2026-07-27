@@ -1,0 +1,20 @@
+:: awakening__examine_ink [awakening]
+<!-- harness:meta
+location: cartography_shop
+-->
+
+You lean over the table, heart hammering. The ink has not merely bled, it has *drawn* something. The new river on the Veilwood map forks at a point you recognise: the old stone bridge near Miller's Crossing. But the fork does not exist. You mapped that area yourself last spring.
+
+Unless it exists now.
+
+You press your fingertip to the wet ink. It is warm. Warmer than it should be. And when you pull your hand away, the river on the map has shifted to follow the curve of your fingerprint.
+
+<<set $has_discovered_power to true>>
+<<set $maps_drawn to $maps_drawn + 1>>
+
+A knock at the door. Three sharp raps. Guild business, that rhythm.
+
+<<if $has_discovered_power>>You have to decide what to do before they come in.<<else>>You should probably answer that.<</if>>
+
+[[Answer the door|awakening__front_door]]
+[[Hide the map|awakening__hide_map]]

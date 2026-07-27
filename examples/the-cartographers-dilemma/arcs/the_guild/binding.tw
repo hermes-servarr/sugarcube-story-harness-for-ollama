@@ -1,0 +1,24 @@
+:: the_guild__binding [the_guild]
+<!-- harness:meta
+location: guild_hall
+-->
+
+"I'll accept the binding," you say.
+
+Voss nods. He does not look relieved. He looks sad. "Hold out your hands."
+
+He takes a silver stylus from his coat and traces a line across each of your palms. The lines burn cold, then the cold becomes numbness, and the numbness spreads to your fingertips. When it reaches your wrists, your hands feel like they belong to someone else.
+
+"You will not be able to draw again," he says. "Not maps. Not anything. The gift will fade. In time you may regain the use of your hands for other work, but the ink will never call to you."
+
+You try to pick up the stylus. Your fingers will not close. They are yours but they will not obey.
+
+Outside, the sun is fully up. You can hear the city waking: carts, voices, the distant rush of the Serpentine, the river you wrote into being. It sounds like it has always been there.
+
+<<set $has_discovered_power to false>>
+
+You walk out of the Guild hall with empty hands and a river you can never unmake.
+
+**THE END: Bound**
+
+[[Begin again|Start]]

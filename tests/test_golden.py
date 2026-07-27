@@ -627,6 +627,11 @@ class InitPromptTests(unittest.TestCase):
             self.assertIn(k, out)
         self.assertIn("morally grey", out)
 
+    def test_characters_sketch_prompt_requests_enrichment_fields(self):
+        out = build_characters_sketch_prompt("p", world_overview="w", count=3)
+        for field in ("physical", "personality", "motivation", "backstory", "relationships", "speech"):
+            self.assertIn(field, out)
+
     def test_locations_sketch_prompt_specifies_count(self):
         out = build_locations_sketch_prompt("p", world_overview="w", count=4, direction="all coastal")
         self.assertIn("4", out)
@@ -857,6 +862,117 @@ class CommitConcurrencyTests(unittest.TestCase):
             graph = load_story(p)
             files = [graph.passages[pid].file for pid in results]
             self.assertEqual(len(set(files)), N, "file paths collided under contention")
+
+
+# ── Arc name normalization ──────────────────────────────────────────────────
+
+class ArcNameNormalizationTests(unittest.TestCase):
+    def test_plain_name_gets_number_prefix(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("atlantis", []), "01_atlantis")
+
+    def test_existing_number_preserved(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("02_ravenhold", ["01_atlantis"]), "02_ravenhold")
+
+    def test_nn_prefix_stripped(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("nn_01_atlantis", []), "01_atlantis")
+        self.assertEqual(normalize_arc_name("nn_02_ravenhold", ["01_atlantis"]), "02_ravenhold")
+
+    def test_auto_number_avoids_conflicts(self):
+        from harness.planning import normalize_arc_name
+        result = normalize_arc_name("curious_adventure", ["01_atlantis", "02_ravenhold"])
+        self.assertEqual(result, "03_curious_adventure")
+
+    def test_blank_returns_empty(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("", []), "")
+        self.assertEqual(normalize_arc_name("   ", []), "")
+
+    def test_uppercase_lowered(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("UPPER CASE", []), "01_upper_case")
+
+    def test_double_underscore_collapsed(self):
+        from harness.planning import normalize_arc_name
+        self.assertEqual(normalize_arc_name("arc 4: the deep", []), "01_arc_4_the_deep")
+
+
+# ── Sketch list enrichment ─────────────────────────────────────────────────────
+
+class SketchListEnrichmentTests(unittest.TestCase):
+    def test_enrichment_fields_passed_through(self):
+        items = [{
+            "id": "kael", "name": "Kael", "description": "A warden.",
+            "physical": "Tall, scarred",
+            "personality": "Stoic, loyal",
+            "motivation": "Duty to the crown",
+            "backstory": "Former soldier",
+            "relationships": "Rival to Jack",
+            "speech": "Clipped, formal",
+        }]
+        out = _normalise_sketch_list(items, count=5)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["physical"], "Tall, scarred")
+        self.assertEqual(out[0]["personality"], "Stoic, loyal")
+        self.assertEqual(out[0]["motivation"], "Duty to the crown")
+        self.assertEqual(out[0]["backstory"], "Former soldier")
+        self.assertEqual(out[0]["relationships"], "Rival to Jack")
+        self.assertEqual(out[0]["speech"], "Clipped, formal")
+
+    def test_missing_enrichment_fields_omitted(self):
+        items = [{"id": "alice", "name": "Alice", "description": "A scribe."}]
+        out = _normalise_sketch_list(items, count=5)
+        self.assertEqual(len(out), 1)
+        self.assertNotIn("physical", out[0])
+        self.assertEqual(out[0]["description"], "A scribe.")
+
+    def test_partial_enrichment(self):
+        items = [{
+            "id": "jack", "name": "Jack", "description": "A PI.",
+            "physical": "Rugged",
+        }]
+        out = _normalise_sketch_list(items, count=5)
+        self.assertEqual(out[0]["physical"], "Rugged")
+        self.assertNotIn("personality", out[0])
+
+
+# ── Lore arc-context matching ─────────────────────────────────────────────────
+
+class LoreArcContextTests(unittest.TestCase):
+    def test_arc_prefix_matching(self):
+        from harness.generators import _entities_in_context
+        from harness.models import Snapshot
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            write_lore_entity(p, "locations", "atlantis_ruins",
+                              "---\nid: atlantis_ruins\n---\n# Atlantis Ruins\n\nUnderwater.")
+            write_lore_entity(p, "locations", "ravenhold_market",
+                              "---\nid: ravenhold_market\n---\n# Ravenhold Market\n\nBusy.")
+            result = _entities_in_context(p, Snapshot(), "", arc_name="atlantis")
+            self.assertIn("atlantis_ruins", result)
+            self.assertNotIn("ravenhold_market", result)
+
+    def test_nn_prefix_arc_still_matches(self):
+        from harness.generators import _entities_in_context
+        from harness.models import Snapshot
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            write_lore_entity(p, "locations", "atlantis_ruins",
+                              "---\nid: atlantis_ruins\n---\n# Atlantis Ruins\n\nUnderwater.")
+            result = _entities_in_context(p, Snapshot(), "", arc_name="01_atlantis")
+            self.assertIn("atlantis_ruins", result)
+
+    def test_no_arc_no_match_without_prompt(self):
+        from harness.generators import _entities_in_context
+        from harness.models import Snapshot
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            write_lore_entity(p, "locations", "atlantis_ruins",
+                              "---\nid: atlantis_ruins\n---\n# Atlantis Ruins\n\nUnderwater.")
+            result = _entities_in_context(p, Snapshot(), "", arc_name="")
+            self.assertNotIn("atlantis_ruins", result)
 
 
 if __name__ == "__main__":

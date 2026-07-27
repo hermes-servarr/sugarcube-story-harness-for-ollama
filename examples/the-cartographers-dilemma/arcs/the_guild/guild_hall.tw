@@ -1,0 +1,20 @@
+:: the_guild__guild_hall [the_guild]
+<!-- harness:meta
+location: guild_hall
+-->
+
+The Cartographers' Guild sits behind a facade of unmarked stone on Brassmaker's Row. You have been inside a hundred times for audits and license renewals. It has never felt like this.
+
+The Hallmaster, Aldric Voss, is waiting for you in the inner chamber. He is an old man made of maps; there is ink in his veins, they say, and his skin has the yellow sheen of old parchment. He does not look angry. He looks afraid.
+
+"Sit," he says. The chair is hard wood. "You know why you are here."
+
+He slides a map across the table. It is your Veilwood map. The one you burned. It is whole. The blue ink still glistens.
+
+"We found this in your stove," Voss says. "Fire does not touch maps that have been *written true*. You have crossed a line, cartographer. You are not describing the world anymore."
+
+<<set $guild_trust to $guild_trust - 1>>
+
+[[Deny everything|the_guild__denial]]
+[[Confess|the_guild__confession]]
+[[Ask what "written true" means|the_guild__written_true]]

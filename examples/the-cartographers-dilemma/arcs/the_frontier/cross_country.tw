@@ -1,0 +1,20 @@
+:: the_frontier__cross_country [the_frontier]
+<!-- harness:meta
+location: salt_wastes
+-->
+
+You bypass the Veilwood entirely, striking northeast across open country. By the end of the first day the grass thins and the soil turns pale. By the second day you are walking on salt.
+
+The Salt Wastes stretch before you: white, flat, and featureless to the horizon. The sky is white too. There is no wind. No sound. It is the blankness that drew you here. A blank canvas.
+
+You set up camp as the light fades. Your hands itch. The ink in your pack hums.
+
+This is the place. If you draw a map here, a map of a world that should be, you could write it true. You could fill in the Salt Wastes with rivers and forests and cities. You could heal the old wound in the earth. Or you could remake everything.
+
+<<set $frontier_reached to true>>
+
+But the Collectors are behind you. And Maren, your apprentice, may have followed too. She saw too much back at the shop.
+
+[[Begin drawing a new world|the_choice__council]]
+[[Wait and see who follows|the_betrayal__confrontation]]
+[[Draw only a single river, then decide|the_choice__reshape]]

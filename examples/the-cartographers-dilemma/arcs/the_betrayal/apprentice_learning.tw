@@ -1,0 +1,21 @@
+:: the_betrayal__apprentice_learning [the_betrayal]
+<!-- harness:meta
+location: cartography_shop
+-->
+
+You teach her over three days. The Guild summons gives you the excuse. You lock the shop, close the shutters, and show Maren how to hold the nib so the ink flows true. She is a fast learner. Faster than you were.
+
+On the first day she can make ink pool without touching the parchment. On the second day she draws a line on a blank map and the line becomes a crack in the floorboards of the shop. On the third day she draws a door on a blank sheet and the door appears on the back wall of the shop, slightly crooked, the wood grain running the wrong way.
+
+"Don't open it," you tell her. "We don't know where it goes."
+
+She opens it that night while you sleep. You wake to cold air and the smell of salt. The door is open. Maren is gone. On the drafting table is a map you did not draw: the Salt Wastes, marked with a path from the Veilwood to a point deep in the waste. And at that point, in her handwriting, a single word: *Here*.
+
+<<set $apprentice_loyalty to 3>>
+<<set $frontier_reached to false>>
+
+She has gone ahead. She has taken ink and parchment with her. And she drew the door *true*.
+
+[[Follow her to the Salt Wastes|the_frontier__cross_country]]
+[[Go to the Guild and beg for help|the_guild__confession]]
+[[Draw your own door and go after her directly|the_betrayal__confrontation]]
