@@ -362,8 +362,11 @@ def _render_passage_tw(
         # if the prose already contains a <<widget>> macro we emit it raw.
         # See docs/sugarcube2-analysis.md §3.7, TEMPLATE_VERIFICATION_REPORT §2.3.
         if "<<widget" not in prose:
-            # Auto-wrap: derive widget name from the passage slug suffix.
-            widget_name = passage_id.rsplit("__", 1)[-1]
+            # Auto-wrap: derive widget name from the passage slug suffix,
+            # stripping the leading NN_ numeric prefix (e.g. "01_" in
+            # "intro__01_stats_widget" → widget name "stats_widget").
+            suffix = passage_id.rsplit("__", 1)[-1]
+            widget_name = re.sub(r'^\d+_', '', suffix)
             lines.append(f'<<widget "{widget_name}">>')
             lines.append(prose.strip())
             lines.append("<</widget>>")

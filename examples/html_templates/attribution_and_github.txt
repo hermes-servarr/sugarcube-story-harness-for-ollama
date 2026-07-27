@@ -1,0 +1,59 @@
+SugarCube HTML Templates — Attribution & GitHub Links
+=====================================================
+
+Templates by manonamora
+License: CC-BY (Creative Commons Attribution)
+       https://creativecommons.org/licenses/by/4.0/
+
+Asset / download page:
+  https://manonamora.itch.io/twine-sugarcube-templates
+
+Upstream source repository (GitHub):
+  https://github.com/manonamora/Twine-Template
+  (commit 3f8fa40, 2026-01-24, verified byte-for-byte against the compiled
+   HTML in this directory — see TEMPLATE_VERIFICATION_REPORT.md)
+
+SugarCube 2 documentation (referenced by the templates):
+  https://www.motoslave.net/sugarcube/2/docs/
+
+Target format: SugarCube v2.37.3
+
+
+Templates included (7)
+-----------------------
+
+1. Character Creator Template  — interactive PC customization, popups, widgets
+2. One Page Template           — Chapbook-style single page with dropdown menu
+3. Settings Template            — Settings API reference (range, toggle, list)
+4. Simple Book Template         — notebook look with covers, codex/stats menu
+5. Space-Tech UI Template       — dual sci-fi themes (space + CRT), stat bars
+6. Title Page Template          — title/menu page variants, CSS-only, no JS
+7. VN-lite RPG Template         — Visual Novel + Disco Elysium inspired, portraits
+
+Each template directory contains:
+  - compiled HTML (the usable artifact; verified current with upstream)
+  - source/  (.tw Twee source, .js Script, .css StyleSheet)
+  - READ ME.txt  (author's usage notes)
+  - IFID CHANGE.txt  (reminder to change the placeholder IFID before publishing)
+
+
+Attribution requirement (CC-BY)
+-------------------------------
+
+If you publish a story built on one of these templates, you MUST credit
+manonamora. The templates include a "Credits" passage for this purpose;
+keep it and link to the itch.io page above. Do not remove the attribution.
+
+
+Harness integration
+-------------------
+
+The harness (harness/templates.py) catalogs these templates so the LLM can
+be guided by a template's style during generation and the compiler
+(harness/compile.py) can optionally inject the template's CSS/JS into the
+compiled story. Set `template_id` in .harness/config.yaml to activate:
+
+  character-creator | one-page | settings | simple-book
+  | space-tech | title-page | vn-lite-rpg
+
+See README.md → "Templates" section for details.

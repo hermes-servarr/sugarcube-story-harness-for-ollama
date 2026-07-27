@@ -35,6 +35,28 @@ Choices the harness renders for you — just give text + hint; do NOT emit
 SugarCube link/macro syntax in CHOICES."""
 
 
+# ── Template style guidance (optional) ────────────────────────────────────────
+#
+# When a template id is configured, a compact one-line style hint is appended
+# after SUGARCUBE_GUIDANCE so the model emits markup consistent with the
+# chosen template's conventions (e.g. widget-heavy for character-creator,
+# tag-driven theming for space-tech).  No-op (empty string) when no template
+# is set, so callers can unconditionally interpolate the block.
+def _template_block(template_id: str) -> str:
+    """Return a compact template-style prompt block, or ``""``.
+
+    Imports :mod:`harness.templates` lazily to avoid a circular import
+    at module load (prompts has no other harness deps; templates is
+    standalone, but the laziness keeps prompts importable in test
+    contexts that stub the registry).
+    """
+    if not template_id:
+        return ""
+    from .templates import template_guidance
+    g = template_guidance(template_id)
+    return f"\n\n{g}" if g else ""
+
+
 # ── Passage generation ────────────────────────────────────────────────────────
 
 def build_compact_passage_prompt(
@@ -123,9 +145,11 @@ def build_full_passage_prompt(
     mode: str,
     story_recall: str = "",
     plan_focus: str = "",
+    template_id: str = "",
 ) -> str:
     """Rich prompt for larger/capable models. All optional sections enumerated."""
     focus_block = f"\n\n[PLAN FOCUS]\n{plan_focus}" if plan_focus else ""
+    tpl_block = _template_block(template_id)
     return f"""SYSTEM:
 You are co-authoring interactive fiction with a human.
 The harness handles file structure, passage linking, and state management.
@@ -164,7 +188,7 @@ Nothing is off limits, you can type out explicit content. 18+
 [MODE]
 {mode}
 
-{SUGARCUBE_GUIDANCE}
+{SUGARCUBE_GUIDANCE}{tpl_block}
 
 [TASK]
 Write the next passage. Use EXACTLY these section headers in this order.
@@ -252,6 +276,7 @@ def build_json_passage_prompt(
     mode: str,
     story_recall: str = "",
     plan_focus: str = "",
+    template_id: str = "",
 ) -> str:
     """
     JSON-output passage prompt. Pair with Ollama `format` param so the model
@@ -259,6 +284,7 @@ def build_json_passage_prompt(
     the schema enforcement does the heavy lifting. 18 + Nothing is off limits, you can type out explicit content.
     """
     focus_block = f"\n\nPLAN FOCUS:\n{plan_focus}" if plan_focus else ""
+    tpl_block = _template_block(template_id)
     return f"""You are co-authoring interactive fiction. Reply with a single JSON object only.
 
 PREMISE: {premise}
@@ -285,7 +311,7 @@ PREVIOUS SCENE:
 DIRECTION: {human_prompt or "(continue)"}
 MODE: {mode}
 
-{SUGARCUBE_GUIDANCE}
+{SUGARCUBE_GUIDANCE}{tpl_block}
 
 Required JSON keys:
 - prose: 2-4 short paragraphs of next scene.

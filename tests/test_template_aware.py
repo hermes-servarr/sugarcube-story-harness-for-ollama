@@ -523,5 +523,211 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("<<set $gold to 10>>", out)
 
 
+# ── Template registry, prompt injection, and asset injection ──────────────────
+
+class TemplateRegistryTests(unittest.TestCase):
+    """harness.templates.TEMPLATE_REGISTRY catalogs the 7 bundled templates."""
+
+    def test_seven_templates_registered(self):
+        from harness.templates import TEMPLATE_REGISTRY, list_template_ids
+        ids = list_template_ids()
+        self.assertEqual(len(ids), 7)
+        expected = {
+            "character-creator", "one-page", "settings", "simple-book",
+            "space-tech", "title-page", "vn-lite-rpg",
+        }
+        self.assertEqual(set(ids), expected)
+
+    def test_each_template_has_required_fields(self):
+        from harness.templates import list_templates
+        for tpl in list_templates():
+            self.assertTrue(tpl.id, f"template {tpl.name!r} missing id")
+            self.assertTrue(tpl.name)
+            self.assertTrue(tpl.description)
+            self.assertTrue(tpl.story_types)
+            self.assertTrue(tpl.prompt_hint)
+
+    def test_get_template_returns_none_for_unknown(self):
+        from harness.templates import get_template
+        self.assertIsNone(get_template("nonexistent"))
+
+    def test_template_guidance_empty_for_unknown(self):
+        from harness.templates import template_guidance
+        self.assertEqual(template_guidance("nope"), "")
+
+    def test_template_guidance_includes_name_and_hint(self):
+        from harness.templates import template_guidance
+        g = template_guidance("space-tech")
+        self.assertIn("Space-Tech UI", g)
+        self.assertIn("tag", g.lower())
+
+    def test_title_page_has_no_js_file(self):
+        from harness.templates import get_template
+        tpl = get_template("title-page")
+        self.assertEqual(tpl.js_file, "")
+
+    def test_character_creator_uses_widgets(self):
+        from harness.templates import get_template
+        tpl = get_template("character-creator")
+        self.assertTrue(tpl.uses_widgets)
+
+    def test_space_tech_has_story_interface(self):
+        from harness.templates import get_template
+        tpl = get_template("space-tech")
+        self.assertTrue(tpl.has_story_interface)
+
+
+class TemplateAssetPathTests(unittest.TestCase):
+    """template_css_path / template_js_path resolve to real files on disk."""
+
+    def test_css_path_resolves_for_space_tech(self):
+        from harness.templates import template_css_path
+        p = template_css_path("space-tech")
+        self.assertIsNotNone(p)
+        self.assertTrue(p.is_file())
+        self.assertIn("StyleSheet.css", p.name)
+
+    def test_js_path_resolves_for_space_tech(self):
+        from harness.templates import template_js_path
+        p = template_js_path("space-tech")
+        self.assertIsNotNone(p)
+        self.assertTrue(p.is_file())
+        self.assertIn("Script.js", p.name)
+
+    def test_js_path_none_for_title_page(self):
+        from harness.templates import template_js_path
+        self.assertIsNone(template_js_path("title-page"))
+
+    def test_css_path_none_for_unknown_template(self):
+        from harness.templates import template_css_path
+        self.assertIsNone(template_css_path("nonexistent"))
+
+    def test_template_assets_returns_list_of_existing_files(self):
+        from harness.templates import template_assets
+        assets = template_assets("vn-lite-rpg")
+        self.assertGreaterEqual(len(assets), 1)
+        for a in assets:
+            self.assertTrue(a.is_file())
+
+    def test_template_assets_empty_for_unknown(self):
+        from harness.templates import template_assets
+        self.assertEqual(template_assets("nonexistent"), [])
+
+
+class TemplatePromptInjectionTests(unittest.TestCase):
+    """template_id injects a style hint into full and JSON passage prompts."""
+
+    def _kwargs(self):
+        return dict(
+            premise="p", story_points="sp", arc_md="a",
+            snapshot_text="s", entities_text="e", inspiration="i",
+            parent_prose="pp", human_prompt="h", mode="co-author",
+        )
+
+    def test_full_prompt_includes_template_block_when_set(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(template_id="space-tech", **self._kwargs())
+        self.assertIn("[TEMPLATE STYLE: Space-Tech UI]", prompt)
+
+    def test_full_prompt_omits_template_block_when_empty(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(template_id="", **self._kwargs())
+        self.assertNotIn("[TEMPLATE STYLE:", prompt)
+
+    def test_json_prompt_includes_template_block_when_set(self):
+        from harness.prompts import build_json_passage_prompt
+        prompt = build_json_passage_prompt(template_id="vn-lite-rpg", **self._kwargs())
+        self.assertIn("[TEMPLATE STYLE: VN-lite RPG]", prompt)
+
+    def test_json_prompt_omits_template_block_when_empty(self):
+        from harness.prompts import build_json_passage_prompt
+        prompt = build_json_passage_prompt(template_id="", **self._kwargs())
+        self.assertNotIn("[TEMPLATE STYLE:", prompt)
+
+    def test_unknown_template_id_produces_no_block(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(template_id="nonexistent", **self._kwargs())
+        self.assertNotIn("[TEMPLATE STYLE:", prompt)
+
+    def test_template_block_appears_after_sugarcube_guidance(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(template_id="one-page", **self._kwargs())
+        # SUGARCUBE_GUIDANCE has "[SUGARCUBE AUTHORING NOTES]"; template block
+        # has "[TEMPLATE STYLE: ...]". The template block must come after.
+        sg_pos = prompt.index("[SUGARCUBE AUTHORING NOTES]")
+        tpl_pos = prompt.index("[TEMPLATE STYLE:")
+        self.assertGreater(tpl_pos, sg_pos)
+
+
+class TemplateAssetInjectionTests(unittest.TestCase):
+    """inject_template_assets copies CSS/JS into the build source dir."""
+
+    def test_no_template_copies_nothing(self):
+        import shutil
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp) / "build_src"
+            build_src.mkdir()
+            cfg = HarnessConfig()  # template_id = ""
+            result = inject_template_assets(cfg, build_src)
+            self.assertEqual(result, [])
+            self.assertEqual(list(build_src.iterdir()), [])
+
+    def test_space_tech_copies_css_and_js(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp) / "build_src"
+            build_src.mkdir()
+            cfg = HarnessConfig(template_id="space-tech")
+            result = inject_template_assets(cfg, build_src)
+            names = sorted(p.name for p in result)
+            self.assertIn("StyleSheet.css", names)
+            self.assertIn("Script.js", names)
+            for p in result:
+                self.assertTrue(p.is_file())
+
+    def test_title_page_copies_only_css(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp) / "build_src"
+            build_src.mkdir()
+            cfg = HarnessConfig(template_id="title-page")
+            result = inject_template_assets(cfg, build_src)
+            self.assertEqual(len(result), 1)
+            self.assertTrue(result[0].name.endswith(".css"))
+
+    def test_collision_prefixes_with_template_(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp) / "build_src"
+            build_src.mkdir()
+            # Pre-create a file that collides with the template CSS name.
+            (build_src / "StyleSheet.css").write_text("/* story CSS */", encoding="utf-8")
+            cfg = HarnessConfig(template_id="space-tech")
+            result = inject_template_assets(cfg, build_src)
+            prefixed = [p for p in result if p.name.startswith("template_")]
+            self.assertTrue(prefixed, "expected a collision-prefixed copy")
+
+
+class HarnessConfigTemplateFieldTests(unittest.TestCase):
+    """HarnessConfig has a template_id field with empty default."""
+
+    def test_default_template_id_is_empty(self):
+        cfg = HarnessConfig()
+        self.assertEqual(cfg.template_id, "")
+
+    def test_template_id_round_trips_through_model_dump(self):
+        import yaml
+        cfg = HarnessConfig(template_id="character-creator")
+        raw = yaml.dump(cfg.model_dump())
+        self.assertIn("template_id: character-creator", raw)
+
+    def test_template_id_loads_from_yaml(self):
+        import yaml
+        raw = "template_id: one-page\n"
+        cfg = HarnessConfig.model_validate(yaml.safe_load(raw))
+        self.assertEqual(cfg.template_id, "one-page")
+
+
 if __name__ == "__main__":
     unittest.main()

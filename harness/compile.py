@@ -184,7 +184,45 @@ def _populate_build_src(
             _embed_media(p, tw_path.read_text(encoding="utf-8"), media_map),
             encoding="utf-8",
         )
+
+    # ── Template assets ──────────────────────────────────────────────────
+    # When a template id is configured, copy its CSS/JS into build_src/ so
+    # Tweego bundles them into the compiled story (Tweego natively wraps
+    # and injects any .css/.js it finds in the source tree into <head>).
+    inject_template_assets(cfg, build_src)
+
     return build_src
+
+
+def inject_template_assets(cfg: HarnessConfig, build_src: Path) -> list[Path]:
+    """Copy the active template's CSS/JS source files into *build_src*.
+
+    Returns the list of files actually copied (empty when no template is
+    configured or the template has no assets).  Tweego natively discovers
+    ``.css`` / ``.js`` files in the source directory and injects them into
+    the compiled HTML ``<head>``, so copying them next to the passages is
+    sufficient — no manual wrapping or ``--head`` flag needed.
+
+    See ``harness/templates.py`` (TEMPLATE_REGISTRY) and
+    ``examples/html_templates/TEMPLATE_VERIFICATION_REPORT.md``.
+    """
+    if not getattr(cfg, "template_id", ""):
+        return []
+
+    # Imported here to avoid a circular import at module load time
+    # (templates.py is standalone, but keeping the import local documents
+    # the compile-time dependency and lets tests stub it out cleanly).
+    from .templates import template_assets
+
+    copied: list[Path] = []
+    for src in template_assets(cfg.template_id):
+        dest = build_src / src.name
+        # Avoid collisions with story-owned stylesheets by prefixing.
+        if dest.exists():
+            dest = build_src / f"template_{src.name}"
+        shutil.copy2(src, dest)
+        copied.append(dest)
+    return copied
 
 
 def _build_tweego_argv(

@@ -128,6 +128,22 @@ Each template directory contains:
 
 To use a template as a starting point for your own story, copy the source files into your story's `arcs/` directory and modify them. The harness generation pipeline can produce passages that follow the SugarCube macro patterns demonstrated in these templates (see the SugarCube 2 documentation analysis below for details).
 
+### Template-Aware Generation (template_id)
+
+The harness has a template registry (`harness/templates.py`) cataloging all 7 bundled templates. When a template id is set in your story config, two things happen automatically:
+
+1. **Generation hints** — a compact, template-specific style hint is appended to the full and JSON passage prompts, steering the LLM toward the template's SugarCube conventions (e.g. widget-heavy for character-creator, tag-driven theming for space-tech). No-op when unset.
+2. **Asset injection** — the template's CSS/JS source files are copied into the Tweego build directory at compile time so the compiled story picks up the template's styling. Tweego natively discovers `.css`/`.js` files in the source tree and injects them into `<head>`, so no manual wrapping is needed.
+
+Set `template_id` in your story's `.harness/config.yaml`:
+
+```yaml
+template_id: space-tech   # one of: character-creator, one-page, settings,
+                           #        simple-book, space-tech, title-page, vn-lite-rpg
+```
+
+Leave `template_id` empty (or omit it) for unstyled, default SugarCube generation. The attribution file `examples/html_templates/attribution_and_github.txt` records the CC-BY license, upstream repo, and integration notes.
+
 ### Custom Macro Dependencies
 
 Two templates use Chapel's custom macro packages (not included):

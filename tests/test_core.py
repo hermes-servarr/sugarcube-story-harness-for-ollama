@@ -653,5 +653,419 @@ class PlanFocusPromptTests(unittest.TestCase):
         self.assertNotIn("PLAN FOCUS:", without)
 
 
+# ── SugarCube 2 documentation integration tests ───────────────────────────────
+
+
+class SugarCubeGuidancePromptTests(unittest.TestCase):
+    """The SugarCube authoring cheat sheet must appear in full + JSON prompts."""
+
+    def test_full_prompt_contains_sugarcube_guidance(self):
+        from harness.prompts import build_full_passage_prompt, SUGARCUBE_GUIDANCE
+        prompt = build_full_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+        )
+        self.assertIn(SUGARCUBE_GUIDANCE, prompt)
+        # Variable scoping guidance present.
+        self.assertIn("_var", prompt)
+        self.assertIn("$var", prompt)
+        # Markup (not markdown) guidance present.
+        self.assertIn("''bold''", prompt)
+        self.assertIn("//italic//", prompt)
+
+    def test_json_prompt_contains_sugarcube_guidance(self):
+        from harness.prompts import build_json_passage_prompt, SUGARCUBE_GUIDANCE
+        prompt = build_json_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+        )
+        self.assertIn(SUGARCUBE_GUIDANCE, prompt)
+
+    def test_compact_prompt_omits_sugarcube_guidance(self):
+        """Compact prompt is token-budget-constrained; guidance is reserved
+        for the full and JSON prompts."""
+        from harness.prompts import build_compact_passage_prompt, SUGARCUBE_GUIDANCE
+        prompt = build_compact_passage_prompt(
+            premise="p", story_points="sp", arc_notes="a", entities_text="e",
+            parent_prose="pp", snapshot_text="s", human_prompt="h",
+        )
+        self.assertNotIn(SUGARCUBE_GUIDANCE, prompt)
+
+    def test_prompt_version_bumped(self):
+        """PROMPT_VERSION must reflect the SugarCube guidance addition."""
+        from harness.prompts import PROMPT_VERSION
+        self.assertGreaterEqual(PROMPT_VERSION, 6)
+
+
+class TemplatePromptTests(unittest.TestCase):
+    """Template style guidance must appear in prompts only when set."""
+
+    def test_full_prompt_includes_template_block(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+            template_id="space-tech",
+        )
+        self.assertIn("[TEMPLATE STYLE: Space-Tech UI]", prompt)
+
+    def test_full_prompt_omits_template_block_when_empty(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+            template_id="",
+        )
+        self.assertNotIn("[TEMPLATE STYLE:", prompt)
+
+    def test_json_prompt_includes_template_block(self):
+        from harness.prompts import build_json_passage_prompt
+        prompt = build_json_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+            template_id="character-creator",
+        )
+        self.assertIn("[TEMPLATE STYLE: Character Creator]", prompt)
+
+    def test_unknown_template_id_omits_block(self):
+        from harness.prompts import build_full_passage_prompt
+        prompt = build_full_passage_prompt(
+            premise="p", story_points="sp", arc_md="a", snapshot_text="s",
+            entities_text="e", inspiration="i", parent_prose="pp",
+            human_prompt="h", mode="co-author",
+            template_id="nonexistent",
+        )
+        self.assertNotIn("[TEMPLATE STYLE:", prompt)
+
+
+class TemplateRegistryTests(unittest.TestCase):
+    """The template registry catalogs the 7 bundled HTML templates."""
+
+    def test_registry_has_seven_templates(self):
+        from harness.templates import TEMPLATE_REGISTRY
+        self.assertEqual(len(TEMPLATE_REGISTRY), 7)
+
+    def test_expected_template_ids(self):
+        from harness.templates import list_template_ids
+        self.assertEqual(
+            set(list_template_ids()),
+            {
+                "character-creator", "one-page", "settings",
+                "simple-book", "space-tech", "title-page", "vn-lite-rpg",
+            },
+        )
+
+    def test_get_template_returns_info(self):
+        from harness.templates import get_template
+        tpl = get_template("space-tech")
+        self.assertIsNotNone(tpl)
+        self.assertEqual(tpl.name, "Space-Tech UI")
+        self.assertTrue(tpl.has_story_interface)
+        self.assertTrue(tpl.uses_widgets)
+
+    def test_get_template_unknown_returns_none(self):
+        from harness.templates import get_template
+        self.assertIsNone(get_template("nope"))
+
+    def test_template_guidance_returns_nonempty_for_known(self):
+        from harness.templates import template_guidance
+        g = template_guidance("vn-lite-rpg")
+        self.assertIn("VN-lite", g)
+        self.assertIn("[TEMPLATE STYLE:", g)
+
+    def test_template_guidance_empty_for_unknown(self):
+        from harness.templates import template_guidance
+        self.assertEqual(template_guidance("nope"), "")
+
+    def test_template_guidance_empty_for_empty(self):
+        from harness.templates import template_guidance
+        self.assertEqual(template_guidance(""), "")
+
+    def test_template_css_path_exists_for_all(self):
+        """Every registered template that declares a css_file must resolve
+        to an existing file on disk."""
+        from harness.templates import list_templates, template_css_path
+        for tpl in list_templates():
+            if tpl.css_file:
+                p = template_css_path(tpl.id)
+                self.assertIsNotNone(p, f"CSS missing for {tpl.id}")
+                self.assertTrue(p.exists(), f"CSS file not found for {tpl.id}: {p}")
+
+    def test_template_js_path_for_js_templates(self):
+        """Templates with js_file must resolve to existing files; title-page
+        (CSS-only, no JS) must return None."""
+        from harness.templates import template_js_path
+        cc_js = template_js_path("character-creator")
+        self.assertIsNotNone(cc_js)
+        self.assertTrue(cc_js.exists())
+        tp_js = template_js_path("title-page")
+        self.assertIsNone(tp_js)  # CSS-only template
+
+    def test_template_assets_returns_css_and_js(self):
+        from harness.templates import template_assets
+        assets = template_assets("one-page")
+        names = {p.name for p in assets}
+        self.assertIn("StyleSheet.css", names)
+        self.assertIn("Script.js", names)
+
+    def test_template_assets_empty_for_unknown(self):
+        from harness.templates import template_assets
+        self.assertEqual(template_assets("nope"), [])
+
+
+class TemplateAssetInjectionTests(unittest.TestCase):
+    """compile.inject_template_assets copies CSS/JS into build_src."""
+
+    def test_no_template_id_copies_nothing(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp)
+            cfg = HarnessConfig()  # template_id=""
+            copied = inject_template_assets(cfg, build_src)
+            self.assertEqual(copied, [])
+            self.assertEqual(list(build_src.iterdir()), [])
+
+    def test_copies_css_and_js_for_template(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp)
+            cfg = HarnessConfig(template_id="space-tech")
+            copied = inject_template_assets(cfg, build_src)
+            names = {p.name for p in copied}
+            self.assertIn("StyleSheet.css", names)
+            self.assertIn("Script.js", names)
+            # Files exist on disk
+            for f in copied:
+                self.assertTrue(f.exists())
+                self.assertTrue(f.stat().st_size > 0)
+
+    def test_title_page_copies_only_css(self):
+        from harness.compile import inject_template_assets
+        with TemporaryDirectory() as tmp:
+            build_src = Path(tmp)
+            cfg = HarnessConfig(template_id="title-page")
+            copied = inject_template_assets(cfg, build_src)
+            self.assertEqual(len(copied), 1)
+            self.assertTrue(copied[0].name.endswith(".css"))
+
+
+class WidgetPassageRenderTests(unittest.TestCase):
+    """widget and include passage types render SugarCube-idiomatic output."""
+
+    def test_widget_auto_wraps_prose(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="You see $name standing there.",
+                choices=[],
+                summary="Widget body.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_stats_widget", out, None,
+                passage_type="widget",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertIn("<<widget \"stats_widget\">>", tw)
+            self.assertIn("You see $name standing there.", tw)
+            self.assertIn("<</widget>>", tw)
+            # widget tag in header
+            self.assertIn("widget", tw.splitlines()[0])
+
+    def test_widget_preserves_existing_widget_macro(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose='<<widget "greet">>Hello there.<</widget>>',
+                choices=[],
+                summary="Widget.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_greet_widget", out, None,
+                passage_type="widget",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            # Should NOT auto-wrap a second time
+            self.assertEqual(tw.count("<<widget"), 1)
+            self.assertIn("<<widget \"greet\">>", tw)
+
+    def test_include_passage_renders_prose_verbatim(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            out = ModelOutput(
+                prose="Shared menu content here.",
+                choices=[],
+                summary="Include.",
+            )
+            pid, graph = create_passage(
+                p, "intro", "01_menu_elements", out, None,
+                passage_type="include",
+            )
+            tw = (Path(tmp) / graph.passages[pid].file).read_text(encoding="utf-8")
+            self.assertIn("Shared menu content here.", tw)
+            # include tag in header, no choices rendered
+            self.assertIn("include", tw.splitlines()[0])
+            self.assertNotIn("<<link", tw)
+
+
+class DeprecatedFeatureValidationTests(unittest.TestCase):
+    """check_deprecated_features warns on SugarCube v2.37.0 deprecations."""
+
+    @staticmethod
+    def _check(tmp, body, tags=""):
+        p = init_project(Path(tmp), title="Test")
+        f = p.arcs_dir / "x" / "01.tw"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        header = f":: x__01 [x{(' ' + tags) if tags else ''}]"
+        f.write_text(header + "\n" + body + "\n", encoding="utf-8")
+        from harness.project import load_story, save_story
+        from harness.validation import check_deprecated_features
+        graph = load_story(p)
+        graph.passages["x__01"] = PassageEntry(file="arcs/x/01.tw", arc="x")
+        save_story(p, graph)
+        return check_deprecated_features(p, graph)
+
+    def test_actions_macro_warns(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<actions [[Go|target]]>>")
+            self.assertTrue(any(i.code == "deprecated_macro" and "actions" in i.message for i in issues))
+
+    def test_choice_macro_warns(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<choice \"opt\">>text<</choice>>")
+            self.assertTrue(any(i.code == "deprecated_macro" and "choice" in i.message for i in issues))
+
+    def test_silently_macro_warns(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<silently>>hidden<</silently>>")
+            self.assertTrue(any(i.code == "deprecated_macro" and "silently" in i.message for i in issues))
+
+    def test_silent_macro_does_not_warn(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<silent>>hidden<</silent>>")
+            self.assertFalse(any(i.code == "deprecated_macro" for i in issues))
+
+    def test_bookmark_tag_warns(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "body", tags="bookmark")
+            self.assertTrue(any(i.code == "deprecated_tag" and "bookmark" in i.message for i in issues))
+
+    def test_clean_passage_has_no_deprecation_warnings(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<if $x>>ok<</if>>\n<<link \"Go\" \"target\">><</link>>")
+            self.assertEqual(
+                [i for i in issues if i.code.startswith("deprecated")],
+                [],
+            )
+
+    def test_deprecated_warnings_are_warnings_not_errors(self):
+        with TemporaryDirectory() as tmp:
+            issues = self._check(tmp, "<<actions [[Go|target]]>>")
+            for i in issues:
+                self.assertEqual(i.level, "warning")
+
+    def test_storyshare_passage_warns(self):
+        with TemporaryDirectory() as tmp:
+            p = init_project(Path(tmp), title="Test")
+            f = p.arcs_dir / "x" / "01.tw"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(":: StoryShare [x]\nshare content\n", encoding="utf-8")
+            from harness.project import load_story, save_story
+            from harness.validation import check_deprecated_features
+            graph = load_story(p)
+            graph.passages["StoryShare"] = PassageEntry(file="arcs/x/01.tw", arc="x")
+            save_story(p, graph)
+            issues = check_deprecated_features(p, graph)
+            self.assertTrue(any(i.code == "deprecated_passage" and "StoryShare" in i.message for i in issues))
+
+
+class MacroContainerSetTests(unittest.TestCase):
+    """MACRO_CONTAINERS includes the v2.37.x additions."""
+
+    def test_silent_in_containers(self):
+        from harness.validation import MACRO_CONTAINERS
+        self.assertIn("silent", MACRO_CONTAINERS)
+
+    def test_do_in_containers(self):
+        from harness.validation import MACRO_CONTAINERS
+        self.assertIn("do", MACRO_CONTAINERS)
+
+    def test_script_in_containers(self):
+        from harness.validation import MACRO_CONTAINERS
+        self.assertIn("script", MACRO_CONTAINERS)
+
+    def test_done_in_containers(self):
+        from harness.validation import MACRO_CONTAINERS
+        self.assertIn("done", MACRO_CONTAINERS)
+
+    def test_silently_still_in_containers(self):
+        """Deprecated silently is kept for backward-compat validation."""
+        from harness.validation import MACRO_CONTAINERS
+        self.assertIn("silently", MACRO_CONTAINERS)
+
+    def test_new_containers_validate_as_pairs(self):
+        """<<silent>> and <<do>> should validate cleanly when properly closed."""
+        with TemporaryDirectory() as tmp:
+            from harness.validation import check_macro_pairing
+            p = init_project(Path(tmp), title="Test")
+            f = p.arcs_dir / "x" / "01.tw"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(":: x__01 [x]\n<<silent>>hi<</silent>><<do>>x<</do>>\n", encoding="utf-8")
+            graph = StoryGraph()
+            graph.passages["x__01"] = PassageEntry(file="arcs/x/01.tw", arc="x")
+            self.assertEqual(check_macro_pairing(p, graph), [])
+
+
+class ScanStateReadsTests(unittest.TestCase):
+    """scan_state_reads now covers RHS of <<set>>, naked prose vars, <<if>>."""
+
+    def test_reads_rhs_of_set(self):
+        from harness.passage import scan_state_reads
+        reads = scan_state_reads("<<set $b to $a + 1>>")
+        self.assertIn("$a", reads)
+        self.assertNotIn("$b", reads)  # LHS is a write, not a read
+
+    def test_reads_naked_prose_var(self):
+        from harness.passage import scan_state_reads
+        reads = scan_state_reads("You have $gold coins and $hp health.")
+        self.assertIn("$gold", reads)
+        self.assertIn("$hp", reads)
+
+    def test_reads_if_condition_vars(self):
+        from harness.passage import scan_state_reads
+        reads = scan_state_reads("<<if $has_key and $door_open>>yes<</if>>")
+        self.assertIn("$has_key", reads)
+        self.assertIn("$door_open", reads)
+
+    def test_reads_print_expr_vars(self):
+        from harness.passage import scan_state_reads
+        reads = scan_state_reads("<<print $obj.prop>>")
+        self.assertIn("$obj", reads)
+
+
+class HarnessConfigTemplateFieldTests(unittest.TestCase):
+    """HarnessConfig carries a template_id field."""
+
+    def test_default_template_id_empty(self):
+        cfg = HarnessConfig()
+        self.assertEqual(cfg.template_id, "")
+
+    def test_template_id_set(self):
+        cfg = HarnessConfig(template_id="vn-lite-rpg")
+        self.assertEqual(cfg.template_id, "vn-lite-rpg")
+
+    def test_template_id_round_trips_through_yaml(self):
+        import yaml
+        cfg = HarnessConfig(template_id="space-tech")
+        dumped = yaml.dump(cfg.model_dump(), allow_unicode=True)
+        loaded = yaml.safe_load(dumped)
+        cfg2 = HarnessConfig.model_validate(loaded)
+        self.assertEqual(cfg2.template_id, "space-tech")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -334,6 +334,7 @@ def build_prompt(
             mode=mode,
             story_recall=_trim_text(story_recall, profile.inspiration_chars),
             plan_focus=_trim_text(_collapse_ws(plan_focus), profile.arc_chars),
+            template_id=getattr(cfg, "template_id", ""),
         )
 
     if use_compact:
@@ -363,6 +364,7 @@ def build_prompt(
         mode=mode,
         story_recall=story_recall,
         plan_focus=plan_focus,
+        template_id=getattr(cfg, "template_id", ""),
     )
 
 

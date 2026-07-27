@@ -251,6 +251,13 @@ class HarnessConfig(BaseModel):
     # Module directories passed via `-m` — every .css/.js inside is wrapped
     # and injected into <head>.
     tweego_module_dirs: list[str] = Field(default_factory=list)
+    # ── Template awareness ───────────────────────────────────────────────────
+    # Registry id of an active SugarCube HTML template (see harness.templates).
+    # When set, the harness injects the template's CSS/JS into compiled
+    # stories and adds a style hint to passage prompts. Empty = no template.
+    # Valid ids: character-creator, one-page, settings, simple-book,
+    # space-tech, title-page, vn-lite-rpg.
+    template_id: str = ""
 
 
 class SessionState(BaseModel):
