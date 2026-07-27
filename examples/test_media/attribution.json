@@ -1,0 +1,112 @@
+{
+  "source": "Wikimedia Commons (https://commons.wikimedia.org/)",
+  "description": "Placeholder test media files for verifying image, video, and icon support in the SugarCube Story Harness. These files do NOT need to match any scene content. All images and the first video are from Wikimedia Commons under their respective licenses. Icons are original SVGs created for testing. Videos 3-5 are copies of video_1 due to Wikimedia rate limiting during download.",
+  "license_note": "See individual file entries for specific licenses. Wikimedia Commons files retain their original licenses (Public Domain, CC BY, CC BY-SA). Icon SVGs are CC0 (original works created for testing).",
+  "files": [
+    {
+      "file": "images/image_1.jpg",
+      "title": "Paul Bril - Mountain Scene - WGA3197.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Paul_Bril_-_Mountain_Scene_-_WGA3197.jpg",
+      "description": "Renaissance mountain landscape painting"
+    },
+    {
+      "file": "images/image_2.jpg",
+      "title": "New York City at night HDR.jpg",
+      "license": "CC BY-SA 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:New_York_City_at_night_HDR.jpg",
+      "description": "New York City skyline at night"
+    },
+    {
+      "file": "images/image_3.jpg",
+      "title": "Forest path.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Forest_path.jpg",
+      "description": "Forest path through trees"
+    },
+    {
+      "file": "images/image_4.jpg",
+      "title": "Ocean beach at low tide against the sun.jpg",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Ocean_beach_at_low_tide_against_the_sun.jpg",
+      "description": "Ocean beach at low tide (thumbnail, 1200px)"
+    },
+    {
+      "file": "images/image_5.jpg",
+      "title": "Georgette Agutte - Ancient Castle - 1915.11.2",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Georgette_Agutte_-_Ancient_Castle_-_1915.11.2_-_Smithsonian_American_Art_Museum.jpg",
+      "description": "Ancient castle painting"
+    },
+    {
+      "file": "videos/video_1.webm",
+      "title": "Clouds transformation.webm",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Clouds_transformation.webm",
+      "description": "Time-lapse clouds transformation"
+    },
+    {
+      "file": "videos/video_2.webm",
+      "title": "Clouds transformation.webm (second copy)",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Clouds_transformation.webm",
+      "description": "Time-lapse clouds (same as video_1, downloaded before rate limit)"
+    },
+    {
+      "file": "videos/video_3.webm",
+      "title": "Clouds transformation.webm (placeholder copy)",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Clouds_transformation.webm",
+      "description": "Placeholder - copy of video_1 (Wikimedia rate limit prevented unique download)"
+    },
+    {
+      "file": "videos/video_4.webm",
+      "title": "Clouds transformation.webm (placeholder copy)",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Clouds_transformation.webm",
+      "description": "Placeholder - copy of video_1 (Wikimedia rate limit prevented unique download)"
+    },
+    {
+      "file": "videos/video_5.webm",
+      "title": "Clouds transformation.webm (placeholder copy)",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Clouds_transformation.webm",
+      "description": "Placeholder - copy of video_1 (Wikimedia rate limit prevented unique download)"
+    },
+    {
+      "file": "icons/icon_1.svg",
+      "title": "Arrow Up Icon (original)",
+      "license": "CC0",
+      "source": "Original work created for harness testing",
+      "description": "Blue arrow pointing up"
+    },
+    {
+      "file": "icons/icon_2.svg",
+      "title": "Star Icon (original)",
+      "license": "CC0",
+      "source": "Original work created for harness testing",
+      "description": "Orange five-pointed star"
+    },
+    {
+      "file": "icons/icon_3.svg",
+      "title": "Heart Icon (original)",
+      "license": "CC0",
+      "source": "Original work created for harness testing",
+      "description": "Red heart outline"
+    },
+    {
+      "file": "icons/icon_4.svg",
+      "title": "Gear/Settings Icon (OOjs UI)",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:OOjs_UI_icon_advanced.svg",
+      "description": "Settings gear icon from OOjs UI"
+    },
+    {
+      "file": "icons/icon_5.svg",
+      "title": "Home/House Icon (original)",
+      "license": "CC0",
+      "source": "Original work created for harness testing",
+      "description": "Green house icon"
+    }
+  ]
+}
