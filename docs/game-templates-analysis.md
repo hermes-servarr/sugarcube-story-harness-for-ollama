@@ -1,11 +1,16 @@
 # Anonymized Example Game Analysis
 
-**Date:** 2026-07-28
-**Commit:** 81a5022 (origin/main)
-**Files analyzed:**
-- `examples/game_templates/example-structure.html` (10,227 lines, 691KB, 159 passages)
-- `examples/game_templates/example-structure (2).html` (20,598 lines, 928KB, 487 passages)
-- `examples/game_templates/example-structure (3).html` (52,693 lines, 3.6MB, 785 passages)
+**Date:** 2026-07-28 (updated)
+**Commits:** 81a5022 (initial), c98c1e0 (added CSS+JS), ece2dfc (updated again)
+**Files analyzed (current state on origin/main):**
+- `examples/game_templates/example-structure.html` (60,687 lines, 4.5MB, 785 passages) - large narrative game
+- `examples/game_templates/example-structure (2).html` (10,247 lines, 1.5MB, 159 passages) - visual novel
+- `examples/game_templates/example-structure (3).html` (29,502 lines, 1.9MB, 487 passages) - RPG with character systems
+
+**NOTE:** File contents were swapped between commits. The current mapping is:
+- `example-structure.html` = Game 3 (large narrative, 785 passages) WITH engine JS+CSS
+- `example-structure (2).html` = Game 1 (VN, 159 passages) WITH engine JS+CSS
+- `example-structure (3).html` = Game 2 (RPG, 487 passages) WITH engine JS+CSS
 
 ---
 
@@ -26,22 +31,23 @@ The author ran these files through a parser that:
 | Character dialogue labels | Replaced with `Character1` through `Character9` |
 | Media references | Replaced with `media-placeholder` and `resource-placeholder` |
 | tw-tag names | Replaced with "Lorem ipsum" |
-| CSS content | Replaced with `/* Lorem ipsum dolor sit amet. */` |
-| JS content | Replaced with `/* Lorem ipsum dolor sit amet. */` |
-| SugarCube engine JS | **Completely stripped** (no SugarCube code remains) |
+| CSS content (SugarCube default) | Anonymized: `selector001`-`selector138` for class/id names, all values zeroed, `color-placeholder` for colors, `resource-placeholder` for font URLs |
+| JS content (engine) | Anonymized: ALL identifiers replaced with `identifier001`-`identifier999`, including JS builtins (`document`, `window`, `JSON`, `localStorage` etc), all strings to "Lorem ipsum", all numbers to 0 |
+| JS content (user-defined) | Game-specific JS preserved in structure: 0-32KB per game, function/var patterns intact, jQuery patterns visible |
+| SugarCube engine JS | **Present** (~630-696KB per file), fully anonymized but structurally intact |
 | HTML structure | Preserved (tags, nesting, data-twine-* elements) |
 
 ### Critical finding: these files are NOT playable
 
-The anonymization stripped the SugarCube engine JavaScript and all CSS. A normal
-compiled SugarCube HTML file (like the Cartographer's Dilemma) contains ~440KB of
-SugarCube engine JS. These files have 66-99 bytes of script content total, all
-"Lorem ipsum" comments. They are **structural skeletons** showing passage
-organization and macro usage patterns, not runnable games.
+The anonymization emptied `startnode`, all passage names, `format`, `format-version`, and `ifid`. Even though the SugarCube engine JS is present, the game cannot start because the start passage pointer is empty and all passages share the name "Lorem ipsum", making navigation impossible. All CSS values are zeroed (widths, heights, colors all 0 or `#000000`), so even if it ran, it would be visually broken.
 
 ### What is preserved and useful
 
 - The full HTML element structure (head, body, tw-storydata, tw-passagedata)
+- The SugarCube engine JS (630-696KB, anonymized but structurally intact)
+- The SugarCube default CSS (~5KB, anonymized)
+- Game-specific CSS (0-11KB inside tw-storydata, anonymized selectors but patterns visible)
+- User-defined JavaScript (0-32KB per game, showing custom game logic patterns)
 - The number and nesting of passages
 - Macro usage patterns (which macros, how often, how nested)
 - Variable reference patterns (how many vars, how they're used)
@@ -51,6 +57,8 @@ organization and macro usage patterns, not runnable games.
 - Media reference patterns (img, video, audio placeholders)
 - Dialogue formatting patterns (@@Character1: ... @@)
 - Input form usage (textbox, radiobutton, listbox, numberbox)
+- jQuery usage patterns in user JS (event binding, DOM manipulation)
+- CSS structural patterns (@keyframes, @media, transitions, gradients, flexbox)
 
 ---
 
@@ -187,7 +195,7 @@ Build a tool that can anonymize a SugarCube HTML game while preserving the Sugar
 ## 5. What's Glaringly Missing (Kanban Candidates)
 
 ### A. The anonymized files are not playable
-The anonymization stripped the SugarCube engine JS. These files cannot be opened in a browser and played. They're only useful as structural references. A proper anonymization would preserve the engine while stripping identifying content.
+The anonymization emptied `startnode`, `ifid`, `format`, all passage names, and zeroed all CSS values. Even though the SugarCube engine JS is now present (~630-696KB), the game cannot start. A proper anonymization would keep `startnode`, `format`, `format-version`, unique passage names (hashed), and non-zero CSS values while stripping author-identifying content.
 
 ### B. The harness generates a tiny subset of SugarCube
 4 macros vs 25+ in real games. `<<actions>>` is not used in any real game. The harness is generating a SugarCube subset that doesn't match real-world usage patterns.
@@ -244,3 +252,90 @@ Detailed per-file reports:
 5. **OOP entity objects** (Games 2 and 3): Game state uses deeply nested objects with methods. The harness currently uses flat `$has_discovered_power` boolean flags.
 
 6. **Pervasive custom functions** (all 3 games): Games define custom functions/macros called hundreds or thousands of times. The harness has no custom function support.
+
+---
+
+## 7. Engine JS and CSS Analysis (Updated Files)
+
+### Engine JS Structure
+
+All 3 files contain the full SugarCube engine JavaScript, anonymized:
+
+| File | script[0] | script[1] (user JS) | script[2] | Total engine |
+|---|---|---|---|---|
+| example-structure.html (785 passages) | 227KB | 20KB | 450KB | 697KB |
+| example-structure (2).html (159 passages) | 233KB | 0KB | 398KB | 631KB |
+| example-structure (3).html (487 passages) | 233KB | 32KB | 397KB | 662KB |
+
+- **script[0]**: Engine bootstrap + early initialization (~227-233KB)
+- **script[1]**: User-defined JavaScript (0-32KB, game-specific custom code)
+- **script[2]**: Main SugarCube engine body (~397-450KB)
+
+### SugarCube Version Identification
+
+Files B and C share identical engine script[0] (hash=5bb03f4ce98b) and CSS (hash=01fbce057f74), confirming the same SugarCube version. File A has different hashes, indicating a different version. All engines are larger than v2.37.3 (550KB), suggesting v2.37.x or newer.
+
+| Known version | Total engine JS |
+|---|---|
+| v2.30.0 (Cartographer's Dilemma) | 440KB |
+| v2.37.3 (manonamora templates) | 551KB |
+| Example games (Files B+C) | 631KB |
+| Example games (File A) | 677KB |
+
+### Anonymization of Engine JS
+
+The anonymization is extremely thorough. It replaced:
+- ALL JavaScript identifiers (variable names, function names, object properties) with `identifier001`-`identifier999`
+- ALL string literals with "Lorem ipsum"
+- ALL numeric values with 0
+- Even JS builtins (`document`, `window`, `JSON`, `localStorage`, `Math`) are replaced with identifiers
+- CSS selectors replaced with `selector001`-`selector138`
+- CSS colors replaced with `#000000` or `color-placeholder`
+- Font URLs replaced with `resource-placeholder`
+
+This means the engine JS is structurally intact (you can see the code flow, function definitions, control structures) but semantically opaque (you cannot tell what any function does).
+
+### User-Defined JavaScript
+
+| Game | User JS | Pattern |
+|---|---|---|
+| Game 1 (VN, 159 passages) | 0KB | No custom JS, pure SugarCube macros |
+| Game 3 (narrative, 785 passages) | 20KB | 40 jQuery calls, 31 event handlers, 8 try/catch, heavy DOM event binding |
+| Game 2 (RPG, 487 passages) | 32KB | 68 if blocks, 14 jQuery calls, 83 comment lines, logic-heavy with async patterns |
+
+Key patterns:
+- Games use jQuery for event binding and DOM manipulation beyond what SugarCube macros provide
+- RPG game (32KB user JS) has the most complex custom logic: async patterns (.catch), regex validation, conditional rendering
+- VN game needs no custom JS at all, everything is done via SugarCube macros
+- User JS defines custom macros, event handlers, and game-specific state management
+
+### Game-Specific CSS (inside tw-storydata)
+
+| Game | Game CSS | Key patterns |
+|---|---|---|
+| Game 1 (VN, 159 passages) | 0KB | No custom CSS |
+| Game 3 (narrative, 785 passages) | 5.6KB | 3 @import fonts, 33 selectors, font-family/size definitions, image positioning |
+| Game 2 (RPG, 487 passages) | 10.8KB | 2 @keyframes, 14 transitions, 12 linear-gradients, 27 border-radius, 62 selectors, styled buttons, table styling |
+
+The RPG game has the richest CSS: gradient buttons, animated elements, custom table styling, and 62 unique selectors. The harness currently generates no game-specific CSS.
+
+### SugarCube Default CSS
+
+All 3 files share the same SugarCube default CSS structure (~5KB):
+- `@keyframes init-loading-spin` - loading spinner animation
+- `@media` responsive rules
+- Dialog overlay styles (`html[data-dialog] body{overflow:hidden}`)
+- Sidebar/passage layout
+- Transition and opacity animations
+
+### Implications for the Harness
+
+1. **The harness should generate user JS for complex games.** Real games with character systems (RPG) need 20-32KB of custom JavaScript beyond SugarCube macros. The harness currently generates zero user JS.
+
+2. **The harness should generate game-specific CSS.** Real games have 5-11KB of custom CSS for fonts, buttons, tables, gradients, and animations. The harness currently generates none.
+
+3. **Two SugarCube versions are in use.** The harness should pin to one version and ensure compatibility. The example games use a version newer than v2.37.3.
+
+4. **jQuery is the primary user-JS pattern.** Games use jQuery for event binding and DOM manipulation, not vanilla JS. The harness should generate jQuery-compatible code.
+
+5. **VN games can be macro-only.** The VN game (159 passages) has zero user JS and zero game CSS, proving that SugarCube macros alone can build a complete game. The harness could target this as the baseline complexity level.
