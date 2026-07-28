@@ -25,6 +25,12 @@ from .models import (
 # ── Delimited-section parser ─────────────────────────────────────────────────
 
 # Matches section headers whether the model puts content on the same line or not.
+# TODO(input-macros): append `|INPUT` to the alternation group so _split_sections
+# recognises the INPUT: section header for form passage input macros (P3 §3.1).
+# Append `|INPUT` to the BEATS alternation so the regex becomes:
+#   r'...|CHARACTER_STATUS|SUMMARY|BEATS|INPUT)\s*:\s*'
+# No other change to the regex. The INPUT section carries form input fields
+# (one ParsedInputField per line; P3 §3.4). See p3_interfaces.md §3.1, p1_research.md §3.5.
 _SECTION_RE = re.compile(
     r'^(PROSE|CHOICES|STATE|MEDIA|NEW_CHARACTERS|NEW_LORE|THREADS_OPEN|'
     r'THREADS_CLOSE|WORLD_STATE_ADD|WORLD_STATE_REMOVE|'
@@ -194,6 +200,30 @@ def _parse_character_delta(line: str, *, is_exit: bool = False) -> CharacterDelt
     return CharacterDelta(
         id=cid, status=status, knows=knows, relationship_to_player=relationship,
     )
+
+
+# TODO(input-macros): define _parse_input_option(raw: str) -> ParsedInputOption | None
+# here, after _parse_character_delta and before _parse_input_field (P3 §3.2).
+# Parses one <<option>> child line of a listbox/cycle: `label [| value [| selected]]`.
+# Mirrors _parse_character_delta: strip bullets, guard against templates, split on
+# `|`, return None for blank/template lines. Returns ParsedInputOption (P2 §4).
+# Signature only; P7 body. See p3_interfaces.md §3.2, p2_data_structures.md §4.
+
+# TODO(input-macros): define _parse_input_field(raw: str) -> ParsedInputField | None
+# here, after _parse_input_option and before _parse_input_section (P3 §3.3).
+# Parses one INPUT-section line: `kind | $var | default | label [| flag1 flag2 ...]`.
+# The kind must be in INPUT_MACRO_KINDS (P2 §2); unknown kinds return None.
+# Uses _strip_bullet + _is_template (existing helpers). Returns ParsedInputField
+# (P2 §5) with kind, var, default, label, and relevant keyword flags parsed from
+# the trailing token group. Signature only; P7 body.
+# See p3_interfaces.md §3.3, p2_data_structures.md §5.
+
+# TODO(input-macros): define _parse_input_section(raw: str) -> list[ParsedInputField]
+# here, after _parse_input_field (P3 §3.4). Parses the full INPUT section body
+# into an ordered list of ParsedInputField. For listbox/cycle fields the trailing
+# indented <<option>> child lines (parsed by _parse_input_option) attach to the
+# preceding field's options list. Empty list if section empty/no valid fields.
+# Signature only; P7 body. See p3_interfaces.md §3.4.
 
 
 def parse_model_output(raw: str) -> ModelOutput:
@@ -366,6 +396,14 @@ def parse_model_output(raw: str) -> ModelOutput:
         beat = _strip_bullet(line)
         if beat and beat not in ("(none)", "(none).") and not _is_template(beat):
             output.beats.append(beat)
+
+    # TODO(input-macros): parse the INPUT section here, after BEATS and before
+    # the fallback block (P3 §3.5). Two lines:
+    #   input_raw = sections.get("INPUT", "")
+    #   output.inputs = _parse_input_section(input_raw)
+    # _parse_input_section (P3 §3.4) builds list[ParsedInputField] from the
+    # pipe-delimited lines; empty when the section is absent (non-form passages).
+    # See p3_interfaces.md §3.5, p2_data_structures.md §6.
 
     # ── Fallbacks for small models that ignore the format ──────────────────
     # PROSE fallback: if empty, scan raw for the first substantial prose block

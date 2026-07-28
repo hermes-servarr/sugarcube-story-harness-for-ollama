@@ -369,6 +369,25 @@ def _wrap_gates(rendered: str, choice) -> str:
 #       """Emit <<run memorize>> lines for earned achievements, or empty string."""
 # See p3_interfaces.md section 2 I2, p1_research.md section 4B/3.
 
+# TODO(input-macros): add _render_input_field(field: ParsedInputField) -> str here,
+# before _render_passage_tw (P3 §2.1). Renders one input macro from a
+# ParsedInputField descriptor (P2 §5); `kind` selects the macro, only relevant
+# fields populated. Returns a single SugarCube macro line (or the full
+# <<listbox>>…<</listbox>> / <<cycle>>…<</cycle>> block incl. <<option>> children).
+# Does NOT include the optional label prefix (caller _render_form_block adds it).
+# Keyword flags map directly from P2 fields (autofocus, autocheck, checked, once,
+# autoselect). Signature only; P7 body. See p3_interfaces.md §2.1, p1_research.md §2.3.
+
+# TODO(input-macros): add _render_form_block(fields, choices, start_index=0,
+# loop_vars=None) -> list[str] here, after _render_input_field and before
+# _render_passage_tw (P3 §2.2). Renders all form input fields followed by the
+# submit choice link(s). Calls _render_input_field per field and
+# _render_choice_link per submit choice. start_index is the choice index offset
+# (form's submit is choices[start_index] → UNRESOLVED_choice{start_index}_*).
+# Returns ordered lines (label + macro per field, blank, submit link). Empty list
+# when fields empty (validation flags the error; renderer does not raise).
+# Signature only; P7 body. See p3_interfaces.md §2.2, p1_research.md §3.3.
+
 
 def _render_passage_tw(
     passage_id: str,
@@ -391,6 +410,12 @@ def _render_passage_tw(
     #   achievements: list[ParsedAchievement] | None = None,
     # Default None so existing callers unaffected. P7 normalizes None to [] and calls
     # _render_achievement_block. See p3_interfaces.md section 3 I3.
+    # TODO(input-macros): add trailing kwarg `inputs: list[ParsedInputField] = ()`
+    # before `) -> str:` (P3 §2.3). Default empty tuple so all existing callers
+    # (which pass no inputs) are unaffected. The form branch reads this param.
+    # Exact code:
+    #   inputs: list[ParsedInputField] = (),   # form passage input fields (P2 §5)
+    # See p3_interfaces.md §2.3, p2_data_structures.md §6.
 ) -> str:
     """Render a passage to SugarCube twee source.
 
@@ -578,6 +603,15 @@ def _render_passage_tw(
         lines.append("<</for>>")
         lines.append("")
 
+    # TODO(input-macros): add `elif passage_type == "form":` branch here, after the
+    # loop branch and before the else default (P3 §2.3). Body (P7):
+    #   lines.extend(_render_form_block(inputs, choices, start_index=0, loop_vars=loop_vars))
+    #   lines.append("")
+    # Inputs come from ModelOutput.inputs (P2 §5); submit reuses choices[0] via
+    # the UNRESOLVED_choice0_* placeholder (P1 §2.8, Q1). One-liner delegating to
+    # _render_form_block matches the existing _render_hub_links delegation pattern.
+    # See p3_interfaces.md §2.3, p1_research.md §3.3.
+
     else:
         # normal / conditional / event / random_event default rendering
         for i, choice in enumerate(choices):
@@ -720,6 +754,12 @@ def create_passage(
             # this _render_passage_tw call (P3 section 8, I3). Add:
             #   achievements=output.achievements,
             # See p3_interfaces.md section 3 I3, p2_data_structures.md section 4 D4.
+            # TODO(input-macros): thread inputs=output.inputs into this
+            # _render_passage_tw call (P3 §2.3). Add:
+            #   inputs=output.inputs,
+            # output.inputs (P2 §6) is populated by parse_model_output's INPUT
+            # section (P3 §3.5) / parse_model_output_json (P2 schema). Empty list
+            # for non-form passages → form branch is a no-op. See p3_interfaces.md §2.3.
         )
         rendered_state_reads = scan_state_reads(tw_content)
         write_passage_file(tw_path, tw_content)
@@ -996,6 +1036,16 @@ def scan_state_reads(tw_content: str) -> list[str]:
         tw_content,
     )
 
+    # TODO(input-macros): before the $var finditer in step 2, strip the quoted
+    # first argument of the 7 input macros (textbox/numberbox/textarea/checkbox/
+    # radiobutton/listbox/cycle — INPUT_MACRO_KINDS P2 §2) so their receiver
+    # names (e.g. the "$name" in <<textbox "$name" "default">>) are NOT counted
+    # as reads (P3 §6.2, P1 §2.7). Without this fix, form field target vars
+    # would be misclassified as reads → false undeclared_state_var errors and
+    # polluted state_reads. Exact mechanism (strip input-macro quoted args
+    # before the finditer, or post-filter) is a P7 detail; signature unchanged.
+    # See p3_interfaces.md §6.2, p1_research.md §2.7.
+
     # 2) Collect every $var token remaining. This naturally includes:
     #    - naked prose interpolation ($name in text)
     #    - <<if>>/<<elseif>> condition variables
@@ -1012,6 +1062,14 @@ def scan_state_writes(tw_content: str) -> list[str]:
     writes = set()
     for m in re.finditer(r'<<set\s+\$(\w+)\s*(?:to\b|=)', tw_content):
         writes.add(f"${m.group(1)}")
+    # TODO(input-macros): extend the scan to also recognize the 7 input macros
+    # (INPUT_MACRO_KINDS P2 §2) as writers of their quoted target variable (P3 §6.1,
+    # P1 §2.7). Input macros like <<textbox "$name" "default">> write to $name in
+    # real time but are NOT matched by the <<set>> regex above. The fix extracts
+    # the quoted $var from each input macro so form field targets register as
+    # writes (and thus count as declared-by-write in check_undeclared_state_vars).
+    # Signature + return type unchanged (still list[str] of $var names). Exact
+    # regex mechanism is a P7 detail. See p3_interfaces.md §6.1, p1_research.md §2.7.
     return sorted(writes)
 
 
