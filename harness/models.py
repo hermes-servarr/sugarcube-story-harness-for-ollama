@@ -34,9 +34,8 @@ PASSAGE_TYPES = (
     # "include" (P2 §3). Form passages render SugarCube input macros + a
     # submit <<link>>; navigable like normal/hub (P1 §3.1). Exact code:
     #   "form",  # collects player input via <<textbox>>/<<checkbox>>/... + submit <<link>>
-    # TODO(timed-narrative): append "timed" entry to PASSAGE_TYPES here, after
-    # "include" (P2 §3.1, P1 §4). Exact code:
-    #   "timed",          # time-based narrative: delayed reveals / countdowns / recurring events (<<timed>>/<<repeat>>)
+    # ── timed passage type (P7, P2 §3.1) ────────────────────────────────────
+    "timed",          # time-based narrative: delayed reveals / countdowns / recurring events (<<timed>>/<<repeat>>)
     # Purely additive; no reordering. Existing type indices are stable. All timed
     # fields on PassageEntry default empty/None so a non-timed passage is unaffected.
     # See p2_data_structures.md §3.1, p3_interfaces.md §5.
@@ -129,35 +128,33 @@ class SnapshotDelta(BaseModel):
     open_threads: ListSectionDelta = Field(default_factory=ListSectionDelta)
 
 
-# TODO(timed-narrative): define TimedReveal(BaseModel) and TimedConfig(BaseModel)
-# here, BEFORE class PassageEntry (after SnapshotDelta), so the sub-models are
-# defined before the model that references them (P2 §2.1, §2.2, P2 §5 placement).
-# Both are pure field-bags — no methods, no validators (P2 is strict: schemas only).
-# Exact code:
-#   class TimedReveal(BaseModel):
-#       """One block in a delayed-reveal chain (<<timed>>/<<next>> sequence).
-#
-#       `delay` is a CSS time string per SugarCube ("2s", "500ms"); minimum 40ms
-#       enforced as a P6 invariant, not here. `content` is the SugarCube markup
-#       block shown when the delay elapses.
-#       """
-#       delay: str            # CSS time, e.g. "2s", "500ms"
-#       content: str          # SugarCube markup revealed when this block fires
-#
-#   class TimedConfig(BaseModel):
-#       """Configuration for countdown and recurring timed modes.
-#
-#       - `reveal` mode ignores this (uses `timed_reveals` list instead).
-#       - `countdown` mode uses interval, counter_var, start_value, final_content, anchor_id.
-#       - `recurring` mode uses only interval and content.
-#       Fields not relevant to the active mode are left at their defaults.
-#       """
-#       interval: str = ""            # CSS time for the <<repeat>> loop
-#       counter_var: str = ""         # countdown: SugarCube variable name
-#       start_value: int = 0          # countdown: starting counter value
-#       final_content: str = ""       # countdown: content shown when counter reaches 0
-#       anchor_id: str = ""           # countdown: DOM id for <<replace "#anchor_id">>
-#       content: str = ""             # recurring: SugarCube markup executed each interval
+# ── Timed passage sub-models (P7, P2 §2.1/§2.2) ──────────────────────────────
+# Pure field-bags — no methods, no validators (P2 is strict: schemas only).
+class TimedReveal(BaseModel):
+    """One block in a delayed-reveal chain (<<timed>>/<<next>> sequence).
+
+    `delay` is a CSS time string per SugarCube ("2s", "500ms"); minimum
+    40ms enforced as a P6 invariant, not here. `content` is the SugarCube markup
+    block shown when the delay elapses.
+    """
+    delay: str            # CSS time, e.g. "2s", "500ms"
+    content: str          # SugarCube markup revealed when this block fires
+
+
+class TimedConfig(BaseModel):
+    """Configuration for countdown and recurring timed modes.
+
+    - `reveal` mode ignores this (uses `timed_reveals` list instead).
+    - `countdown` mode uses interval, counter_var, start_value, final_content, anchor_id.
+    - `recurring` mode uses only interval and content.
+    Fields not relevant to the active mode are left at their defaults.
+    """
+    interval: str = ""            # CSS time for the <<repeat>> loop
+    counter_var: str = ""         # countdown: SugarCube variable name
+    start_value: int = 0          # countdown: starting counter value
+    final_content: str = ""       # countdown: content shown when counter reaches 0
+    anchor_id: str = ""           # countdown: DOM id for <<replace "#anchor_id">>
+    content: str = ""             # recurring: SugarCube markup executed each interval
 # See p2_data_structures.md §2.1/§2.2, p3_interfaces.md §2.1.
 
 
@@ -191,21 +188,16 @@ class PassageEntry(BaseModel):
     # (nobr is config-derived, see HarnessConfig). After rebuild_story this list
     # round-trips exactly the mood tags that were in the original header. See
     # p2_data_structures.md §2, p3_interfaces.md §S4 (rebuild_story tag round-trip).
-    # TODO(timed-narrative): add three timed fields here, after dialogue_npc,
-    # following the "flat optional field, default empty/None" convention (P2 §3.2).
-    # Exact code:
-    #   # ── timed passage type ────────────────────────────────────────────────
-    #   # Models the three §3.11 time-based behaviors via a timed_mode discriminator:
-    #   #   reveal    -> timed_reveals list renders a <<timed>>/<<next>> chain
-    #   #   countdown -> timed_config renders a <<repeat>>/<<stop>> loop + <<replace>>
-    #   #   recurring -> timed_config renders a <<repeat>> loop (no stop)
-    #   # All default empty/None so a normal passage is unaffected.
-    #   timed_mode: str = "reveal"                                     # "reveal" | "countdown" | "recurring"
-    #   timed_reveals: list[TimedReveal] = Field(default_factory=list)  # reveal mode
-    #   timed_config: Optional[TimedConfig] = None                      # countdown/recurring; None for reveal
-    # Optional and Field are already imported (models.py L3-4). Appended at the
-    # end of the type-specific block — no existing field touched. See
-    # p2_data_structures.md §3.2, p3_interfaces.md §3.1.
+    # ── timed passage type (P7, P2 §3.2) ───────────────────────────────────
+    # Models the three §3.11 time-based behaviors via a timed_mode discriminator:
+    #   reveal    -> timed_reveals list renders a <<timed>>/<<next>> chain
+    #   countdown -> timed_config renders a <<repeat>>/<<stop>> loop + <<replace>>
+    #   recurring -> timed_config renders a <<repeat>> loop (no stop)
+    # All default empty/None so a normal passage is unaffected.
+    timed_mode: str = "reveal"                                     # "reveal" | "countdown" | "recurring"
+    timed_reveals: list[TimedReveal] = Field(default_factory=list)  # reveal mode
+    timed_config: Optional[TimedConfig] = None                      # countdown/recurring; None for reveal
+    # See p2_data_structures.md §3.2, p3_interfaces.md §3.1.
 
 
 class StateVariable(BaseModel):
@@ -561,20 +553,16 @@ class ExtractedEntities(BaseModel):
 # See p2_data_structures.md §2 D2.
 
 
-# TODO(timed-narrative): define TimedProposal(BaseModel) here, after
-# ExtractedEntities / ParsedAchievement and before ModelOutput, so the
-# proposal sub-model is defined before the model that references it (P2 §2.3,
-# P2 §5 placement — parallel to ParsedChoice/ParsedCharacter). Pure field-bag.
-# Exact code:
-#   class TimedProposal(BaseModel):
-#       """Model-proposed timed passage structure, parsed from the TIMED section.
-#
-#       Mirrors the PassageEntry timed fields (timed_mode + timed_reveals +
-#       timed_config) so create_passage can forward them with no translation.
-#       """
-#       timed_mode: str = "reveal"                      # "reveal" | "countdown" | "recurring"
-#       timed_reveals: list[TimedReveal] = Field(default_factory=list)
-#       timed_config: Optional[TimedConfig] = None
+# ── Timed passage proposal sub-model (P7, P2 §2.3) ──────────────────────────
+class TimedProposal(BaseModel):
+    """Model-proposed timed passage structure, parsed from the TIMED section.
+
+    Mirrors the PassageEntry timed fields (timed_mode + timed_reveals +
+    timed_config) so create_passage can forward them with no translation.
+    """
+    timed_mode: str = "reveal"                      # "reveal" | "countdown" | "recurring"
+    timed_reveals: list[TimedReveal] = Field(default_factory=list)
+    timed_config: Optional[TimedConfig] = None
 # See p2_data_structures.md §2.3, p3_interfaces.md §4.1.
 
 
@@ -604,12 +592,8 @@ class ModelOutput(BaseModel):
     # before parse_warnings. Default empty → zero regression. Exact code:
     #   achievements: list[ParsedAchievement] = Field(default_factory=list)
     # See p2_data_structures.md §4 D4, p3_interfaces.md §2 I2/I3.
-    # TODO(timed-narrative): add `timed: Optional[TimedProposal] = None` field
-    # here, after beats/achievements, before parse_warnings (P2 §3.3). Optional +
-    # None default because the TIMED section is optional in model output (most
-    # passages are not timed); None = section absent. Exact code:
-    #   # ── Timed passage proposal (from TIMED section) ───────────────────────
-    #   timed: Optional[TimedProposal] = None     # parsed from the TIMED section; None if absent
+    # ── Timed passage proposal (from TIMED section) (P7, P2 §3.3) ──────────
+    timed: Optional[TimedProposal] = None     # parsed from the TIMED section; None if absent
     # Positioned immediately before parse_warnings so the cross-cutting warnings
     # field remains the final field (parsing code appends to it). See
     # p2_data_structures.md §3.3, p3_interfaces.md §4.1/§4.2.

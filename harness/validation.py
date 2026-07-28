@@ -86,6 +86,17 @@ def check_passage_types(graph: StoryGraph) -> list[ValidationIssue]:
                 "error", "bad_event_odds",
                 f"random_event {pid!r} event_odds {entry.event_odds} out of range 1-100.", pid,
             ))
+        # ── INV-7 (P6): timed_mode must be one of the closed set ────────────
+        # Body-level extension of check_passage_types (no new signature — P6
+        # identified this enforcement site). Mirrors the random_event range
+        # check above. A bad mode is a silent no-op at render time
+        # (_render_timed_block falls through), so validation must catch it.
+        if t == "timed" and entry.timed_mode not in {"reveal", "countdown", "recurring"}:
+            issues.append(_issue(
+                "error", "timed_bad_mode",
+                f"timed passage {pid!r} has timed_mode {entry.timed_mode!r} not in "
+                f"{{reveal, countdown, recurring}}.", pid,
+            ))
         if t == "ending" and entry.children:
             issues.append(_issue(
                 "warning", "ending_has_children",
@@ -163,6 +174,114 @@ def check_passage_file_links(p: ProjectPaths, graph: StoryGraph) -> list[Validat
                     pid,
                 ))
     return issues
+
+
+# ── Timed-narrative validation (P6 INV-4 / INV-5) ─────────────────────────────
+# Two new check_* functions identified by P6 as P7 enforcement sites. Both
+# follow the standard (p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]
+# pattern. P3 §7 explicitly deferred timed-specific validation to P6; P6
+# specifies these now. See p6_invariants.md §1 (INV-4, INV-5).
+
+def check_timed_countdown_anchor(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """INV-4: countdown prose has <span id=\"{anchor_id}\"> matching <<replace #...>>.
+
+    Scans each timed/countdown passage's .tw file for a
+    ``<span id=\"{anchor_id}\">`` element matching the passage's
+    ``timed_config.anchor_id``. Emits a ``timed_countdown_no_anchor`` error if
+    the anchor is missing or mismatched. The renderer emits the
+    ``<<replace \"#{anchor_id}\">>`` target; the model must include the
+    matching ``<span>`` in prose (P1 §5.4 decision: require-from-model, not
+    auto-injected). Mirrors the file-content scan pattern of
+    check_passage_file_links.
+    """
+    issues = []
+    for pid, entry in graph.passages.items():
+        if entry.passage_type != "timed":
+            continue
+        if entry.timed_mode != "countdown":
+            continue
+        cfg = entry.timed_config
+        if cfg is None or not cfg.anchor_id:
+            continue
+        anchor = cfg.anchor_id
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # The renderer emits <<replace "#{anchor}">>; the matching prose must
+        # contain <span id="anchor"> (or single-quoted variant).
+        span_pat = re.compile(
+            r'<span\s+id\s*=\s*["\']' + re.escape(anchor) + r'["\']',
+            re.IGNORECASE,
+        )
+        if not span_pat.search(content):
+            issues.append(_issue(
+                "error", "timed_countdown_no_anchor",
+                f"timed/countdown passage {pid!r} prose missing "
+                f"<span id={anchor!r}> matching <<replace #{anchor!r}>>.",
+                pid,
+            ))
+    return issues
+
+
+def check_timed_delays(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """INV-5: timed delays/intervals are valid CSS time strings >= 40ms.
+
+    Validates every ``delay`` in ``timed_reveals`` (reveal mode) and every
+    ``interval`` in ``timed_config`` (countdown/recurring mode) against the
+    CSS-time regex ``^\\d+(\\.\\d+)?(s|ms)$`` and the >= 40ms floor
+    (SugarCube minimum, docs/core/macros.md). Emits a ``timed_bad_delay``
+    error for any invalid or sub-minimum value. Graph-only check (reads
+    PassageEntry fields, not file content), mirroring check_passage_types.
+    """
+    issues = []
+    css_time_re = re.compile(r'^\d+(\.\d+)?(s|ms)$')
+    for pid, entry in graph.passages.items():
+        if entry.passage_type != "timed":
+            continue
+        # Reveal mode: validate each timed_reveals delay.
+        for i, r in enumerate(entry.timed_reveals):
+            delay = r.delay.strip()
+            if not css_time_re.match(delay):
+                issues.append(_issue(
+                    "error", "timed_bad_delay",
+                    f"timed passage {pid!r} reveal[{i}] delay {delay!r} is not "
+                    f"a valid CSS time (e.g. '2s', '500ms').", pid,
+                ))
+                continue
+            if _css_time_to_ms(delay) < 40:
+                issues.append(_issue(
+                    "error", "timed_bad_delay",
+                    f"timed passage {pid!r} reveal[{i}] delay {delay!r} is "
+                    f"below the 40ms SugarCube minimum.", pid,
+                ))
+        # Countdown / recurring mode: validate timed_config.interval.
+        cfg = entry.timed_config
+        if cfg is not None and cfg.interval.strip():
+            interval = cfg.interval.strip()
+            if not css_time_re.match(interval):
+                issues.append(_issue(
+                    "error", "timed_bad_delay",
+                    f"timed passage {pid!r} interval {interval!r} is not "
+                    f"a valid CSS time (e.g. '1s', '500ms').", pid,
+                ))
+            elif _css_time_to_ms(interval) < 40:
+                issues.append(_issue(
+                    "error", "timed_bad_delay",
+                    f"timed passage {pid!r} interval {interval!r} is "
+                    f"below the 40ms SugarCube minimum.", pid,
+                ))
+    return issues
+
+
+def _css_time_to_ms(s: str) -> float:
+    """Convert a CSS time string ('2s', '500ms') to milliseconds."""
+    s = s.strip()
+    if s.endswith("ms"):
+        return float(s[:-2])
+    if s.endswith("s"):
+        return float(s[:-1]) * 1000.0
+    return float("inf")  # invalid → fails the >= 40ms floor
 
 
 # SugarCube container macros that require a matching <</name>>. Self-contained
@@ -670,6 +789,13 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_passage_types(graph),
         check_manifest_drift(p, graph),
         check_passage_file_links(p, graph),
+        # ── Timed-narrative validation (P6 INV-4 / INV-5) ─────────────────
+        # Registered after check_passage_file_links (file-scan cluster) and
+        # before check_macro_pairing. check_timed_countdown_anchor scans .tw
+        # file content (INV-4); check_timed_delays is graph-only (INV-5).
+        # INV-7 (timed_bad_mode) is already inside check_passage_types above.
+        check_timed_countdown_anchor(p, graph),
+        check_timed_delays(p, graph),
         check_macro_pairing(p, graph),
         check_deprecated_features(p, graph),
         check_capture_in_loops(p, graph),

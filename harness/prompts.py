@@ -8,14 +8,11 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 7
-# TODO(timed-narrative): bump PROMPT_VERSION (P3 §5, P1 §3.5). The SUGARCUBE_GUIDANCE
-# timed line and the TIMED section specs in build_full_passage_prompt /
-# build_json_passage_prompt change prompt wording → version must bump. Final
-# value depends on merge order with other features that also bump (macro-vocab
-# TODO below bumps to 8; timed-narrative bumps to 8 independently — P7 resolves
-# the actual final number at implementation time). Golden tests pin to this.
-# See p3_interfaces.md §5, p1_research.md §3.5.
+PROMPT_VERSION = 8
+# ── PROMPT_VERSION bump (P7, P3 §5, P1 §3.5) ──────────────────────────────
+# timed-narrative changes prompt wording (SUGARCUBE_GUIDANCE + TIMED sections).
+# macro-vocab TODO also targets 8; both features bump to 8 independently, so
+# the merged result is 8. Golden tests pin against this number.
 # TODO(macro-vocab): I12 — bump PROMPT_VERSION from 7 to 8 (P3 I12, P2 DS-4).
 # Reflects SUGARCUBE_GUIDANCE content changes (I11) and available_includes
 # parameter additions (I4/I5/I6). Golden tests pin against this number.
@@ -46,15 +43,9 @@ SugarCube link/macro syntax in CHOICES.
 <<capture>> rule: any <<link>>/<<button>>/<<timed>> inside a <<for>> loop,
 or whose <<set>> body references a loop variable, MUST be wrapped in
 <<capture $loopvar>>…<</capture>> so each iteration's click handler sees
-its own value (docs.sugarcube2-analysis.md §3.9)."""
-# TODO(timed-narrative): append one timed-macros line to SUGARCUBE_GUIDANCE,
-# BEFORE the closing triple-quote above (P3 §5, P1 §3.5/§5.5). This is the
-# shared cheat sheet (all 3 prompts), so it only gets a one-line mention;
-# the full TIMED section spec goes in build_full_passage_prompt and
-# build_json_passage_prompt only (Q5.5 resolution: compact prompt omits it).
-# Exact text to add before closing triple-quote:
-#   - Timed reveals: <<timed 2s>>...<<next>>...<</timed>>; recurring: <<repeat 5s>>...<</repeat>>.
-# See p3_interfaces.md §1 Q5.5/§5, p1_research.md §3.5/§5.5.
+its own value (docs.sugarcube2-analysis.md §3.9).
+- Timed reveals: <<timed 2s>>...<<next>>...<</timed>>; recurring: <<repeat 5s>>...<</repeat>>.
+"""  # P7 (P3 §5, P1 §3.5/§5.5)
 # TODO(achievements): I7 - append one memorize/recall scope note BEFORE the
 # closing triple-quote of SUGARCUBE_GUIDANCE above (P3 section 4 I7, P1 section 4C). Text:
 #   - memorize()/recall(): cross-playthrough data (achievements, NG+) -
@@ -291,17 +282,13 @@ BEATS:
 - A short factual event from the scene.
 - Another short factual event.
 (2-5 lines. Omit this section entirely if the scene is purely transitional.)
-# TODO(timed-narrative): append TIMED section spec to the f-string above, after
-# BEATS and before the closing triple-quote (P3 §5, P1 §3.5). The TIMED section
-# is OPTIONAL — omit entirely if the passage has no timed content. Exact text:
-#   TIMED:
-#   mode: reveal | countdown | recurring
-#   reveal:    delay | content (one block per <<timed>>/<<next>> reveal)
-#   countdown: interval | counter_var | start_value | final_content | anchor_id
-#   recurring: interval | content
-#   (omit this section entirely if the passage has no timed content)
-# See p3_interfaces.md §5, p1_research.md §3.5.
-"""
+TIMED:
+mode: reveal | countdown | recurring
+reveal:    delay | content (one block per <<timed>>/<<next>> reveal)
+countdown: interval | counter_var | start_value | final_content | anchor_id
+recurring: interval | content
+(omit this section entirely if the passage has no timed content)
+"""  # P7 (P3 §5, P1 §3.5)
 # TODO(achievements): I8 (full-mode) - when achievements_enabled is True,
 # append ACHIEVEMENTS: section header to the f-string above, after BEATS,
 # before closing triple-quote (P3 section 4 I8, P1 section 4B). Text:
@@ -383,12 +370,8 @@ Optional JSON keys (omit or empty if unused):
 - characters_present: [{{"id", "status", "knows": [...], "relationship_to_player"}}] — characters now in the scene.
 - character_status: same shape — status/knowledge updates for characters already present.
 - characters_exit: [{{"id", "last_known"}}] — characters who leave the scene.
-# TODO(timed-narrative): append timed key spec to the Optional JSON keys list
-# above, after characters_exit (P3 §5, P1 §3.5). The JSON parser is schema-driven
-# (ModelOutput.model_validate picks up the `timed` key from P2 §3.3), so this
-# is documentation-only — no parsing logic change needed. Exact text:
-#   - timed: {{"timed_mode": "reveal|countdown|recurring", "timed_reveals": [{{"delay", "content"}}], "timed_config": {{...}}}} — optional; omit or null if not a timed passage.
-# See p3_interfaces.md §4.2/§5, p2_data_structures.md §2.3/§3.3.
+- timed: {{"timed_mode": "reveal|countdown|recurring", "timed_reveals": [{{"delay", "content"}}], "timed_config": {{...}}}} — optional; omit or null if not a timed passage.
+# P7 (P3 §4.2/§5, P2 §2.3/§3.3) — timed key spec above.
 # TODO(achievements): I8 (JSON-mode) - when achievements_enabled is True,
 # append to the Optional JSON keys list above, after characters_exit (P3 section 4 I8):
 #   - achievements: [{"id": "achievement_id", "description": "one-line text"}] -

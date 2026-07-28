@@ -25,16 +25,12 @@ from .models import (
 # ── Delimited-section parser ─────────────────────────────────────────────────
 
 # Matches section headers whether the model puts content on the same line or not.
-# TODO(timed-narrative): add `|TIMED` to the _SECTION_RE alternation below
-# (P3 §4.1, P1 §3.4). TIMED is an OPTIONAL section — do NOT add it to
-# REQUIRED_SECTIONS (most passages are not timed). Exact change: append
-# `|TIMED` to the last alternation group, before the closing `)`:
-#   r'CHARACTERS_PRESENT|CHARACTERS_EXIT|CHARACTER_STATUS|SUMMARY|BEATS|TIMED)\s*:\s*',
-# See p3_interfaces.md §4.1, p1_research.md §3.4.
+# ── Timed section (P7, P3 §4.1, P1 §3.4) ───────────────────────────────────
+# TIMED is an OPTIONAL section — NOT added to REQUIRED_SECTIONS.
 _SECTION_RE = re.compile(
     r'^(PROSE|CHOICES|STATE|MEDIA|NEW_CHARACTERS|NEW_LORE|THREADS_OPEN|'
     r'THREADS_CLOSE|WORLD_STATE_ADD|WORLD_STATE_REMOVE|'
-    r'CHARACTERS_PRESENT|CHARACTERS_EXIT|CHARACTER_STATUS|SUMMARY|BEATS)\s*:\s*',
+    r'CHARACTERS_PRESENT|CHARACTERS_EXIT|CHARACTER_STATUS|SUMMARY|BEATS|TIMED)\s*:\s*',
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -373,19 +369,56 @@ def parse_model_output(raw: str) -> ModelOutput:
         if beat and beat not in ("(none)", "(none).") and not _is_template(beat):
             output.beats.append(beat)
 
-    # TODO(timed-narrative): parse the TIMED section here, after BEATS and before
-    # the fallbacks (P3 §4.1, P2 §2.3/§3.3). An inline branch in the section loop,
-    # NOT a separate _parse_timed_section helper (P3 §7 — YAGNI). Populates
-    # output.timed (Optional[TimedProposal]) from the section content: timed_mode
-    # (first line), timed_reveals (delay/content pairs), timed_config (for
-    # countdown/recurring). Absent section → output.timed stays None (default).
-    # Must import TimedProposal, TimedReveal, TimedConfig from .models.
-    # Exact code sketch:
-    #   timed_raw = sections.get("TIMED", "")
-    #   if timed_raw.strip():
-    #       from .models import TimedProposal, TimedReveal, TimedConfig
-    #       # parse timed_mode (first non-empty line), then reveal blocks or config
-    #       output.timed = TimedProposal(...)  # populate fields from section content
+    # ── TIMED (P7, P3 §4.1, P2 §2.3/§3.3) ───────────────────────────────────
+    # Inline branch (NOT a separate _parse_timed_section helper — P3 §7 YAGNI).
+    # Populates output.timed (Optional[TimedProposal]) from the section content.
+    # Absent section → output.timed stays None (the default).
+    timed_raw = sections.get("TIMED", "")
+    if timed_raw.strip():
+        from .models import TimedProposal, TimedReveal, TimedConfig
+        tlines = [ln.strip() for ln in timed_raw.splitlines() if ln.strip()]
+        mode = "reveal"
+        reveals: list[TimedReveal] = []
+        cfg: TimedConfig | None = None
+        # Parse simple "key: value" or "delay | content" lines.
+        for ln in tlines:
+            low = ln.lower()
+            if low.startswith("mode:"):
+                mode = ln.split(":", 1)[1].strip() or "reveal"
+            elif low.startswith("interval:"):
+                if cfg is None:
+                    cfg = TimedConfig()
+                cfg.interval = ln.split(":", 1)[1].strip()
+            elif low.startswith("counter_var:"):
+                if cfg is None:
+                    cfg = TimedConfig()
+                cfg.counter_var = ln.split(":", 1)[1].strip()
+            elif low.startswith("start_value:"):
+                if cfg is None:
+                    cfg = TimedConfig()
+                try:
+                    cfg.start_value = int(ln.split(":", 1)[1].strip())
+                except ValueError:
+                    pass
+            elif low.startswith("final_content:"):
+                if cfg is None:
+                    cfg = TimedConfig()
+                cfg.final_content = ln.split(":", 1)[1].strip()
+            elif low.startswith("anchor_id:"):
+                if cfg is None:
+                    cfg = TimedConfig()
+                cfg.anchor_id = ln.split(":", 1)[1].strip()
+            elif low.startswith("content:") and mode != "reveal":
+                if cfg is None:
+                    cfg = TimedConfig()
+                cfg.content = ln.split(":", 1)[1].strip()
+            elif "|" in ln and mode == "reveal":
+                # reveal block: "delay | content"
+                d, c = ln.split("|", 1)
+                reveals.append(TimedReveal(delay=d.strip(), content=c.strip()))
+        output.timed = TimedProposal(
+            timed_mode=mode, timed_reveals=reveals, timed_config=cfg,
+        )
     # See p3_interfaces.md §4.1, p2_data_structures.md §2.3/§3.3.
 
     # ── Fallbacks for small models that ignore the format ──────────────────
