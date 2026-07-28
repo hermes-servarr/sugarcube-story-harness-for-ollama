@@ -9,6 +9,9 @@ tests pin against this number.
 from __future__ import annotations
 
 PROMPT_VERSION = 7
+# TODO(macro-vocab): I12 — bump PROMPT_VERSION from 7 to 8 (P3 I12, P2 DS-4).
+# Reflects SUGARCUBE_GUIDANCE content changes (I11) and available_includes
+# parameter additions (I4/I5/I6). Golden tests pin against this number.
 
 
 # ── SugarCube 2 authoring guidance ───────────────────────────────────────────
@@ -37,6 +40,11 @@ SugarCube link/macro syntax in CHOICES.
 or whose <<set>> body references a loop variable, MUST be wrapped in
 <<capture $loopvar>>…<</capture>> so each iteration's click handler sees
 its own value (docs/sugarcube2-analysis.md §3.9)."""
+# TODO(achievements): I7 - append one memorize/recall scope note BEFORE the
+# closing triple-quote of SUGARCUBE_GUIDANCE above (P3 section 4 I7, P1 section 4C). Text:
+#   - memorize()/recall(): cross-playthrough data (achievements, NG+) -
+#     persists across restarts, not in saves.
+# Only included when achievements_enabled. See p3_interfaces.md section 4 I7.
 
 
 # ── Template style guidance (optional) ────────────────────────────────────────
@@ -150,6 +158,11 @@ def build_full_passage_prompt(
     story_recall: str = "",
     plan_focus: str = "",
     template_id: str = "",
+    # TODO(achievements): I4 - add trailing kwarg before `) -> str:` (P3 section 3 I4):
+    #   achievements_enabled: bool = False,
+    # Default False so existing callers unaffected. When True, P7 adds the
+    # ACHIEVEMENTS: section (I8 full-mode) + memorize/recall guidance note (I7).
+    # See p3_interfaces.md section 3 I4, p2_data_structures.md section 5 D5.
 ) -> str:
     """Rich prompt for larger/capable models. All optional sections enumerated."""
     focus_block = f"\n\n[PLAN FOCUS]\n{plan_focus}" if plan_focus else ""
@@ -264,6 +277,14 @@ BEATS:
 - Another short factual event.
 (2-5 lines. Omit this section entirely if the scene is purely transitional.)
 """
+# TODO(achievements): I8 (full-mode) - when achievements_enabled is True,
+# append ACHIEVEMENTS: section header to the f-string above, after BEATS,
+# before closing triple-quote (P3 section 4 I8, P1 section 4B). Text:
+#   ACHIEVEMENTS:
+#   - achievement_id | one-line description of what the player did to earn it
+#   (omit this section entirely if no achievement is earned this passage)
+# Shape maps onto ParsedAchievement {id, description} (P2 D2).
+# See p3_interfaces.md section 4 I8.
 
 
 # ── JSON-mode passage prompt ──────────────────────────────────────────────────
@@ -281,6 +302,10 @@ def build_json_passage_prompt(
     story_recall: str = "",
     plan_focus: str = "",
     template_id: str = "",
+    # TODO(achievements): I5 - add trailing kwarg before `) -> str:` (P3 section 3 I5):
+    #   achievements_enabled: bool = False,
+    # Default False so existing callers unaffected. When True, P7 adds the
+    # `achievements` JSON key (I8 JSON-mode). See p3_interfaces.md section 3 I5.
 ) -> str:
     """
     JSON-output passage prompt. Pair with Ollama `format` param so the model
@@ -333,6 +358,11 @@ Optional JSON keys (omit or empty if unused):
 - characters_present: [{{"id", "status", "knows": [...], "relationship_to_player"}}] — characters now in the scene.
 - character_status: same shape — status/knowledge updates for characters already present.
 - characters_exit: [{{"id", "last_known"}}] — characters who leave the scene.
+# TODO(achievements): I8 (JSON-mode) - when achievements_enabled is True,
+# append to the Optional JSON keys list above, after characters_exit (P3 section 4 I8):
+#   - achievements: [{"id": "achievement_id", "description": "one-line text"}] -
+#     achievements earned this passage (omit or empty if none).
+# Shape maps onto ParsedAchievement (P2 D2). See p3_interfaces.md section 4 I8.
 
 Reply with ONLY the JSON object. No prose preamble, no code fences.
 """

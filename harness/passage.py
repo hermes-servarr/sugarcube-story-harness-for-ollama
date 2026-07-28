@@ -101,6 +101,9 @@ def _format_sc_value(val) -> str:
 
 def _is_plain_choice(choice) -> bool:
     """True when a choice has no state writes, no skill check, no gating."""
+    # TODO(macro-vocab): I2 — update docstring to include "no linkreplace" and
+    # add `and not choice.linkreplace` to the return expression below (P3 I2).
+    # A linkreplace choice is NOT plain even if it has no other fields set.
     return (
         choice.skill_check is None
         and not choice.state_writes
@@ -239,7 +242,16 @@ def _render_choice_link(
       • Skill-checked navigation        → ``<<link>>`` with inline ``<<if>>``
         branching to success/fail placeholders.
       • Gated (requires/blocks)         → wrapped in outer ``<<if expr>>…<</if>>``.
+      • Linkreplace (choice.linkreplace) → ``<<linkreplace "text">>content<</linkreplace>>``
+        where content is the state-writes rendered as visible text, with
+        optional ``<<goto>>`` for navigation. Gate-wrapping and
+        ``<<capture>>`` apply identically to the linkreplace form.
     """
+    # TODO(macro-vocab): I1 — add a linkreplace dispatch branch in the body:
+    # when choice.linkreplace is True, emit <<linkreplace "text">>content<</linkreplace>>
+    # where content = state-writes rendered as visible text + optional <<goto>>
+    # (P3 I1, P1 §4 G1). Gate-wrapping (_wrap_gates) and capture (_capture_wrap)
+    # already operate on rendered strings and apply identically.
     placeholder = f"UNRESOLVED_choice{i}_{_safe_slug(choice.hint or choice.text)}"
     capture_vars = _capture_vars_for_choice(choice, loop_vars)
 
@@ -349,6 +361,15 @@ def _wrap_gates(rendered: str, choice) -> str:
     return f"<<if {expr}>>{rendered}<</if>>"
 
 
+# TODO(achievements): I2 - add _render_achievement_block(achievements: list[ParsedAchievement]) -> str
+# here, before _render_passage_tw (P3 section 2 I2). Emits one
+# <<run memorize('achievements', Object.merge(recall('achievements', {}), {<id>: true}))>>
+# line per earned ParsedAchievement. Returns "" when empty. Signature-only; P7 body.
+#   def _render_achievement_block(achievements: list[ParsedAchievement]) -> str:
+#       """Emit <<run memorize>> lines for earned achievements, or empty string."""
+# See p3_interfaces.md section 2 I2, p1_research.md section 4B/3.
+
+
 def _render_passage_tw(
     passage_id: str,
     arc_name: str,
@@ -366,6 +387,10 @@ def _render_passage_tw(
     dialogue_npc: str = "",
     loop_vars: list[str] | None = None,
     loop_collection: str = "",
+    # TODO(achievements): I3 - add trailing kwarg before `) -> str:` (P3 section 3 I3):
+    #   achievements: list[ParsedAchievement] | None = None,
+    # Default None so existing callers unaffected. P7 normalizes None to [] and calls
+    # _render_achievement_block. See p3_interfaces.md section 3 I3.
 ) -> str:
     """Render a passage to SugarCube twee source.
 
@@ -436,6 +461,16 @@ def _render_passage_tw(
         lines.append(f"<<set {var} to {_format_sc_value(val)}>>")
     if state_assigns:
         lines.append("")
+
+    # TODO(achievements): _render_passage_tw body - after state-assigns, before
+    # choices, emit achievement <<run memorize>> block (P3 section 8, P1 section 4B):
+    #   achievements = achievements or []
+    #   block = _render_achievement_block(achievements)
+    #   if block:
+    #       lines.append(block)
+    #       lines.append("")
+    # When empty/None (default), _render_achievement_block returns "" so no change.
+    # See p3_interfaces.md section 2 I2 / section 3 I3, p1_research.md section 4B/7.
 
     # ── Choices / exits / random ─────────────────────────────────────────────
     # Placeholder format: UNRESOLVED_choice<N>_<safe_hint> so _resolve_parent_link
@@ -681,6 +716,10 @@ def create_passage(
             dialogue_npc=dialogue_npc,
             loop_vars=loop_vars,
             loop_collection=loop_collection,
+            # TODO(achievements): thread achievements=output.achievements into
+            # this _render_passage_tw call (P3 section 8, I3). Add:
+            #   achievements=output.achievements,
+            # See p3_interfaces.md section 3 I3, p2_data_structures.md section 4 D4.
         )
         rendered_state_reads = scan_state_reads(tw_content)
         write_passage_file(tw_path, tw_content)

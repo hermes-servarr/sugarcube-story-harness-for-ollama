@@ -648,6 +648,16 @@ def check_delta_round_trip(graph: StoryGraph) -> list[ValidationIssue]:
     return issues
 
 
+# TODO(achievements): I6 - add check_metadata_keys(graph: StoryGraph)
+# -> list[ValidationIssue] here, before "Run all checks" (P3 section 2 I6).
+# P6 INV-A2 hook: flag memorize()/recall() keys in passages not declared in
+# graph.metadata_keys (well-known 'achievements' key always permitted).
+# Mirrors check_broken_links/check_orphan_passages/check_passage_types pattern.
+#   def check_metadata_keys(graph: StoryGraph) -> list[ValidationIssue]:
+#       """Flag memorize()/recall() keys in passages not declared in metadata_keys."""
+# Signature-only; P7 body. See p3_interfaces.md section 2 I6, p1_research.md section 5.
+
+
 # ── Run all checks ─────────────────────────────────────────────────────────────
 
 def run_validation(p: ProjectPaths) -> ValidationResult:
@@ -679,6 +689,9 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_snapshot_bloat(graph),
         check_plan_gaps(graph),
         check_delta_round_trip(graph),
+        # TODO(achievements): insert check_metadata_keys(graph) into this
+        # checks list (P3 section 8, I6). Graph-only check. When metadata_keys is
+        # empty (default), returns [] so no change. See p3_interfaces.md section 2 I6.
     ]
 
     for check_list in checks:

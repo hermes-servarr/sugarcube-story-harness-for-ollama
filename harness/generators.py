@@ -335,6 +335,10 @@ def build_prompt(
             story_recall=_trim_text(story_recall, profile.inspiration_chars),
             plan_focus=_trim_text(_collapse_ws(plan_focus), profile.arc_chars),
             template_id=getattr(cfg, "template_id", ""),
+            # TODO(achievements): thread achievements_enabled into this
+            # build_json_passage_prompt call (P3 section 8, I5). Add:
+            #   achievements_enabled=getattr(cfg, "achievements_enabled", False),
+            # See p3_interfaces.md section 3 I5, p2_data_structures.md section 5 D5.
         )
 
     if use_compact:
