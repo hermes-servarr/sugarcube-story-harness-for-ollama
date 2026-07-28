@@ -8,6 +8,13 @@ from .planning import recompute_beat_status
 from .project import ProjectPaths, load_slots, load_story
 from .passage import extract_links, scan_state_reads
 from .snapshot_delta import apply_delta
+# TODO(print-validation): P3 S4/S5 — define _parse_var_name(token: str) ->
+# VarNameSpec and _expression_context(passage_text: str, var: str, pos: int) ->
+# TypeUsageContext helper signatures here (after the P2 types block, before
+# _issue). P7 implements the bodies. Types consumed: Sigil, VarNameSpec,
+# _VAR_NAME_RE (S4); TypeUsageKind, TypeUsageContext (S5). No issues emitted
+# (pure parse/classify). Placement per P3 §3 (grouped with parse-layer
+# helpers, before the first check_*).
 
 
 def _issue(level: str, code: str, msg: str, passage: str | None = None) -> ValidationIssue:
@@ -504,6 +511,28 @@ def _reachable_unset(
     return unset
 
 
+# TODO(print-validation): P3 S1 — define check_invalid_variable_names(
+# p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue] here. P1 §4.1
+# sigil/name validity check. Iterates passages, permissive-scans for all
+# $/_-prefixed tokens (including malformed), parses each via _parse_var_name
+# (S4), flags tokens that don't match _VAR_NAME_RE. Emits invalid_var_name
+# (error, P2 C2). Consumes VarNameSpec, Sigil. Placement per P3 §2 (after
+# _reachable_unset, before check_unresolved_media, state-variable cluster).
+# TODO(print-validation): P3 S2 — define check_state_var_type_consistency(
+# p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue] immediately
+# after S1. P1 §4.2 type-vs-declared-type check. For each read of a $var with
+# a declared type in graph.state_variables, classifies the expression context
+# via _expression_context (S5), flags mismatches. Emits type_mismatch
+# (warning, P2 C2). Consumes TypeUsageContext, TypeUsageKind, StateVariable.type.
+# TODO(print-validation): P3 S3 — define check_undefined_in_compound_expr(
+# p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue] immediately
+# after S2. P1 §4.3 compound-expression + temp-var check. (1) Flags
+# undefined_compound_var (warning) for .prop/[idx] access on a scalar-typed
+# var. (2) Flags undefined_temp_var (error) for _var read without a preceding
+# <<set _var>> in the same passage (intra-passage, per P1 Q1 default).
+# Consumes VarNameSpec, Sigil, StateVariable.type.
+
+
 def check_unresolved_media(p: ProjectPaths) -> list[ValidationIssue]:
     """Resolved paths that don't exist on disk are errors."""
     issues = []
@@ -635,6 +664,16 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_deprecated_features(p, graph),
         check_capture_in_loops(p, graph),
         check_undeclared_state_vars(p, graph),
+        # TODO(print-validation): P3 S6 — register the three new
+        # state-variable checks here, after check_undeclared_state_vars(p,
+        # graph) and before check_unresolved_media(p), keeping the
+        # state-variable cluster contiguous. P3 §4 specifies:
+        #   check_invalid_variable_names(p, graph),
+        #   check_state_var_type_consistency(p, graph),
+        #   check_undefined_in_compound_expr(p, graph),
+        # The dispatch loop routes issues by issue.level automatically
+        # (no new dispatch logic): invalid_var_name + undefined_temp_var →
+        # errors; type_mismatch + undefined_compound_var → warnings (P2 C2).
         check_unresolved_media(p),
         check_pending_media(p),
         check_snapshot_bloat(graph),
