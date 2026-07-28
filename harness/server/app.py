@@ -42,6 +42,13 @@ from ..planning import (
     update_scene,
 )
 from ..models import PASSAGE_TYPES, CharacterPresent, HarnessConfig, MediaSlot, SessionState
+# TODO(timed-narrative): add TimedReveal, TimedConfig to this import (P2 §3.4,
+# P3 §5). Both are needed by CommitRequest (timed_reveals/timed_config field
+# types) and the commit endpoint (forwarding to create_passage). Exact change:
+#   from ..models import (PASSAGE_TYPES, CharacterPresent, HarnessConfig,
+#       MediaSlot, SessionState, TimedReveal, TimedConfig)
+# Optional and Field are already imported (server/app.py L7/L13). See
+# p2_data_structures.md §3.4, p3_interfaces.md §5.
 from ..generators import (
     build_prompt,
     extract_entities,
@@ -291,6 +298,11 @@ async def get_passage_types():
         "event":        "One-shot scripted scene (fires once).",
         "random_event": "Fires only if random(1,100) ≤ event_odds.",
         "ending":       "Terminal node; no choices required.",
+        # TODO(timed-narrative): add "timed" description entry here (P3 §5,
+        # P1 §3.6). The descriptions dict currently omits widget/include (minor
+        # pre-existing gap — not our scope). Exact code:
+        #   "timed":        "Time-based narrative: delayed reveals, countdowns, recurring events.",
+        # See p3_interfaces.md §5, p1_research.md §3.6.
     }
     return {"types": [{"id": t, "description": descriptions.get(t, "")} for t in PASSAGE_TYPES]}
 
@@ -958,6 +970,14 @@ class CommitRequest(BaseModel):
     event_odds: int = 100
     dialogue_npc: str = ""
     skill_branch: str = ""         # "success" | "fail" | ""
+    # TODO(timed-narrative): add three timed fields to CommitRequest here, after
+    # skill_branch (P2 §3.4, P3 §5). Mirrors PassageEntry's timed fields so the
+    # server forwards them to create_passage without translation. Exact code:
+    #   # ── timed passage type (forwarded to create_passage) ──────────────────
+    #   timed_mode: str = "reveal"
+    #   timed_reveals: list[TimedReveal] = Field(default_factory=list)
+    #   timed_config: Optional[TimedConfig] = None
+    # Optional and Field are already imported. See p2_data_structures.md §3.4.
 
 
 @app.post("/api/commit")
@@ -986,6 +1006,12 @@ async def commit(req: CommitRequest):
         event_odds=req.event_odds,
         dialogue_npc=req.dialogue_npc,
         skill_branch=req.skill_branch,
+        # TODO(timed-narrative): forward timed fields to this create_passage call
+        # (P3 §5, P2 §3.4). Exact code:
+        #   timed_mode=req.timed_mode,
+        #   timed_reveals=req.timed_reveals,
+        #   timed_config=req.timed_config,
+        # See p3_interfaces.md §5, p2_data_structures.md §3.4.
     )
 
     # write new character/lore sheets

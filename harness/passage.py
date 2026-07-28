@@ -13,6 +13,14 @@ from .models import (
     PassageEntry,
     Snapshot,
     StoryGraph,
+    # TODO(timed-narrative): add TimedReveal, TimedConfig to this import list
+    # (P3 §2.1/§3.1, P2 §2.1/§2.2). Both are new pydantic sub-models defined in
+    # models.py before PassageEntry. Needed by _render_timed_block (signature),
+    # _render_passage_tw (timed_config kwarg type), create_passage (forwarding),
+    # and _parse_meta_block (ast.literal_eval → TimedReveal/TimedConfig validation).
+    # Exact import additions:
+    #   TimedReveal,
+    #   TimedConfig,
 )
 from .project import (
     ProjectPaths,
@@ -370,6 +378,22 @@ def _wrap_gates(rendered: str, choice) -> str:
 # See p3_interfaces.md section 2 I2, p1_research.md section 4B/3.
 
 
+# TODO(timed-narrative): define _render_timed_block helper here, before
+# _render_passage_tw (P3 §2.1, P1 §6 P3). New private render helper called by
+# the `timed` elif branch of _render_passage_tw. Emits the SugarCube markup for
+# the three timed modes (reveal / countdown / recurring). Follows the
+# established helper pattern (_render_choice_link, _render_hub_links,
+# _render_actions_block). Signature only — P7 implements the body.
+# Exact code:
+#   def _render_timed_block(
+#       timed_mode: str,
+#       timed_reveals: list,          # list[TimedReveal]
+#       timed_config,                 # TimedConfig | None
+#   ) -> str:
+#       """Render the SugarCube timed block for one of the three timed modes."""
+# See p3_interfaces.md §2.1, p2_data_structures.md §2.1/§2.2.
+
+
 def _render_passage_tw(
     passage_id: str,
     arc_name: str,
@@ -387,6 +411,17 @@ def _render_passage_tw(
     dialogue_npc: str = "",
     loop_vars: list[str] | None = None,
     loop_collection: str = "",
+    # TODO(timed-narrative): add three trailing kwargs here, after loop_collection,
+    # before the achievements kwarg (P3 §3.1). All additive with defaults so
+    # existing callers are unaffected. Exact code:
+    #   # ── timed passage type ────────────────────────────────────────────────
+    #   timed_mode: str = "reveal",
+    #   timed_reveals: list | None = None,   # list[TimedReveal]
+    #   timed_config=None,                   # TimedConfig | None
+    # timed_reveals uses `list | None = None` (mirrors exits: dict | None = None);
+    # timed_config uses bare `= None` (TimedConfig is an import, not a builtin —
+    # matches the codebase convention for optional-model params in this function).
+    # See p3_interfaces.md §3.1, p2_data_structures.md §3.2.
     # TODO(achievements): I3 - add trailing kwarg before `) -> str:` (P3 section 3 I3):
     #   achievements: list[ParsedAchievement] | None = None,
     # Default None so existing callers unaffected. P7 normalizes None to [] and calls
@@ -578,6 +613,20 @@ def _render_passage_tw(
         lines.append("<</for>>")
         lines.append("")
 
+    # TODO(timed-narrative): add `elif passage_type == "timed":` branch here,
+    # after the loop elif and before the else (P3 §3.1, P1 §4). Calls
+    # _render_timed_block(timed_mode, timed_reveals or [], timed_config) and
+    # appends the result to lines. For countdown mode, the <span id="anchor">
+    # goes in the prose (already rendered above); the timed block is the
+    # <<silent>><<repeat>>...<</repeat>><</silent>> loop. For reveal mode, the
+    # block is the <<timed>>/<<next>> chain. For recurring, <<repeat>>...<</repeat>>.
+    # timed_reveals defaults to [] when None; timed_config defaults to None.
+    # See p3_interfaces.md §2.1/§3.1, p2_data_structures.md §2.1/§2.2.
+    # elif passage_type == "timed":
+    #     timed_reveals = timed_reveals or []
+    #     lines.append(_render_timed_block(timed_mode, timed_reveals, timed_config))
+    #     lines.append("")
+
     else:
         # normal / conditional / event / random_event default rendering
         for i, choice in enumerate(choices):
@@ -638,6 +687,15 @@ def create_passage(
     skill_branch: str = "",           # "success"/"fail" if parent choice was a skill check
     loop_vars: list[str] | None = None,       # <<for>> loop vars (for "loop" passage_type)
     loop_collection: str = "",                # SugarCube collection expr to iterate
+    # TODO(timed-narrative): add three trailing kwargs here, after loop_collection,
+    # mirroring _render_passage_tw's additions (P3 §3.2). Forwarded 1:1 to both
+    # _render_passage_tw (for .tw rendering) and PassageEntry (for story.json
+    # persistence). Exact code:
+    #   # ── timed passage type ────────────────────────────────────────────────
+    #   timed_mode: str = "reveal",
+    #   timed_reveals: list | None = None,   # list[TimedReveal]
+    #   timed_config=None,                   # TimedConfig | None
+    # See p3_interfaces.md §3.2, p2_data_structures.md §3.2.
 ) -> tuple[str, StoryGraph]:
     """
     Commit a model-proposed passage to disk and update story.json.
@@ -716,6 +774,13 @@ def create_passage(
             dialogue_npc=dialogue_npc,
             loop_vars=loop_vars,
             loop_collection=loop_collection,
+            # TODO(timed-narrative): thread timed kwargs into this _render_passage_tw
+            # call (P3 §3.2). Forward timed_mode, timed_reveals, timed_config from
+            # create_passage's params. Exact code:
+            #   timed_mode=timed_mode,
+            #   timed_reveals=timed_reveals,
+            #   timed_config=timed_config,
+            # See p3_interfaces.md §3.2.
             # TODO(achievements): thread achievements=output.achievements into
             # this _render_passage_tw call (P3 section 8, I3). Add:
             #   achievements=output.achievements,
@@ -744,6 +809,14 @@ def create_passage(
             exits=exits or {},
             event_odds=event_odds,
             dialogue_npc=dialogue_npc,
+            # TODO(timed-narrative): set timed fields on this PassageEntry
+            # construction (P3 §3.2, P2 §3.2). Forward timed_mode, timed_reveals,
+            # timed_config from create_passage's params. Exact code:
+            #   timed_mode=timed_mode,
+            #   timed_reveals=timed_reveals or [],
+            #   timed_config=timed_config,
+            # timed_reveals defaults to [] when None (matches PassageEntry default).
+            # See p3_interfaces.md §3.2, p2_data_structures.md §3.2.
         )
         graph.passages[passage_id] = entry
 
@@ -1065,6 +1138,33 @@ def _parse_meta_block(content: str) -> dict:
                 meta["event_odds"] = int(val)
             except ValueError:
                 pass
+        # TODO(timed-narrative): parse three new timed keys here, in the elif
+        # chain, before the else fallback (P3 §4.3, P2 §3.2). Uses the same
+        # ast.literal_eval precedent as exits (L1055-1062). Exact code:
+        #   elif key == "timed_mode":
+        #       meta["timed_mode"] = val   # plain string, like type/npc
+        #   elif key == "timed_reveals":
+        #       try:
+        #           import ast
+        #           parsed = ast.literal_eval(val)
+        #           if isinstance(parsed, list):
+        #               meta["timed_reveals"] = [
+        #                   TimedReveal(**item) if isinstance(item, dict) else item
+        #                   for item in parsed
+        #               ]
+        #       except (ValueError, SyntaxError):
+        #           pass
+        #   elif key == "timed_config":
+        #       try:
+        #           import ast
+        #           parsed = ast.literal_eval(val)
+        #           if isinstance(parsed, dict):
+        #               meta["timed_config"] = TimedConfig(**parsed)
+        #       except (ValueError, SyntaxError):
+        #           pass
+        # timed_reveals serializes as a JSON list literal; timed_config as a JSON
+        # object literal — both parsed via ast.literal_eval like exits. See
+        # p3_interfaces.md §4.3, p1_research.md §3.3.
         else:
             meta[key] = val
     return meta
@@ -1122,6 +1222,13 @@ def rebuild_story(p: ProjectPaths, *, preserve_meta: bool = True) -> tuple[Story
             exits=meta.get("exits", {}),
             event_odds=meta.get("event_odds", 100),
             dialogue_npc=meta.get("npc", ""),
+            # TODO(timed-narrative): pass timed fields to this PassageEntry
+            # construction (P3 §4.4, P2 §3.2). Mirrors exits=meta.get("exits", {})
+            # and dialogue_npc=meta.get("npc", ""). Exact code:
+            #   timed_mode=meta.get("timed_mode", "reveal"),
+            #   timed_reveals=meta.get("timed_reveals", []),
+            #   timed_config=meta.get("timed_config", None),
+            # See p3_interfaces.md §4.4, p1_research.md §3.3.
         )
 
         if preserve_meta and pid in old.passages:
