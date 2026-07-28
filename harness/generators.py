@@ -369,6 +369,10 @@ def build_prompt(
         story_recall=story_recall,
         plan_focus=plan_focus,
         template_id=getattr(cfg, "template_id", ""),
+        # TODO(achievements): thread achievements_enabled into this
+        # build_full_passage_prompt call (P3 section 8, I4). Add:
+        #   achievements_enabled=getattr(cfg, "achievements_enabled", False),
+        # See p3_interfaces.md section 3 I4, p2_data_structures.md section 5 D5.
     )
 
 
