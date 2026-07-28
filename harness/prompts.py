@@ -39,18 +39,16 @@ SugarCube link/macro syntax in CHOICES.
 <<capture>> rule: any <<link>>/<<button>>/<<timed>> inside a <<for>> loop,
 or whose <<set>> body references a loop variable, MUST be wrapped in
 <<capture $loopvar>>…<</capture>> so each iteration's click handler sees
-its own value (docs/sugarcube2-analysis.md §3.9)."""
-# TODO(input-macros): append input-macro note BEFORE the closing triple-quote of
-# SUGARCUBE_GUIDANCE above (P3 §4.1). Text to add inside the string (P7):
-# Input macros (for form passages) use QUOTED variable names:
-# - <<textbox "$name" "default">>  <<numberbox "$age" 18>>  <<textarea "$bio" "">>
-# - <<checkbox "$flag" "off" "on">>  <<radiobutton "$g" "F">>  <<radiobutton "$g" "M">>
-# - <<listbox "$x">><<option "A">><<option "B">><</listbox>>
-# - <<cycle "$y">><<option "A">><<option "B">><</cycle>>
-# The quotes pass the NAME, not the value — SugarCube writes to $var as the
-# player interacts. Emit inputs in the INPUT section: `kind | $var | default | label`.
-# Only the appended note block changes; no other guidance text. PROMPT_VERSION
-# (L11) bumps in P7. See p3_interfaces.md §4.1, p1_research.md §3.4.
+its own value (docs/sugarcube2-analysis.md §3.9).
+
+Input macros (for form passages) use QUOTED variable names:
+- <<textbox "$name" "default">>  <<numberbox "$age" 18>>  <<textarea "$bio" "">>
+- <<checkbox "$flag" "off" "on">>  <<radiobutton "$g" "F">>  <<radiobutton "$g" "M">>
+- <<listbox "$x">><<option "A">><<option "B">><</listbox>>
+- <<cycle "$y">><<option "A">><<option "B">><</cycle>>
+The quotes pass the NAME, not the value — SugarCube writes to $var as the
+player interacts. Emit inputs in the INPUT section: `kind | $var | default | label`.
+"""
 # TODO(achievements): I7 - append one memorize/recall scope note BEFORE the
 # closing triple-quote of SUGARCUBE_GUIDANCE above (P3 section 4 I7, P1 section 4C). Text:
 #   - memorize()/recall(): cross-playthrough data (achievements, NG+) -
@@ -106,15 +104,6 @@ def build_compact_passage_prompt(
     focus_block = f"\n\nPLAN FOCUS:\n{plan_focus}" if plan_focus else ""
     direction = human_prompt or "(continue the story)"
 
-    # TODO(input-macros): add an INPUT: section block to the f-string below,
-    # between the CHOICES: block and the SUMMARY: block (P3 §4.2). Text (P7):
-    #   INPUT:
-    #   - kind | $var | default | label
-    #   - textbox | $name | "" | Player name
-    #   - radiobutton | $mc.gender | F | Gender
-    #   - radiobutton | $mc.gender | M | Gender
-    #   (omit this section entirely if this passage collects no input)
-    # Body change only; signature unchanged. See p3_interfaces.md §4.2.
     return f"""Continue this interactive story. Write the next scene only.
 
 PREMISE: {premise}
@@ -143,6 +132,13 @@ can also include inner monologue of the protagonist. No choices here.
 CHOICES:
 - choice text | short hint
 - choice text | short hint
+
+INPUT:
+- kind | $var | default | label
+- textbox | $name | "" | Player name
+- radiobutton | $mc.gender | F | Gender
+- radiobutton | $mc.gender | M | Gender
+(omit this section entirely if this passage collects no input)
 
 SUMMARY:
 One sentence.
@@ -187,24 +183,6 @@ def build_full_passage_prompt(
     """Rich prompt for larger/capable models. All optional sections enumerated."""
     focus_block = f"\n\n[PLAN FOCUS]\n{plan_focus}" if plan_focus else ""
     tpl_block = _template_block(template_id)
-    # TODO(input-macros): add an INPUT: section block to the f-string below,
-    # between the CHOICES: block (~L233) and the STATE: block (~L237) (P3 §4.3).
-    # Text (P7):
-    #   INPUT:
-    #   - kind | $var | default | label
-    #   - textbox | $name | "" | Player name
-    #   - numberbox | $age | 18 | Age
-    #   - checkbox | $hardcore | "off" | "on" | Hardcore mode
-    #   - radiobutton | $mc.gender | F | Gender
-    #   - radiobutton | $mc.gender | M | Gender
-    #   - listbox | $class | | Class
-    #     - option | Fighter
-    #     - option | Mage
-    #   - cycle | $tone | | Tone
-    #     - option | Serious
-    #     - option | Playful
-    #   (omit this section entirely if this passage collects no input)
-    # Body change only; signature unchanged. See p3_interfaces.md §4.3.
     return f"""SYSTEM:
 You are co-authoring interactive fiction with a human.
 The harness handles file structure, passage linking, and state management.
@@ -261,6 +239,21 @@ can also include inner monologue of the protagonist.
 CHOICES:
 - First choice text | hint about where this leads
 - Second choice text | hint about where this leads
+
+INPUT:
+- kind | $var | default | label
+- textbox | $name | "" | Player name
+- numberbox | $age | 18 | Age
+- checkbox | $hardcore | "off" | "on" | Hardcore mode
+- radiobutton | $mc.gender | F | Gender
+- radiobutton | $mc.gender | M | Gender
+- listbox | $class | | Class
+  - option | Fighter
+  - option | Mage
+- cycle | $tone | | Tone
+  - option | Serious
+  - option | Playful
+(omit this section entirely if this passage collects no input)
 
 STATE:
 $variable_name = value
@@ -396,6 +389,7 @@ Optional JSON keys (omit or empty if unused):
 - characters_present: [{{"id", "status", "knows": [...], "relationship_to_player"}}] — characters now in the scene.
 - character_status: same shape — status/knowledge updates for characters already present.
 - characters_exit: [{{"id", "last_known"}}] — characters who leave the scene.
+- inputs: [{{"kind": "textbox|numberbox|textarea|checkbox|radiobutton|listbox|cycle", "var": "$name", "label": "...", "default": "...", "options": [{{"label", "value", "selected"}}], "autofocus": bool, ...}}] — form input fields. Omit or empty if not a form passage.
 # TODO(achievements): I8 (JSON-mode) - when achievements_enabled is True,
 # append to the Optional JSON keys list above, after characters_exit (P3 section 4 I8):
 #   - achievements: [{"id": "achievement_id", "description": "one-line text"}] -
@@ -404,13 +398,6 @@ Optional JSON keys (omit or empty if unused):
 
 Reply with ONLY the JSON object. No prose preamble, no code fences.
 """
-# TODO(input-macros): add an `inputs` key to the Optional JSON keys list in the
-# f-string above, after characters_exit and before the closing triple-quote
-# (P3 §4.4). Text to add inside the string (P7):
-#   - inputs: [{"kind": "textbox|numberbox|textarea|checkbox|radiobutton|listbox|cycle", "var": "$name", "label": "...", "default": "...", "options": [{"label", "value", "selected"}], "autofocus": bool, ...}] — form input fields. Omit or empty if not a form passage.
-# Body change only; signature unchanged. The P2 schema addition (ModelOutput.inputs
-# with default_factory=list) means parse_model_output_json needs no code change.
-# See p3_interfaces.md §4.4, p2_data_structures.md §6.
 
 
 def build_beats_prompt(

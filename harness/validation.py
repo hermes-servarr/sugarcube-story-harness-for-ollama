@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .models import PASSAGE_TYPES, StoryGraph, Snapshot, ValidationIssue, ValidationResult
+from .models import INPUT_MACRO_KINDS, PASSAGE_TYPES, StoryGraph, Snapshot, ValidationIssue, ValidationResult
 from .planning import recompute_beat_status
 from .project import ProjectPaths, load_slots, load_story
-from .passage import extract_links, scan_state_reads
+from .passage import extract_links, scan_state_reads, scan_state_writes
 from .snapshot_delta import apply_delta
 # TODO(print-validation): P3 S4/S5 — define _parse_var_name(token: str) ->
 # VarNameSpec and _expression_context(passage_text: str, var: str, pos: int) ->
@@ -91,17 +91,11 @@ def check_passage_types(graph: StoryGraph) -> list[ValidationIssue]:
                 "warning", "ending_has_children",
                 f"Ending passage {pid!r} has {len(entry.children)} children (ending is terminal).", pid,
             ))
-        # TODO(input-macros): add `if t == "form" and not entry.children:` block
-        # here, after the ending block (P3 §5.2). Mirrors the ending block pattern
-        # (reads PassageEntry only, no .tw file content). Body (P7):
-        #   if t == "form" and not entry.children:
-        #       issues.append(_issue(
-        #           "error", "form_no_submit",
-        #           f"Form passage {pid!r} has no submit target (no children).", pid,
-        #       ))
-        # The submit-choice count is readable from entry.children. The >=1 input
-        # field check lives in check_form_fields (separate, reads .tw content).
-        # See p3_interfaces.md §5.2, p1_research.md §3.6.
+        if t == "form" and not entry.children:
+            issues.append(_issue(
+                "error", "form_no_submit",
+                f"Form passage {pid!r} has no submit target (no children).", pid,
+            ))
     return issues
 
 
@@ -193,14 +187,7 @@ MACRO_CONTAINERS: frozenset[str] = frozenset({
     "linkappend", "linkprepend", "linkreplace",
     "timed", "repeat", "type", "createplaylist", "createaudiogroup",
     "do", "script", "done",
-    # TODO(input-macros): add "listbox" and "cycle" here (P3 §5.3, P2 §7). Both
-    # are container macros requiring closing tags (<<listbox>>…<</listbox>>,
-    # <<cycle>>…<</cycle>>) with <<option>> children. Fixes the doc error in
-    # P1 §2.4 (the analysis doc wrongly called them self-closing). Adding them
-    # makes the existing check_macro_pairing logic validate their nesting
-    # automatically (no logic change — it already iterates this set). Exact code:
-    #   "listbox", "cycle",   # input-macro containers (P1 §2.4 doc fix)
-    # See p3_interfaces.md §5.3, p2_data_structures.md §7, p1_research.md §2.4.
+    "listbox", "cycle",   # input-macro containers (P1 §2.4 doc fix)
 })
 
 _MACRO_NAME_RE = re.compile(r'(/?)\s*([A-Za-z][\w-]*)')
@@ -454,15 +441,28 @@ def check_capture_in_loops(p: ProjectPaths, graph: StoryGraph) -> list[Validatio
     return issues
 
 
-# TODO(input-macros): define check_form_fields(p: ProjectPaths, graph: StoryGraph)
-# -> list[ValidationIssue] here, before check_undeclared_state_vars (P3 §5.1).
-# Reads .tw files (like check_passage_file_links/check_macro_pairing) so it takes
-# (p, graph). Validates form passages have >=1 input field (re-parses input macros
-# from the rendered .tw content or re-reads entry inputs) and >=1 submit choice.
-# Uses _issue(...) like every other check. Signature only; P7 body.
-#   def check_form_fields(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
-#       """Validate form passages have >=1 input field and a submit choice."""
-# See p3_interfaces.md §5.1 (corrected signature takes (p, graph)), p1_research.md §3.6.
+def check_form_fields(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """Validate form passages have >=1 input field and a submit choice."""
+    issues = []
+    for pid, entry in graph.passages.items():
+        if entry.passage_type != "form":
+            continue
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # Count input macros rendered in the .tw file
+        input_count = 0
+        for kind in INPUT_MACRO_KINDS:
+            input_count += len(re.findall(
+                r'<<' + kind + r'\s+"\$', content,
+            ))
+        if input_count == 0:
+            issues.append(_issue(
+                "error", "form_no_fields",
+                f"Form passage {pid!r} has no input fields in its .tw file.", pid,
+            ))
+    return issues
 
 
 def check_undeclared_state_vars(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
@@ -480,13 +480,13 @@ def check_undeclared_state_vars(p: ProjectPaths, graph: StoryGraph) -> list[Vali
     writers: dict[str, set[str]] = {
         pid: set(e.state_writes) for pid, e in graph.passages.items()
     }
-    # TODO(input-macros): the writers dict above must also include input-macro
-    # target variables (from scan_state_writes once it recognizes input macros —
-    # P3 §6.1) so form field targets count as declared-by-write rather than
-    # undeclared-by-read (P3 §5.4, P1 §2.7). The exact body change: re-scan each
-    # passage .tw with the updated scan_state_writes and merge input-macro target
-    # vars into writers[pid]. Signature unchanged. Depends on the
-    # scan_state_writes / scan_state_reads changes in passage.py (§6). P7 detail.
+    # Also re-scan .tw files with the updated scan_state_writes so input-macro
+    # target vars are included as writers (P3 §5.4, P1 §2.7).
+    for pid, entry in graph.passages.items():
+        path = p.root / entry.file
+        if path.exists():
+            extra_writes = scan_state_writes(path.read_text(encoding="utf-8"))
+            writers[pid].update(extra_writes)
 
     # Collect reads per passage once (one file read each).
     reads_by_passage: dict[str, set[str]] = {}
@@ -711,14 +711,7 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_deprecated_features(p, graph),
         check_capture_in_loops(p, graph),
         check_undeclared_state_vars(p, graph),
-        # TODO(input-macros): register check_form_fields(p, graph) in this checks
-        # list here, after check_undeclared_state_vars and before
-        # check_unresolved_media (P3 §5.5). Takes (p, graph) because it reads .tw
-        # files like check_passage_file_links/check_macro_pairing. Exact line:
-        #   check_form_fields(p, graph),       # NEW (form: >=1 input + submit)
-        # One-line list append; function structure unchanged. Dispatch loop routes
-        # issues by level automatically (no new dispatch logic).
-        # See p3_interfaces.md §5.5.
+        check_form_fields(p, graph),       # NEW (form: >=1 input + submit)
         # TODO(print-validation): P3 S6 — register the three new
         # state-variable checks here, after check_undeclared_state_vars(p,
         # graph) and before check_unresolved_media(p), keeping the

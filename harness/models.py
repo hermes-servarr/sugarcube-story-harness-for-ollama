@@ -12,10 +12,19 @@ from pydantic import BaseModel, Field
 # Space-Tech's <<widget "statsformat">>, Title Page's <<include "Menu
 # Elements">>). See examples/html_templates/TEMPLATE_VERIFICATION_REPORT.md
 # §2.3 and docs/sugarcube2-analysis.md §3.7-3.8.
-# TODO(input-macros): define INPUT_MACRO_KINDS tuple here (7 elements: textbox,
-# numberbox, textarea, checkbox, radiobutton, listbox, cycle) — the closed set
-# of input macros the "form" passage type renders (P2 §2). Place just above
-# PASSAGE_TYPES so the two closed-set tuples sit together. Type: tuple[str, ...].
+# The 7 SugarCube input macros the "form" passage type can render.
+# Each writes to a quoted target variable in real time as the player
+# interacts; by submit time the variables are already set in story state.
+# Source: docs/core/macros.md (P1 §2.3). No invented macros.
+INPUT_MACRO_KINDS = (
+    "textbox",      # <<textbox "$var" "default" [passage] [autofocus]>>
+    "numberbox",    # <<numberbox "$var" default [passage] [autofocus]>>
+    "textarea",     # <<textarea "$var" "default" [autofocus]>>
+    "checkbox",     # <<checkbox "$var" uncheckedValue checkedValue [autocheck|checked]>>
+    "radiobutton",  # <<radiobutton "$var" checkedValue [autocheck|checked]>>
+    "listbox",      # <<listbox "$var" [autoselect]>><<option>>…<</listbox>>  (container)
+    "cycle",        # <<cycle "$var" [once] [autoselect]>><<option>>…<</cycle>>  (container)
+)
 PASSAGE_TYPES = (
     "normal",         # plain choice node
     "hub",            # central node players return to
@@ -30,10 +39,7 @@ PASSAGE_TYPES = (
                       # reading a loop var wrapped in <<capture $v>> (§3.9)
     "widget",         # widget definition passage (tagged [widget]); not navigated to
     "include",        # shared-content passage meant to be <<include>>d, not navigated to
-    # TODO(input-macros): append "form" as a passage type here, after
-    # "include" (P2 §3). Form passages render SugarCube input macros + a
-    # submit <<link>>; navigable like normal/hub (P1 §3.1). Exact code:
-    #   "form",  # collects player input via <<textbox>>/<<checkbox>>/... + submit <<link>>
+    "form",           # collects player input via <<textbox>>/<<checkbox>>/... + submit <<link>>
     # TODO(timed-narrative): append "timed" entry to PASSAGE_TYPES here, after
     # "include" (P2 §3.1, P1 §4). Exact code:
     #   "timed",          # time-based narrative: delayed reveals / countdowns / recurring events (<<timed>>/<<repeat>>)
@@ -493,21 +499,41 @@ class SessionState(BaseModel):
 
 # ── Parsed model output ────────────────────────────────────────────────────────
 
-# TODO(input-macros): define ParsedInputOption(BaseModel) here, directly before
-# ParsedInputField (which references it) and before ParsedChoice. 3 fields:
-#   label: str   (required, visible option text)
-#   value: str = ""   (stored value; empty = use label)
-#   selected: bool = False   (pre-select keyword)
-# Represents one <<option>> child of <<listbox>>/<<cycle>> (P2 §4). For
-# radiobutton, each radio is its own ParsedInputField (Q4) — no options list.
+class ParsedInputOption(BaseModel):
+    """One <<option>> child inside a <<listbox>> or <<cycle>> container.
 
-# TODO(input-macros): define ParsedInputField(BaseModel) here, directly after
-# ParsedInputOption, before ParsedChoice. 12 fields (P2 §5): kind, var, label,
-# default, unchecked_value, checked_value, options (list[ParsedInputOption]),
-# autofocus, autocheck, checked, once, autoselect. Flat structure matching
-# ParsedChoice's flat-with-optionals convention; parser fills only the
-# relevant fields per kind. var keeps the $ prefix (e.g. "$name", "$mc.gender").
-# No methods, no logic (P2 contract).
+    SugarCube syntax: <<option label [value [selected]]>>.
+    When ``value`` is omitted SugarCube uses ``label`` as the value.
+    """
+    label: str                        # visible option text
+    value: str = ""                   # stored value; defaults to label when empty
+    selected: bool = False            # pre-select this option (SugarCube `selected` keyword)
+
+
+class ParsedInputField(BaseModel):
+    """One SugarCube input macro to render in a form passage.
+
+    ``kind`` selects the macro; only the fields relevant to that kind
+    are populated (others stay default). See INPUT_MACRO_KINDS for the
+    7 supported macros and their exact SugarCube syntax.
+    """
+    kind: str                         # one of INPUT_MACRO_KINDS
+    var: str                           # quoted target variable, e.g. "$name", "$mc.gender"
+    label: str = ""                   # visible prompt/label shown before the macro
+    # ── textbox / numberbox / textarea ─────────────────────────────────────
+    default: Any = None               # default value (str for textbox/textarea, num for numberbox)
+    # ── checkbox / radiobutton ────────────────────────────────────────────
+    unchecked_value: str = ""         # checkbox: value when unchecked
+    checked_value: str = ""           # checkbox/radiobutton: value when checked/selected
+    # ── listbox / cycle ───────────────────────────────────────────────────
+    options: list[ParsedInputOption] = Field(default_factory=list)
+    # ── keyword flags (all default off) ────────────────────────────────────
+    autofocus: bool = False            # textbox/numberbox/textarea
+    autocheck: bool = False           # checkbox/radiobutton
+    checked: bool = False             # checkbox/radiobutton: pre-checked
+    once: bool = False                # cycle: each option selectable only once
+    autoselect: bool = False          # listbox/cycle: auto-select first option
+
 
 class ParsedChoice(BaseModel):
     text: str
@@ -583,11 +609,7 @@ class ModelOutput(BaseModel):
     choices: list[ParsedChoice] = Field(default_factory=list)
     state: dict[str, Any] = Field(default_factory=dict)
     media: list[ParsedMediaSlot] = Field(default_factory=list)
-    # TODO(input-macros): add `inputs: list[ParsedInputField] =
-    # Field(default_factory=list)` here, after `media` and before
-    # `new_characters` (P2 §6). Groups the "what the passage renders" sections
-    # (prose, choices, state, media, inputs) in rendering order. Empty list =
-    # not a form passage (or a form with no fields, which P6 flags as error).
+    inputs: list[ParsedInputField] = Field(default_factory=list)  # form: input macros + their target vars
     new_characters: list[ParsedCharacter] = Field(default_factory=list)
     new_lore: list[ParsedLore] = Field(default_factory=list)
     threads_open: list[str] = Field(default_factory=list)
