@@ -12,6 +12,10 @@ from pydantic import BaseModel, Field
 # Space-Tech's <<widget "statsformat">>, Title Page's <<include "Menu
 # Elements">>). See examples/html_templates/TEMPLATE_VERIFICATION_REPORT.md
 # §2.3 and docs/sugarcube2-analysis.md §3.7-3.8.
+# TODO(input-macros): define INPUT_MACRO_KINDS tuple here (7 elements: textbox,
+# numberbox, textarea, checkbox, radiobutton, listbox, cycle) — the closed set
+# of input macros the "form" passage type renders (P2 §2). Place just above
+# PASSAGE_TYPES so the two closed-set tuples sit together. Type: tuple[str, ...].
 PASSAGE_TYPES = (
     "normal",         # plain choice node
     "hub",            # central node players return to
@@ -26,7 +30,30 @@ PASSAGE_TYPES = (
                       # reading a loop var wrapped in <<capture $v>> (§3.9)
     "widget",         # widget definition passage (tagged [widget]); not navigated to
     "include",        # shared-content passage meant to be <<include>>d, not navigated to
+    # TODO(input-macros): append "form" as a passage type here, after
+    # "include" (P2 §3). Form passages render SugarCube input macros + a
+    # submit <<link>>; navigable like normal/hub (P1 §3.1). Exact code:
+    #   "form",  # collects player input via <<textbox>>/<<checkbox>>/... + submit <<link>>
+    # TODO(timed-narrative): append "timed" entry to PASSAGE_TYPES here, after
+    # "include" (P2 §3.1, P1 §4). Exact code:
+    #   "timed",          # time-based narrative: delayed reveals / countdowns / recurring events (<<timed>>/<<repeat>>)
+    # Purely additive; no reordering. Existing type indices are stable. All timed
+    # fields on PassageEntry default empty/None so a non-timed passage is unaffected.
+    # See p2_data_structures.md §3.1, p3_interfaces.md §5.
 )
+
+# TODO(story-interface): define STORY_INTERFACE_LAYOUTS tuple here, after
+# PASSAGE_TYPES (P2 D1, P1 3.1). Mirrors the PASSAGE_TYPES tuple convention.
+# Metadata-only constant enumerating valid layout preset ids; the HTML bodies
+# each id resolves to are P7 module constants (logic/assets), NOT P2 data.
+# Exact code:
+#   STORY_INTERFACE_LAYOUTS = (
+#       "vn",          # visual-novel: header + #passages + portrait panel
+#       "rpg_stats",   # RPG: #passages + persistent stats side panel
+#       "minimal",     # bare <div id="passages"></div> — SugarCube minimum
+#       "custom",      # author-supplied raw HTML in StoryInterfaceConfig.html
+#   )
+# See p2_data_structures.md D1, p1_research.md 3.1.
 
 
 class SkillCheck(BaseModel):
@@ -102,6 +129,38 @@ class SnapshotDelta(BaseModel):
     open_threads: ListSectionDelta = Field(default_factory=ListSectionDelta)
 
 
+# TODO(timed-narrative): define TimedReveal(BaseModel) and TimedConfig(BaseModel)
+# here, BEFORE class PassageEntry (after SnapshotDelta), so the sub-models are
+# defined before the model that references them (P2 §2.1, §2.2, P2 §5 placement).
+# Both are pure field-bags — no methods, no validators (P2 is strict: schemas only).
+# Exact code:
+#   class TimedReveal(BaseModel):
+#       """One block in a delayed-reveal chain (<<timed>>/<<next>> sequence).
+#
+#       `delay` is a CSS time string per SugarCube ("2s", "500ms"); minimum 40ms
+#       enforced as a P6 invariant, not here. `content` is the SugarCube markup
+#       block shown when the delay elapses.
+#       """
+#       delay: str            # CSS time, e.g. "2s", "500ms"
+#       content: str          # SugarCube markup revealed when this block fires
+#
+#   class TimedConfig(BaseModel):
+#       """Configuration for countdown and recurring timed modes.
+#
+#       - `reveal` mode ignores this (uses `timed_reveals` list instead).
+#       - `countdown` mode uses interval, counter_var, start_value, final_content, anchor_id.
+#       - `recurring` mode uses only interval and content.
+#       Fields not relevant to the active mode are left at their defaults.
+#       """
+#       interval: str = ""            # CSS time for the <<repeat>> loop
+#       counter_var: str = ""         # countdown: SugarCube variable name
+#       start_value: int = 0          # countdown: starting counter value
+#       final_content: str = ""       # countdown: content shown when counter reaches 0
+#       anchor_id: str = ""           # countdown: DOM id for <<replace "#anchor_id">>
+#       content: str = ""             # recurring: SugarCube markup executed each interval
+# See p2_data_structures.md §2.1/§2.2, p3_interfaces.md §2.1.
+
+
 class PassageEntry(BaseModel):
     file: str
     arc: str
@@ -123,6 +182,30 @@ class PassageEntry(BaseModel):
     exits: dict[str, str] = Field(default_factory=dict)   # room: {"north": pid, ...}
     event_odds: int = 100                  # random_event: 1-100 trigger %
     dialogue_npc: str = ""                 # dialogue: character id
+    # TODO(passage-tags): PassageEntry — add field after dialogue_npc, closing
+    # the type-specific fields block (P2 §2). Exact:
+    #   tags: list[str] = Field(default_factory=list)
+    # Sanitized mood tags for this passage (e.g. ["tense", "rainy"]). Rendered
+    # into the Twee header after the arc and type tags. Holds ONLY mood tags —
+    # never the structural `arc` or `passage_type` values, and never `nobr`
+    # (nobr is config-derived, see HarnessConfig). After rebuild_story this list
+    # round-trips exactly the mood tags that were in the original header. See
+    # p2_data_structures.md §2, p3_interfaces.md §S4 (rebuild_story tag round-trip).
+    # TODO(timed-narrative): add three timed fields here, after dialogue_npc,
+    # following the "flat optional field, default empty/None" convention (P2 §3.2).
+    # Exact code:
+    #   # ── timed passage type ────────────────────────────────────────────────
+    #   # Models the three §3.11 time-based behaviors via a timed_mode discriminator:
+    #   #   reveal    -> timed_reveals list renders a <<timed>>/<<next>> chain
+    #   #   countdown -> timed_config renders a <<repeat>>/<<stop>> loop + <<replace>>
+    #   #   recurring -> timed_config renders a <<repeat>> loop (no stop)
+    #   # All default empty/None so a normal passage is unaffected.
+    #   timed_mode: str = "reveal"                                     # "reveal" | "countdown" | "recurring"
+    #   timed_reveals: list[TimedReveal] = Field(default_factory=list)  # reveal mode
+    #   timed_config: Optional[TimedConfig] = None                      # countdown/recurring; None for reveal
+    # Optional and Field are already imported (models.py L3-4). Appended at the
+    # end of the type-specific block — no existing field touched. See
+    # p2_data_structures.md §3.2, p3_interfaces.md §3.1.
 
 
 class StateVariable(BaseModel):
@@ -131,10 +214,42 @@ class StateVariable(BaseModel):
     declared_in: str = ""
 
 
+# TODO(settings-api): S1 — define SettingDef(BaseModel) here, between StateVariable
+# and BranchEntry (P2 §"Change 1"). 9 fields: name: str, kind: str, label: str,
+# desc: str = "", default: Any = None, list: list[str] = Field(default_factory=list),
+# min: float = 0, max: float = 100, step: float = 1. Pure schema, no methods (P2 is
+# strict: no to_js, no validators, no __init__); the "list"|"range"|"toggle" literal
+# union for `kind` is documented in the docstring and enforced as a P6 invariant,
+# not a model constraint (matches codebase convention — passage_type/StateVariable.type
+# are bare str). Analogous to StateVariable: a declared default that becomes a runtime
+# value (settings.<name>). See p2_data_structures.md §"Change 1", p3_interfaces.md §1.
+# class SettingDef(BaseModel): ...
+
+
 class BranchEntry(BaseModel):
     head: str
     diverges_at: Optional[str] = None
 
+
+# TODO(achievements): D1 — add MetadataKey(BaseModel) here, after BranchEntry and
+# before StoryGraph, so the registry entry model is defined before the graph that
+# references it (P2 §2 D1; matches StateVariable-before-StoryGraph ordering).
+# Pure data, no methods. Exact code:
+#   class MetadataKey(BaseModel):
+#       """Declarative registry entry for a SugarCube metadata-store key.
+#
+#       The metadata store (memorize/recall/forget) persists across browser
+#       restarts but is NOT part of saves — ideal for achievements, playthrough
+#       stats, and NG+ flags. Each MetadataKey tells the StoryInit generator
+#       to emit a hydration line that reads (never writes) the store on startup,
+#       defaulting to `default` when the key is absent.
+#       """
+#       id: str                         # store key name, e.g. "achievements", "ngplus"
+#       default: Any                    # hydration default: {} for maps, false for flags, 0 for counters
+#       description: str = ""           # optional human-readable note
+# `id` and `default` are required (no pydantic default); `description` defaults "".
+# `default: Any` (not str/int/bool) because metadata values are heterogeneous —
+# mirrors StateVariable.default: Any. See p2_data_structures.md §2 D1.
 
 # ── Planning: connect overarching story (beats) ⇄ arcs ⇄ passages ──────────────
 
@@ -175,6 +290,25 @@ class StoryPlan(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
+class TextTemplate(BaseModel):
+    """One SugarCube ``Template.add()`` registration — a named text template
+    expandable in passage prose as ``?name``.
+
+    The ``definition`` list holds one or more string bodies.  A single-element
+    list is SugarCube's plain-string form (always expands to that string); a
+    multi-element list is SugarCube's "pick one member at random per reference"
+    array form.  Function-template definitions are deferred (see P1 D2 / OQ-2).
+
+    The ``name`` field MUST match ``^[A-Za-z][A-Za-z0-9_-]*$`` (basic Latin,
+    start with a letter, then letters/digits/underscore/hyphen) per the
+    SugarCube Template API spec (docs/api/api-template.md).  This rule is NOT
+    enforced here — it is an invariant (P6, INV-T2) checked at add-time and
+    validation.
+    """
+    name: str                 # template name; SugarCube name rule enforced in P6
+    definition: list[str]     # one or more expansion strings; >=2 elements = random pick
+
+
 class StoryGraph(BaseModel):
     version: int = 1
     start_passage: str = ""
@@ -183,6 +317,27 @@ class StoryGraph(BaseModel):
     branches: dict[str, BranchEntry] = Field(default_factory=dict)
     plan: StoryPlan = Field(default_factory=StoryPlan)
     arcs: dict[str, ArcPlan] = Field(default_factory=dict)  # keyed by arc name
+    # ── SugarCube Template API registrations (per-story) ───────────────────
+    # Named ``?name`` text templates registered via ``Template.add()`` and
+    # emitted as ``<<run Template.add(...)>>`` lines in StoryInit at compile
+    # time. Per-story (story.json), not per-project (config.yaml) — see P1
+    # OQ-1. Empty list = no templates (default; greenfield-safe).
+    text_templates: list[TextTemplate] = Field(default_factory=list)
+    # TODO(achievements): D3 — add metadata_keys field here, after arcs.
+    # A list (not dict) so StoryInit emission order is deterministic; the `id`
+    # is an explicit field on MetadataKey. Default empty → zero regression.
+    # Exact code:
+    #   metadata_keys: list[MetadataKey] = Field(default_factory=list)
+    # See p2_data_structures.md §3 D3, p1_research.md §4A.
+    # TODO(settings-api): S2 — add settings_defs field here, after arcs. A list
+    # (not dict) because settings display in declaration order and name uniqueness
+    # is a P6 invariant, not a structural constraint (matches Beats = list[Beat]).
+    # Default empty → every existing story.json loads with [] → no StorySettings
+    # passage emitted → zero regression (P2 §"Change 2", §"Backward Compatibility").
+    # Exact code:
+    #   settings_defs: list[SettingDef] = Field(default_factory=list)
+    # Per-story in story.json (NOT HarnessConfig — settings vary per story, P1 §52).
+    # See p2_data_structures.md §"Change 2", p3_interfaces.md §1/§2.
 
 
 class MediaSlot(BaseModel):
@@ -214,6 +369,22 @@ class MediaSlot(BaseModel):
 
 class MediaSlots(BaseModel):
     slots: dict[str, MediaSlot] = Field(default_factory=dict)
+
+
+# TODO(story-interface): define StoryInterfaceConfig(BaseModel) here, between
+# MediaSlots and HarnessConfig (P2 D2, P1 3.1). Pydantic needs the class
+# defined before the HarnessConfig field annotation that references it,
+# matching the existing SkillCheck->ParsedChoice / MediaSlot->MediaSlots forward-
+# reference ordering. Pure schema — 2 fields, docstrings only, NO methods,
+# NO validators (those are P3/P7). Optional and BaseModel/Field are
+# already imported (line 3/4). Exact code:
+#   class StoryInterfaceConfig(BaseModel):
+#       """Config for the compile-time `StoryInterface` special passage."""
+#       # Preset layout id. One of STORY_INTERFACE_LAYOUTS; "custom" uses `html`.
+#       layout: str = "minimal"
+#       # Raw HTML body, used only when layout == "custom"; must contain id="passages".
+#       html: str = ""
+# See p2_data_structures.md D2, p1_research.md 3.1.
 
 
 class HarnessConfig(BaseModel):
@@ -264,6 +435,54 @@ class HarnessConfig(BaseModel):
     # Valid ids: character-creator, one-page, settings, simple-book,
     # space-tech, title-page, vn-lite-rpg.
     template_id: str = ""
+    # TODO(story-interface): HarnessConfig — add one field after template_id,
+    # opening a "Story interface" config section (P2 D3, P1 3.1). The field is
+    # an Optional structured sub-config; None = no StoryInterface passage emitted
+    # (default SugarCube UI bar preserved). Matches the template_id precedent
+    # (plain string) and the Optional[SkillCheck]=None convention for optional
+    # structured sub-config. No migration code (pydantic default covers absent
+    # keys; load_config/save_config round-trip via model_dump). Exact code:
+    #   # ── Story interface ──────────────────────────────────────────────────
+    #   # Optional custom UI layout. When set, compile emits a `:: StoryInterface`
+    #   # special passage (raw HTML replacing SugarCube's default UI bar; MUST
+    #   # contain an element with id="passages"). None = default UI bar. See
+    #   # docs/sugarcube2-analysis.md 3.19.
+    #   story_interface: Optional[StoryInterfaceConfig] = None
+    # See p2_data_structures.md D3, p1_research.md 3.1/3.5.
+    # TODO(achievements): D5 — add achievements_enabled field here, after
+    # template_id. Opt-in flag defaulting False for zero regression. Exact code:
+    #   # ── Achievement tracking ─────────────────────────────────────────────
+    #   achievements_enabled: bool = False
+    # See p2_data_structures.md §5 D5, p1_research.md §4B/§5 #2.
+    # ── PRNG seeding for deterministic playthroughs ────────────────────────────
+    # Optional seed string written verbatim into StoryInit as
+    # <<run State.prng.init("...")>> so random()/either() calls produce a
+    # reproducible sequence across rebuilds. Empty (default) = seeding off;
+    # the StoryInit body and empty-return guard are unchanged. The seed is
+    # stored as-is; escaping is applied at emit time (_escape_sc_string in
+    # compile.py) so no validation/normalization is needed here (YAGNI — P1
+    # §2.4, P2 §4). useEntropy is NOT exposed (out of scope per P1 §2.4).
+    # No schema migration needed: pydantic's ``default=""`` covers absent
+    # keys in existing config.yaml files. See p1_research.md §3.1,
+    # p2_data_structures.md §2.1/§3, p3_interfaces.md §3.2 I2.
+    # TODO(prng-seed): S1 — add `prng_seed: str = ""` field here, opening the
+    # "PRNG seeding" config section as the last optional-feature field on
+    # HarnessConfig. Type str, default "" (empty = off). Placement after
+    # template_id preserves P2 §2.1's "last optional-feature field" intent.
+    # P7 will uncomment the field line below.
+    # prng_seed: str = ""
+    # TODO(passage-tags): HarnessConfig — add two fields after prng_seed (P2 §3/§4).
+    # Exact:
+    #   nobr_tag: bool = False
+    #   nobr_passage_types: list[str] = Field(default_factory=list)
+    # `nobr_tag`: when true, the special `nobr` SugarCube tag is appended to
+    # every passage header, collapsing newlines in passage content to spaces.
+    # Default false so existing stories are unaffected. `nobr_passage_types`:
+    # passage types (members of PASSAGE_TYPES) that should get the `nobr` tag
+    # even when nobr_tag is globally false. Unioned with nobr_tag: a passage
+    # gets nobr if nobr_tag is true OR its passage_type is in this list. Empty
+    # list = no per-type scoping. See p2_data_structures.md §3/§4, p3_interfaces.md §S3,
+    # p1_research.md §3c.
 
 
 class SessionState(BaseModel):
@@ -273,6 +492,22 @@ class SessionState(BaseModel):
 
 
 # ── Parsed model output ────────────────────────────────────────────────────────
+
+# TODO(input-macros): define ParsedInputOption(BaseModel) here, directly before
+# ParsedInputField (which references it) and before ParsedChoice. 3 fields:
+#   label: str   (required, visible option text)
+#   value: str = ""   (stored value; empty = use label)
+#   selected: bool = False   (pre-select keyword)
+# Represents one <<option>> child of <<listbox>>/<<cycle>> (P2 §4). For
+# radiobutton, each radio is its own ParsedInputField (Q4) — no options list.
+
+# TODO(input-macros): define ParsedInputField(BaseModel) here, directly after
+# ParsedInputOption, before ParsedChoice. 12 fields (P2 §5): kind, var, label,
+# default, unchecked_value, checked_value, options (list[ParsedInputOption]),
+# autofocus, autocheck, checked, once, autoselect. Flat structure matching
+# ParsedChoice's flat-with-optionals convention; parser fills only the
+# relevant fields per kind. var keeps the $ prefix (e.g. "$name", "$mc.gender").
+# No methods, no logic (P2 contract).
 
 class ParsedChoice(BaseModel):
     text: str
@@ -316,11 +551,43 @@ class ExtractedEntities(BaseModel):
     themes: list[str] = Field(default_factory=list)
 
 
+# TODO(achievements): D2 — add ParsedAchievement(BaseModel) here, after
+# ExtractedEntities and before ModelOutput. Pure data, no methods (P2 §2 D2).
+# Exact code:
+#   class ParsedAchievement(BaseModel):
+#       """One achievement proposed by the model for the current passage."""
+#       id: str                         # achievement id, e.g. "ateYellowSnow"
+#       description: str = ""           # human-readable achievement text
+# See p2_data_structures.md §2 D2.
+
+
+# TODO(timed-narrative): define TimedProposal(BaseModel) here, after
+# ExtractedEntities / ParsedAchievement and before ModelOutput, so the
+# proposal sub-model is defined before the model that references it (P2 §2.3,
+# P2 §5 placement — parallel to ParsedChoice/ParsedCharacter). Pure field-bag.
+# Exact code:
+#   class TimedProposal(BaseModel):
+#       """Model-proposed timed passage structure, parsed from the TIMED section.
+#
+#       Mirrors the PassageEntry timed fields (timed_mode + timed_reveals +
+#       timed_config) so create_passage can forward them with no translation.
+#       """
+#       timed_mode: str = "reveal"                      # "reveal" | "countdown" | "recurring"
+#       timed_reveals: list[TimedReveal] = Field(default_factory=list)
+#       timed_config: Optional[TimedConfig] = None
+# See p2_data_structures.md §2.3, p3_interfaces.md §4.1.
+
+
 class ModelOutput(BaseModel):
     prose: str = ""
     choices: list[ParsedChoice] = Field(default_factory=list)
     state: dict[str, Any] = Field(default_factory=dict)
     media: list[ParsedMediaSlot] = Field(default_factory=list)
+    # TODO(input-macros): add `inputs: list[ParsedInputField] =
+    # Field(default_factory=list)` here, after `media` and before
+    # `new_characters` (P2 §6). Groups the "what the passage renders" sections
+    # (prose, choices, state, media, inputs) in rendering order. Empty list =
+    # not a form passage (or a form with no fields, which P6 flags as error).
     new_characters: list[ParsedCharacter] = Field(default_factory=list)
     new_lore: list[ParsedLore] = Field(default_factory=list)
     threads_open: list[str] = Field(default_factory=list)
@@ -333,6 +600,28 @@ class ModelOutput(BaseModel):
     characters_exit: list[CharacterDelta] = Field(default_factory=list)     # leave the scene
     summary: str = ""
     beats: list[str] = Field(default_factory=list)
+    # TODO(achievements): D4 — add achievements field here, after beats,
+    # before parse_warnings. Default empty → zero regression. Exact code:
+    #   achievements: list[ParsedAchievement] = Field(default_factory=list)
+    # See p2_data_structures.md §4 D4, p3_interfaces.md §2 I2/I3.
+    # TODO(timed-narrative): add `timed: Optional[TimedProposal] = None` field
+    # here, after beats/achievements, before parse_warnings (P2 §3.3). Optional +
+    # None default because the TIMED section is optional in model output (most
+    # passages are not timed); None = section absent. Exact code:
+    #   # ── Timed passage proposal (from TIMED section) ───────────────────────
+    #   timed: Optional[TimedProposal] = None     # parsed from the TIMED section; None if absent
+    # Positioned immediately before parse_warnings so the cross-cutting warnings
+    # field remains the final field (parsing code appends to it). See
+    # p2_data_structures.md §3.3, p3_interfaces.md §4.1/§4.2.
+    # TODO(passage-tags): ModelOutput — add field after beats/timed, before
+    # parse_warnings (P2 §1). Exact:
+    #   tags: list[str] = Field(default_factory=list)
+    # Zero-to-three short mood/atmosphere tags the model suggests for the passage
+    # (e.g. "tense", "rainy", "hopeful"). Sanitized before rendering into the Twee
+    # header `:: id [arc type mood1 mood2]`. Excludes structural arc/type tags and
+    # nobr. Populated by parse_model_output (TAGS: section) /
+    # parse_model_output_json (tags key). Empty = none. See p2_data_structures.md §1,
+    # p3_interfaces.md §S10/§S11.
     parse_warnings: list[str] = Field(default_factory=list)
 
 

@@ -21,6 +21,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from harness.compile import _storyinit_twee, _storydata_twee
+# TODO(prng-seed): S11 — NOTE (no import change needed here). _escape_sc_string
+# is NOT needed in this module — the hostile-seed unit test lives in
+# test_core.py (S10). Only the _storyinit_twee signature update (S3) affects
+# this module, handled at the call site (S12). This note prevents a future
+# worker from unnecessarily modifying this import. See P3 §4.
 from harness.models import (
     HarnessConfig,
     ModelOutput,
@@ -517,6 +522,10 @@ class TemplateCompatibilityTests(unittest.TestCase):
         graph = StoryGraph()
         graph.state_variables["$has_key"] = StateVariable(type="bool", default=False)
         graph.state_variables["$gold"] = StateVariable(type="int", default=10)
+        # TODO(prng-seed): S12 — update this call to pass a default config:
+        #   out = _storyinit_twee(graph, HarnessConfig())
+        # With prng_seed="" the output is byte-identical (P6 INV-1).
+        # HarnessConfig is already imported in this module (line 25). P7 edits.
         out = _storyinit_twee(graph)
         self.assertIn(":: StoryInit", out)
         self.assertIn("<<set $has_key to false>>", out)

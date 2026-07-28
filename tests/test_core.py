@@ -7,6 +7,10 @@ from harness.compile import (
     _storydata_twee,
     _storyinit_twee,
     collect_passage_files,
+    # TODO(prng-seed): S7 — add _escape_sc_string to this import list so the
+    # new hostile-seed unit test (S10) can call it directly without going
+    # through _storyinit_twee (P1 Q3, P3 §3.2 #4 testability). P7 will add:
+    #   _escape_sc_string,
 )
 from harness.models import (
     HarnessConfig,
@@ -403,6 +407,9 @@ class StoryInitTests(unittest.TestCase):
     def test_empty_when_no_declared_defaults(self):
         graph = StoryGraph()
         graph.state_variables["$x"] = StateVariable(type="bool", default=None)
+        # TODO(prng-seed): S8 — update this call to pass a default config:
+        #   self.assertEqual(_storyinit_twee(graph, HarnessConfig()), "")
+        # With prng_seed="" the output is byte-identical (P6 INV-1). P7 edits.
         self.assertEqual(_storyinit_twee(graph), "")
 
     def test_emits_set_for_each_declared_default(self):
@@ -410,12 +417,30 @@ class StoryInitTests(unittest.TestCase):
         graph.state_variables["$flag"] = StateVariable(type="bool", default=True)
         graph.state_variables["$gold"] = StateVariable(type="int", default=10)
         graph.state_variables["$name"] = StateVariable(type="str", default='Anna "the bold"')
+        # TODO(prng-seed): S9 — update this call to pass a default config:
+        #   out = _storyinit_twee(graph, HarnessConfig())
+        # With prng_seed="" the output is byte-identical (P6 INV-1). P7 edits.
         out = _storyinit_twee(graph)
         self.assertIn(":: StoryInit", out)
         self.assertIn("<<set $flag to true>>", out)
         self.assertIn("<<set $gold to 10>>", out)
         # quote escaping
         self.assertIn('<<set $name to "Anna \\"the bold\\"">>', out)
+
+    # TODO(prng-seed): S10 — add three new test methods here, after the two
+    # existing StoryInitTests methods and before TweegoArgvTests (P1 §3.5):
+    #   1. test_seeded_emits_prng_init_line_first — cfg with prng_seed set and a
+    #      graph with defaults; assert the init line is the FIRST line of the
+    #      body and precedes the <<set>> lines (P6 INV-3).
+    #   2. test_seeded_with_no_defaults_still_emits_storyinit — cfg with
+    #      prng_seed set and a graph with NO defaults; assert output is
+    #      non-empty and contains the init line (P6 INV-2).
+    #   3. test_hostile_seed_escaped — cfg with prng_seed='a"b\\c'; assert the
+    #      output contains the correctly escaped init line, calling
+    #      _escape_sc_string directly for the literal-comparison (P1 Q3,
+    #      P3 §3.2).
+    # All three construct HarnessConfig(prng_seed=...) and call
+    # _storyinit_twee(graph, cfg). P7 will implement the method bodies.
 
 
 class TweegoArgvTests(unittest.TestCase):
