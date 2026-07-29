@@ -6,10 +6,12 @@ Sends controlled prompts (built from the real `harness/prompts.py` templates wit
 
 ## Quick Start
 
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management. All commands below use `uv run` which automatically handles the venv and dependencies.
+
 ### Dry run (no Ollama needed)
 
 ```bash
-python model_benchmark/benchmark.py --dry-run
+uv run python model_benchmark/benchmark.py --dry-run
 ```
 
 Output:
@@ -39,13 +41,13 @@ The dry run scores a known-good fixture response. Use it to verify the scoring l
 
 ```bash
 # Auto-discover all installed Ollama models
-python model_benchmark/benchmark.py
+uv run python model_benchmark/benchmark.py
 
 # Test specific models
-python model_benchmark/benchmark.py --models llama3.1:8b qwen2.5:7b
+uv run python model_benchmark/benchmark.py --models llama3.1:8b qwen2.5:7b
 
 # Save reports to files
-python model_benchmark/benchmark.py --models llama3.1:8b \
+uv run python model_benchmark/benchmark.py --models llama3.1:8b \
   --output report.txt \
   --json-output report.json
 ```
@@ -57,7 +59,7 @@ python model_benchmark/benchmark.py --models llama3.1:8b \
 If you don't pass `--models`, the benchmark queries `<base_url>/api/tags` on your Ollama server and tests every installed model. This is the simplest way to compare all your local models.
 
 ```bash
-python model_benchmark/benchmark.py
+uv run python model_benchmark/benchmark.py
 ```
 
 ### Specific models
@@ -65,7 +67,7 @@ python model_benchmark/benchmark.py
 Pass model tags as space-separated arguments. These must match tags visible in `ollama list`:
 
 ```bash
-python model_benchmark/benchmark.py --models llama3.1:8b mistral:7b qwen2.5:14b
+uv run python model_benchmark/benchmark.py --models llama3.1:8b mistral:7b qwen2.5:14b
 ```
 
 ### Remote Ollama server
@@ -73,7 +75,7 @@ python model_benchmark/benchmark.py --models llama3.1:8b mistral:7b qwen2.5:14b
 Point at a remote server with `--base-url`:
 
 ```bash
-python model_benchmark/benchmark.py \
+uv run python model_benchmark/benchmark.py \
   --base-url http://192.168.1.100:11434 \
   --models llama3.1:8b
 ```
@@ -181,12 +183,12 @@ Full structured report including:
 ## Running the Tests
 
 ```bash
-# From the repo root with the venv activated
-python -m pytest model_benchmark/test_benchmark.py -v
+# From the repo root
+uv run python -m pytest model_benchmark/test_benchmark.py -v
 
 # Or specific test classes
-python -m pytest model_benchmark/test_benchmark.py::TestScoreMarkupCompliance -v
-python -m pytest model_benchmark/test_benchmark.py::TestInvariants -v
+uv run python -m pytest model_benchmark/test_benchmark.py::TestScoreMarkupCompliance -v
+uv run python -m pytest model_benchmark/test_benchmark.py::TestInvariants -v
 ```
 
 63 tests covering:
