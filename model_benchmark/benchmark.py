@@ -25,7 +25,7 @@ Invariant conformance (INV-1..INV-10 from p6_invariants.md):
 - INV-4 (PROMPT_VERSION traceability): build_benchmark_report populates
   BenchmarkReport.prompt_version from the live harness.prompts.PROMPT_VERSION.
 - INV-5 (no harness modification): this file only imports from harness.*; the
-  final git diff lists only scripts/benchmark.py and tests/test_benchmark.py.
+  final git diff lists only model_benchmark/benchmark.py and model_benchmark/test_benchmark.py.
 - INV-6 (graceful failure): every scorer has an empty-input early-return guard;
   run_single_model wraps call+parse+score in try/except returning failing results.
 - INV-7 (choice text+hint scanning): score_passage_structure and

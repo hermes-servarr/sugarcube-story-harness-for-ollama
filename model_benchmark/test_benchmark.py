@@ -1,4 +1,4 @@
-"""Tests for the production implementation of scripts/benchmark.py (P7).
+"""Tests for the production implementation of model_benchmark/benchmark.py (P7).
 
 These tests exercise all 6 scoring categories, the orchestrator, prompt fixture
 factory, report assembly, CLI, and all 10 invariants from p6_invariants.md.
@@ -10,8 +10,8 @@ import os
 import json
 import inspect
 
-# Ensure scripts/ is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+# Ensure model_benchmark/ is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
 import pytest
 from benchmark import (
