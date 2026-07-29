@@ -548,6 +548,98 @@ def _reachable_unset(
     return unset
 
 
+def check_markdown_leak(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    """Detect markdown formatting that won't render in SugarCube.
+
+    SugarCube uses ''bold'' and //italic//, not **bold** or *italic*.
+    When the LLM generates passages, it often emits markdown despite
+    the prompt telling it not to. This check catches that before compile.
+    """
+    import re as _re
+    issues: list[ValidationIssue] = []
+    # Match **text** (bold) or *text* (italic) but NOT '' or // (SugarCube)
+    # Also avoid matching *** (horizontal rules) or list markers
+    bold_re = _re.compile(r'\*\*([^*]+?)\*\*')
+    italic_re = _re.compile(r'(?<!\*)\*([^*\n]+?)\*(?!\*)')
+    for pid, entry in graph.passages.items():
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # Skip macro arguments and code blocks
+        # Simple approach: scan line by line, skip lines that are pure macros
+        for line_num, line in enumerate(content.split("\n"), 1):
+            stripped = line.strip()
+            # Skip lines that are purely SugarCube macros
+            if stripped.startswith("<<") and stripped.endswith(">>"):
+                continue
+            # Skip passage headers
+            if stripped.startswith("::"):
+                continue
+            # Skip HTML comments (media slots)
+            if stripped.startswith("<!--"):
+                continue
+            bold_matches = bold_re.findall(line)
+            italic_matches = italic_re.findall(line)
+            if bold_matches:
+                issues.append(_issue(
+                    "warning", "markdown_leak",
+                    f"Passage {pid!r} line {line_num}: markdown **bold** detected "
+                    f"(SugarCube uses ''bold''): {''.join(bold_matches[:3])}",
+                    pid,
+                ))
+            if italic_matches:
+                # Filter out false positives like list items starting with *
+                real_italics = [m for m in italic_matches if not m.strip().startswith('-')]
+                if real_italics:
+                    issues.append(_issue(
+                        "warning", "markdown_leak",
+                        f"Passage {pid!r} line {line_num}: markdown *italic* detected "
+                        f"(SugarCube uses //italic//): {''.join(real_italics[:3])}",
+                        pid,
+                    ))
+    return issues
+
+
+def check_dollar_temp_var(p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue]:
+    r"""Detect ``$_tempvar`` in prose — a common LLM error.
+
+    In SugarCube, ``$var`` is a story variable and ``_var`` is a temp variable.
+    Writing ``$_damage`` in prose tries to look up a story variable named
+    ``_damage`` (which doesn't exist), instead of printing the temp variable
+    ``_damage``. The correct form is ``<<print _damage>>`` or just ``_damage``
+    (without the ``$`` prefix).
+    """
+    import re as _re
+    issues: list[ValidationIssue] = []
+    # Match $_ followed by a valid variable name, but NOT inside <<set>> or <<print>>
+    dollar_temp_re = _re.compile(r'\$_([a-zA-Z_][a-zA-Z0-9_]*)')
+    for pid, entry in graph.passages.items():
+        path = p.root / entry.file
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        for line_num, line in enumerate(content.split("\n"), 1):
+            # Skip lines that are purely SugarCube macros
+            stripped = line.strip()
+            if stripped.startswith("<<") and stripped.endswith(">>"):
+                continue
+            if stripped.startswith("::"):
+                continue
+            # Check for $_tempvar in prose (not inside macro arguments)
+            # Simple heuristic: if the line doesn't start with <<, check for $_var
+            matches = dollar_temp_re.findall(line)
+            if matches:
+                for m in matches:
+                    issues.append(_issue(
+                        "error", "dollar_temp_var",
+                        f"Passage {pid!r} line {line_num}: $_{m} in prose — "
+                        f"temp vars use _{m} (not ${m}). Use <<print _{m}>> to display.",
+                        pid,
+                    ))
+    return issues
+
+
 # TODO(print-validation): P3 S1 — define check_invalid_variable_names(
 # p: ProjectPaths, graph: StoryGraph) -> list[ValidationIssue] here. P1 §4.1
 # sigil/name validity check. Iterates passages, permissive-scans for all
@@ -711,6 +803,8 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
         check_deprecated_features(p, graph),
         check_capture_in_loops(p, graph),
         check_undeclared_state_vars(p, graph),
+        check_dollar_temp_var(p, graph),   # NEW: catch $_tempvar in prose
+        check_markdown_leak(p, graph),     # NEW: catch **bold** and *italic* markdown leaks
         check_form_fields(p, graph),       # NEW (form: >=1 input + submit)
         # TODO(print-validation): P3 S6 — register the three new
         # state-variable checks here, after check_undeclared_state_vars(p,

@@ -217,3 +217,41 @@ def detect_infinite_loop(
         ],
         suggested_fix_area="story.json / harness/passage.py (passage links)",
     )
+
+
+def detect_markdown_leak(
+    page_text: str, passage_id: str, step_number: int
+) -> PlaytestIssue | None:
+    r"""Detect unrendered markdown formatting visible in rendered passage text.
+
+    SugarCube does not render ``**bold**`` or ``*italic*`` — these appear as
+    literal asterisks in the browser. The playtester sees the rendered output,
+    so finding ``**`` or stray ``*`` in the visible text means the LLM emitted
+    markdown instead of SugarCube markup (``''bold''`` / ``//italic//``).
+    """
+    if not page_text:
+        return None
+    # Look for **text** or *text* in the RENDERED text (what the player sees)
+    # In rendered text, ** should never appear unless markdown leaked through
+    import re as _re
+    bold_re = _re.compile(r'\*\*([^*]+?)\*\*')
+    matches = bold_re.findall(page_text)
+    if not matches:
+        return None
+    return PlaytestIssue(
+        id=f"{step_number:03d}_markdown_leak",
+        category=IssueCategory.markdown_leak,
+        severity=IssueSeverity.minor,
+        passage=passage_id,
+        step_number=step_number,
+        description=(
+            f"Unrendered markdown **bold** detected in passage '{passage_id}': "
+            + ", ".join(matches[:5])
+        ),
+        reproduction_steps=[
+            f"Navigate to passage '{passage_id}'",
+            "Observe literal ** asterisks in the rendered text",
+            "The LLM generated markdown instead of SugarCube ''bold'' markup",
+        ],
+        suggested_fix_area="harness/prompts.py / harness/generators.py (markup conversion)",
+    )

@@ -172,21 +172,53 @@ def _is_external(link) -> bool:
     return False
 
 
-def click_choice(page: Page, element_index: int) -> None:
-    """Click a choice by zero-based index and wait for passage transition."""
+def click_choice(page: Page, element_index: int) -> bool:
+    """Click a choice by zero-based index and wait for passage transition.
+
+    Returns True if the passage changed, False if it didn't (broken nav or
+    the link was not found). Uses SugarCube's State.passage to confirm the
+    transition rather than a fixed timeout.
+    """
     try:
+        # Record current passage so we can detect transition
+        before = get_current_passage(page)
+
         links = page.query_selector_all(".passage a.link-internal")
         if not links:
             links = [
                 l for l in page.query_selector_all(".passage a")
                 if not _is_external(l)
             ]
-        if element_index < len(links):
-            links[element_index].click(timeout=5000)
-            # Wait a brief moment for passage transition
-            page.wait_for_timeout(500)
+        if element_index >= len(links):
+            return False
+
+        links[element_index].click(timeout=5000)
+
+        # Wait for SugarCube to update the passage. SugarCube renders
+        # asynchronously after a link click, so wait for State.passage to
+        # change rather than using a fixed sleep.
+        try:
+            page.wait_for_function(
+                f"() => {{"
+                f"  if (window.SugarCube && window.SugarCube.State) {{"
+                f"    return window.SugarCube.State.passage !== {repr(before)};"
+                f"  }}"
+                f"  // Fallback: check DOM .passage data-passage attr"
+                f"  var el = document.querySelector('.passage');"
+                f"  return el && el.getAttribute('data-passage') !== {repr(before)};"
+                f"}}",
+                timeout=5000,
+            )
+            return True
+        except Exception:
+            # The passage didn't change within 5s — either it's a same-page
+            # action (linkreplace, linkappend) or navigation broke.
+            # Give a short buffer then report the actual state.
+            page.wait_for_timeout(300)
+            after = get_current_passage(page)
+            return after != before
     except Exception:
-        pass
+        return False
 
 
 def take_screenshot(page: Page, path: str) -> None:

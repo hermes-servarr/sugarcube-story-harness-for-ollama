@@ -19,6 +19,7 @@ class IssueCategory(str, Enum):
     broken_media       = "broken_media"
     sc_runtime_error   = "sc_runtime_error"
     infinite_loop      = "infinite_loop"
+    markdown_leak      = "markdown_leak"
 
 
 class IssueSeverity(str, Enum):

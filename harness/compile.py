@@ -44,7 +44,7 @@ def _embed_media(p: ProjectPaths, tw_content: str, rel_map: dict[str, dict[str, 
             return m.group(0)  # leave as-is (pending or missing on disk)
         return media_markup(slot, staged["src"], staged.get("poster", ""))
 
-    return re.sub(r'<!-- media:(slot_[a-f0-9]+) -->', replace_slot, tw_content)
+    return re.sub(r'<!-- media:(slot_[a-zA-Z0-9_]+) -->', replace_slot, tw_content)
 
 
 def find_tweego(configured_path: str = "tweego") -> str | None:

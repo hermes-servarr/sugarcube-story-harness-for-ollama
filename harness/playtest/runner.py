@@ -222,4 +222,10 @@ def _run_detectors_for_step(
         issue.screenshot_path = step.screenshot_path
         issues.append(issue)
 
+    # 9. Markdown leak (LLM emitted **bold** instead of ''bold'')
+    issue = det.detect_markdown_leak(step.passage_text, step.passage_id, step.step_number)
+    if issue:
+        issue.screenshot_path = step.screenshot_path
+        issues.append(issue)
+
     return issues

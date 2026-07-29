@@ -123,6 +123,9 @@ PREVIOUS SCENE:
 
 DIRECTION: {direction}
 
+Use SugarCube markup: ''bold'' //italic// __underline__ — NOT markdown (**bold** *italic*).
+Variable scopes: $var (persistent story state), _var (temp per-turn). Use <<print _var>> for temp vars in prose.
+
 Reply using ONLY these section headers, in this order:
 
 PROSE:
@@ -392,7 +395,7 @@ Optional JSON keys (omit or empty if unused):
 - inputs: [{{"kind": "textbox|numberbox|textarea|checkbox|radiobutton|listbox|cycle", "var": "$name", "label": "...", "default": "...", "options": [{{"label", "value", "selected"}}], "autofocus": bool, ...}}] — form input fields. Omit or empty if not a form passage.
 # TODO(achievements): I8 (JSON-mode) - when achievements_enabled is True,
 # append to the Optional JSON keys list above, after characters_exit (P3 section 4 I8):
-#   - achievements: [{"id": "achievement_id", "description": "one-line text"}] -
+#   - achievements: [{{"id": "achievement_id", "description": "one-line text"}}] -
 #     achievements earned this passage (omit or empty if none).
 # Shape maps onto ParsedAchievement (P2 D2). See p3_interfaces.md section 4 I8.
 

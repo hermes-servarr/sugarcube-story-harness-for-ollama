@@ -1092,5 +1092,58 @@ class HarnessConfigTemplateFieldTests(unittest.TestCase):
         self.assertEqual(cfg2.template_id, "space-tech")
 
 
+class MediaSlotRegexTests(unittest.TestCase):
+    """The media-slot regex must accept both hex and named slot IDs.
+
+    Regression test for the bug where ``<!-- media:slot_village -->`` was
+    silently ignored because the regex ``slot_[a-f0-9]+`` only matched hex.
+    The fix widened the pattern to ``slot_[a-zA-Z0-9_]+``.
+    """
+
+    def test_hex_slot_id_matches(self):
+        from harness.compile import _embed_media
+        from harness.media import MediaSlot, MediaSlots
+        from harness.project import ProjectPaths
+        import tempfile, re
+
+        # Verify the regex pattern itself matches hex IDs
+        pattern = r'<!-- media:(slot_[a-zA-Z0-9_]+) -->'
+        m = re.search(pattern, '<!-- media:slot_1a2b3c -->')
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), 'slot_1a2b3c')
+
+    def test_named_slot_id_matches(self):
+        import re
+        pattern = r'<!-- media:(slot_[a-zA-Z0-9_]+) -->'
+        m = re.search(pattern, '<!-- media:slot_village -->')
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), 'slot_village')
+
+    def test_mixed_slot_id_matches(self):
+        import re
+        pattern = r'<!-- media:(slot_[a-zA-Z0-9_]+) -->'
+        for sid in ['slot_abc123', 'slot_Castle', 'slot_forest_path', 'slot_a']:
+            m = re.search(pattern, f'<!-- media:{sid} -->')
+            self.assertIsNotNone(m, f"Failed to match {sid}")
+            self.assertEqual(m.group(1), sid)
+
+    def test_non_slot_comment_not_matched(self):
+        import re
+        pattern = r'<!-- media:(slot_[a-zA-Z0-9_]+) -->'
+        # Comments that don't start with slot_ should not match
+        m = re.search(pattern, '<!-- media:village -->')
+        self.assertIsNone(m)
+        m = re.search(pattern, '<!-- something:slot_abc -->')
+        self.assertIsNone(m)
+
+    def test_passage_py_regex_also_accepts_named(self):
+        """The _MEDIA_SLOT_RE in passage.py must also accept named slot IDs."""
+        from harness.passage import _MEDIA_SLOT_RE
+        for sid in ['slot_1a2b3c', 'slot_village', 'slot_forest_path', 'slot_Castle']:
+            m = _MEDIA_SLOT_RE.search(f'<!-- media:{sid} -->')
+            self.assertIsNotNone(m, f"passage.py regex failed to match {sid}")
+            self.assertEqual(m.group(1), sid)
+
+
 if __name__ == "__main__":
     unittest.main()

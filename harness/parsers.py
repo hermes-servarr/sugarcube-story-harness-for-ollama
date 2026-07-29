@@ -295,6 +295,41 @@ def _parse_input_section(raw: str) -> list[ParsedInputField]:
     return fields
 
 
+def normalize_markdown_to_sugarcube(text: str) -> str:
+    r"""Convert common markdown formatting to SugarCube markup.
+
+    LLMs often emit ``**bold**`` and ``*italic*`` despite instructions to use
+    SugarCube's ``''bold''`` and ``//italic//``. This post-processor catches
+    the most common patterns. Called on prose before storing in ModelOutput.
+
+    Conversions:
+    - ``**text**`` → ``''text''``   (bold, single-line only)
+    - ``*text*``   → ``//text//``  (italic, single-line only)
+    - Stray trailing ``**`` → removed (unpaired markdown artifacts)
+    - ``$_varname`` → ``<<print _varname>>``  (temp var in prose)
+    """
+    # Process line by line to avoid cross-line false matches
+    lines = text.split('\n')
+    fixed_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Skip macro lines entirely
+        if stripped.startswith('<<') and stripped.endswith('>>'):
+            fixed_lines.append(line)
+            continue
+        # Bold: **text** → ''text'' (within a single line)
+        line = re.sub(r'\*\*([^*\n]+?)\*\*', r"''\1''", line)
+        # Italic: *text* → //text// (avoid ** which we already converted)
+        line = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)', r'//\1//', line)
+        # Stray trailing ** (unpaired markdown bold close with no open)
+        # e.g. "Quest Completed: The Wolf Problem**" → remove the **
+        line = re.sub(r'\*\*(?=\s|$|[,.;:])', '', line)
+        # Temp var in prose: $_varname → <<print _varname>>
+        line = re.sub(r'\$_([a-zA-Z_][a-zA-Z0-9_]*)', r'<<print _\1>>', line)
+        fixed_lines.append(line)
+    return '\n'.join(fixed_lines)
+
+
 def parse_model_output(raw: str) -> ModelOutput:
     sections = _split_sections(raw)
     warnings: list[str] = []
@@ -306,7 +341,8 @@ def parse_model_output(raw: str) -> ModelOutput:
 
     # ── PROSE ──────────────────────────────────────────────────────────────
     prose = sections.get("PROSE", "")
-    output.prose = "" if _is_template(prose) else prose
+    prose = "" if _is_template(prose) else normalize_markdown_to_sugarcube(prose)
+    output.prose = prose
 
     # ── CHOICES ────────────────────────────────────────────────────────────
     choices_raw = sections.get("CHOICES", "")
@@ -616,12 +652,17 @@ def parse_model_output_json(raw: str) -> ModelOutput:
 
     try:
         out = ModelOutput.model_validate(data)
+        # Normalize any markdown that slipped through to SugarCube markup
+        if out.prose:
+            out.prose = normalize_markdown_to_sugarcube(out.prose)
     except ValidationError as e:
         # Salvage pass: keep only known top-level keys and re-validate.
         allowed = set(ModelOutput.model_fields.keys())
         salvaged = {k: v for k, v in data.items() if k in allowed}
         try:
             out = ModelOutput.model_validate(salvaged)
+            if out.prose:
+                out.prose = normalize_markdown_to_sugarcube(out.prose)
             out.parse_warnings.append(f"JSON validation salvaged after error: {_first_validation_error(e)}.")
         except ValidationError as e2:
             fallback = parse_model_output(raw)
