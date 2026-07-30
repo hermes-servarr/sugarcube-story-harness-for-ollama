@@ -1,0 +1,63 @@
+# =============================================================================
+# Example 10: LLM Judge (Stub Mode) — CI-Safe
+# =============================================================================
+# Demonstrates the llm_judge evaluator in stub mode. Stub mode uses
+# heuristics (substring matching, keyword extraction) instead of calling
+# a judge model, so it runs in CI without Ollama. In production, switch
+# to mode=api and provide a model name.
+#
+# The stub evaluator checks:
+#   - Does the response contain the expected answer (substring match)?
+#   - Do all behavioral descriptors have their keywords present?
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/10_llm_judge_stub.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:llm_judge_stub" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: llm_judge_stub
+name: LLM judge (stub mode)
+description: >
+  Uses the llm_judge evaluator in stub mode — heuristic checks without a
+  model call. The stub checks whether the expected answer appears as a
+  substring and whether behavioral descriptors are satisfied via
+  keyword matching. Set mode=api and provide a model for real judge calls.
+
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: hard
+tags: ["llm_judge", "stub", "ci-safe"]
+
+input: |
+  Generate a SugarCube passage where the player examines an old key.
+  Use a SugarCube variable $hasKey and set it via <<set>>.
+  Output the PROSE, CHOICES, and SUMMARY sections.
+
+expected:
+  answer_type: free_text
+  answer: "PROSE"
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+  rubric:
+    - {criterion: "Section presence", weight: 0.5, description: "All 3 sections present"}
+    - {criterion: "Markup format", weight: 0.5, description: "SugarCube syntax, no Markdown"}
+
+evaluation:
+  name: llm_judge
+  type: llm_judge
+  params:
+    mode: stub                # heuristic — no model call (CI-safe)
+  pass_threshold: 0.8
+  max_score: 1.0
+  deterministic: false        # stub mode is non-deterministic in theory
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"
+  notes: >
+    To use a real judge model, change params.mode to "api" and add
+    params.model (e.g. "llama3.1:8b"). The evaluator will call the
+    Ollama /api/generate endpoint and parse the JSON verdict.

@@ -1,0 +1,5 @@
+{"prompt": "Generate a SugarCube passage with PROSE, CHOICES, and SUMMARY sections.", "expected_sections": ["PROSE:", "CHOICES:", "SUMMARY:"], "difficulty": "easy", "variant": "compact", "direction": "A"}
+{"prompt": "Write a passage where the player sets a flag using <<set $hasMetKing to true>>.", "expected_sections": ["PROSE:", "CHOICES:", "SUMMARY:"], "difficulty": "medium", "variant": "compact", "direction": "B"}
+{"prompt": "Create a passage showing the player's gold count and a complex stat.", "expected_sections": ["PROSE:", "CHOICES:", "SUMMARY:"], "difficulty": "medium", "variant": "compact", "direction": "C"}
+{"prompt": "Generate a full SugarCube passage with all sections and proper markup.", "expected_sections": ["PROSE:", "CHOICES:", "SUMMARY:"], "difficulty": "hard", "variant": "full", "direction": "A"}
+{"prompt": "Write a JSON-format passage with conditional logic.", "expected_sections": ["prose", "choices", "summary"], "difficulty": "hard", "variant": "json", "direction": "B"}

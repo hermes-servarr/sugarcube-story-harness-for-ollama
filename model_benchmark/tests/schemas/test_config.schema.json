@@ -1,0 +1,1902 @@
+{
+  "$defs": {
+    "DatasetReference": {
+      "additionalProperties": false,
+      "description": "Reference to an external or inline dataset.\n\nTests can reference datasets by path, HuggingFace identifier, or inline\ndata.  The loader (t_172dd683) resolves the reference, fetches the data,\nand injects rows as parameterized test inputs.",
+      "properties": {
+        "name": {
+          "description": "Stable dataset identifier",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dataset version tag",
+          "title": "Version"
+        },
+        "split": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Train/val/test split name",
+          "title": "Split"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Local file path (portable, not absolute)",
+          "title": "Path"
+        },
+        "format": {
+          "default": "jsonl",
+          "enum": [
+            "csv",
+            "jsonl",
+            "json",
+            "huggingface",
+            "inline"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "huggingface_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "HF dataset repo ID (e.g. 'squad')",
+          "title": "Huggingface Id"
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Row filters applied at load time",
+          "title": "Filters"
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Random sample N rows",
+          "title": "Sample"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Seed for sampling",
+          "title": "Seed"
+        },
+        "checksum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Content checksum (sha256) for integrity",
+          "title": "Checksum"
+        },
+        "inline_data": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inline rows (format=inline)",
+          "title": "Inline Data"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DatasetReference",
+      "type": "object"
+    },
+    "DefaultsDocument": {
+      "additionalProperties": false,
+      "description": "Global defaults document \u2014 sets default values for all tests.\n\nLoaded first; suite and test layers merge on top.",
+      "properties": {
+        "schema_version": {
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "kind": {
+          "const": "defaults",
+          "default": "defaults",
+          "title": "Kind",
+          "type": "string"
+        },
+        "defaults": {
+          "$ref": "#/$defs/TestConfig",
+          "description": "Default values applied to all tests"
+        },
+        "merge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MergePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "defaults"
+      ],
+      "title": "DefaultsDocument",
+      "type": "object"
+    },
+    "EvaluatorReference": {
+      "additionalProperties": false,
+      "description": "Reference to an evaluator plugin with optional parameters.\n\nConfig files reference evaluators by name with optional parameters::\n\n    evaluation:\n      name: semantic_similarity\n      type: llm_judge\n      params:\n        threshold: 0.8\n      pass_threshold: 1.0\n\nBuilt-in evaluators (t_b8e82f29): exact_match, substring_regex, llm_judge.\nCustom evaluators are discovered via the plugin registry.",
+      "properties": {
+        "name": {
+          "description": "Evaluator plugin name (unique ID)",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Evaluator category (exact_match, regex, llm_judge, ...)",
+          "title": "Type"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Evaluator version for traceability",
+          "title": "Version"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Evaluator-specific parameters",
+          "title": "Params",
+          "type": "object"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Evaluator prompt (inline text or template ref)",
+          "title": "Prompt"
+        },
+        "prompt_template_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a prompt template file",
+          "title": "Prompt Template Ref"
+        },
+        "pass_threshold": {
+          "default": 1.0,
+          "description": "Minimum normalized score to pass",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Pass Threshold",
+          "type": "number"
+        },
+        "max_score": {
+          "default": 1.0,
+          "description": "Maximum raw score",
+          "exclusiveMinimum": 0.0,
+          "title": "Max Score",
+          "type": "number"
+        },
+        "deterministic": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether the evaluator is deterministic",
+          "title": "Deterministic"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "EvaluatorReference",
+      "type": "object"
+    },
+    "ExpectedBehavior": {
+      "additionalProperties": false,
+      "description": "Descriptors for the expected model behavior.\n\nCombines a reference answer, behavioral constraints, a scoring rubric,\nand simple match checks (contains / not_contains / regex).  The evaluator\nuses whichever fields are relevant to its type.",
+      "properties": {
+        "answer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference / gold answer",
+          "title": "Answer"
+        },
+        "answer_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "exact",
+                "numeric",
+                "multiple_choice",
+                "structured",
+                "free_text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer Type"
+        },
+        "answer_choices": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Choices for multiple_choice",
+          "title": "Answer Choices"
+        },
+        "numeric_tolerance": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tolerance for numeric answers",
+          "title": "Numeric Tolerance"
+        },
+        "behavior": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Behavioral descriptors the model should exhibit",
+          "title": "Behavior"
+        },
+        "rubric": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scoring rubric items [{criterion, weight, description}]",
+          "title": "Rubric"
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Constraints the answer must satisfy",
+          "title": "Constraints"
+        },
+        "contains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Substrings the output must contain",
+          "title": "Contains"
+        },
+        "not_contains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Substrings the output must NOT contain",
+          "title": "Not Contains"
+        },
+        "regex": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regex patterns the output must match",
+          "title": "Regex"
+        },
+        "must_parse_as": {
+          "anyOf": [
+            {
+              "enum": [
+                "json",
+                "yaml",
+                "csv",
+                "sugarcube_passage"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Must Parse As"
+        }
+      },
+      "title": "ExpectedBehavior",
+      "type": "object"
+    },
+    "MatrixConfig": {
+      "additionalProperties": false,
+      "description": "Controls how parameterized matrix dimensions expand into concrete cases.\n\nThe ``parameters`` dict on the test defines dimension names \u2192 value lists.\nThis model controls the combination strategy and explosion limits.",
+      "properties": {
+        "strategy": {
+          "default": "full",
+          "enum": [
+            "full",
+            "pairwise",
+            "explicit",
+            "sample"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "max_cases": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hard cap on generated cases (prevents explosion)",
+          "title": "Max Cases"
+        },
+        "sample_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "N for 'sample' strategy",
+          "title": "Sample Size"
+        },
+        "explicit_combinations": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Explicit dimension combos for 'explicit' strategy [{context_length: 4000, ...}]",
+          "title": "Explicit Combinations"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Seed for 'sample' strategy",
+          "title": "Seed"
+        }
+      },
+      "title": "MatrixConfig",
+      "type": "object"
+    },
+    "MergePolicy": {
+      "additionalProperties": false,
+      "description": "Declares how list fields merge with parent-layer defaults.\n\nApplied when this document's values are merged onto a parent layer\n(defaults \u2192 suite \u2192 test).  Dict fields always deep-merge; scalars always\nreplace.  Only list fields are controlled here.\n\n``tags`` always union (deduplicated) regardless of policy \u2014 it is a\nsemantic set, not an ordered list.",
+      "properties": {
+        "list_strategy": {
+          "default": "replace",
+          "description": "Default strategy for all list fields: replace or append",
+          "enum": [
+            "replace",
+            "append"
+          ],
+          "title": "List Strategy",
+          "type": "string"
+        },
+        "field_overrides": {
+          "additionalProperties": {
+            "enum": [
+              "replace",
+              "append"
+            ],
+            "type": "string"
+          },
+          "description": "Per-field override, e.g. {tags: append, models: replace}",
+          "title": "Field Overrides",
+          "type": "object"
+        }
+      },
+      "title": "MergePolicy",
+      "type": "object"
+    },
+    "ModelEligibility": {
+      "additionalProperties": false,
+      "description": "Constraints on which models may run this test.",
+      "properties": {
+        "required": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model tags that CAN run this test (allowlist)",
+          "title": "Required"
+        },
+        "excluded": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model tags that CANNOT run (denylist)",
+          "title": "Excluded"
+        },
+        "min_context_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Context Length"
+        },
+        "min_parameters": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum model parameter count (e.g. 7_000_000_000)",
+          "title": "Min Parameters"
+        },
+        "required_capabilities": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required model capabilities (e.g. 'tool_use', 'vision')",
+          "title": "Required Capabilities"
+        }
+      },
+      "title": "ModelEligibility",
+      "type": "object"
+    },
+    "ModelParameters": {
+      "additionalProperties": false,
+      "description": "Generation parameters sent to the model backend (Ollama).\n\nFields mirror ``BenchmarkConfig`` in benchmark.py so the declarative config\ncan drive the existing engine without translation.",
+      "properties": {
+        "base_url": {
+          "default": "http://localhost:11434",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "timeout": {
+          "default": 120,
+          "description": "Seconds per model call",
+          "exclusiveMinimum": 0,
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "num_predict": {
+          "default": 640,
+          "description": "Max tokens to generate",
+          "exclusiveMinimum": 0,
+          "title": "Num Predict",
+          "type": "integer"
+        },
+        "temperature": {
+          "default": 0.2,
+          "maximum": 2.0,
+          "minimum": 0.0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top P"
+        },
+        "top_k": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top K"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop"
+        },
+        "repeat_penalty": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repeat Penalty"
+        }
+      },
+      "title": "ModelParameters",
+      "type": "object"
+    },
+    "PromptTemplate": {
+      "additionalProperties": false,
+      "description": "Prompt template \u2014 either a reference to a file or inline text.\n\n``ref`` and ``text`` are mutually exclusive.  ``variant`` selects the\nharness.prompts builder when using built-in templates.",
+      "properties": {
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to a template file (relative to tests/prompts/)",
+          "title": "Ref"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "enum": [
+                "compact",
+                "full",
+                "json"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Built-in variant: compact/full/json",
+          "title": "Variant"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inline Jinja2/text template",
+          "title": "Text"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Template version for traceability",
+          "title": "Version"
+        },
+        "input_variables": {
+          "additionalProperties": true,
+          "description": "Variables injected into the template",
+          "title": "Input Variables",
+          "type": "object"
+        }
+      },
+      "title": "PromptTemplate",
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "description": "Retry policy for flaky model calls or evaluator errors.",
+      "properties": {
+        "max_retries": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "backoff": {
+          "default": "exponential",
+          "enum": [
+            "fixed",
+            "linear",
+            "exponential"
+          ],
+          "title": "Backoff",
+          "type": "string"
+        },
+        "initial_delay": {
+          "default": 1.0,
+          "description": "Initial delay in seconds",
+          "exclusiveMinimum": 0.0,
+          "title": "Initial Delay",
+          "type": "number"
+        },
+        "max_delay": {
+          "default": 60.0,
+          "description": "Maximum delay cap in seconds",
+          "exclusiveMinimum": 0.0,
+          "title": "Max Delay",
+          "type": "number"
+        },
+        "retry_on": {
+          "description": "Error categories that trigger a retry",
+          "items": {
+            "type": "string"
+          },
+          "title": "Retry On",
+          "type": "array"
+        }
+      },
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "SuiteDocument": {
+      "additionalProperties": false,
+      "description": "Test suite \u2014 a named collection of tests with suite-level overrides.\n\nLists tests by ID reference or inline definition.  Suite-level ``defaults``\nmerge between global defaults and individual test config.",
+      "properties": {
+        "schema_version": {
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "kind": {
+          "const": "suite",
+          "default": "suite",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique suite name (required)",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "defaults": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Suite-level overrides applied to all tests in this suite"
+        },
+        "tests": {
+          "description": "Test IDs (string references) or inline TestConfig definitions",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/TestConfig"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Tests",
+          "type": "array"
+        },
+        "tags": {
+          "description": "Suite-level tags inherited by member tests",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "merge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MergePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "tests"
+      ],
+      "title": "SuiteDocument",
+      "type": "object"
+    },
+    "TestConfig": {
+      "additionalProperties": false,
+      "description": "A single test definition \u2014 or a partial overlay used as defaults.\n\nEvery field is optional so this model can serve three roles:\n* As a complete test (``kind: test``) \u2014 ``id`` is required, others optional.\n* As suite-level overrides (``kind: suite`` \u2192 ``defaults: TestConfig``).\n* As global defaults (``kind: defaults`` \u2192 ``defaults: TestConfig``).\n\nThe loader deep-merges layers in order: built-in \u2192 global \u2192 suite \u2192 test.",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Stable unique test identifier (required for kind=test)",
+          "title": "Id"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable test name",
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Test definition version (semver)",
+          "title": "Version"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "None=unset, True/False to enable/disable",
+          "title": "Enabled"
+        },
+        "capability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capability"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "subcategory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subcategory"
+        },
+        "difficulty": {
+          "anyOf": [
+            {
+              "enum": [
+                "easy",
+                "medium",
+                "hard",
+                "expert"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Difficulty"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inline input/prompt text",
+          "title": "Input"
+        },
+        "system_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Instructions"
+        },
+        "prompt_template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "input_variables": {
+          "additionalProperties": true,
+          "title": "Input Variables",
+          "type": "object"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpectedBehavior"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvaluatorReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatasetReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model_parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelParameters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scoring_categories": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "markup_compliance",
+                  "variable_scoping",
+                  "passage_structure",
+                  "macro_usage",
+                  "naked_interpolation",
+                  "link_setter_syntax"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which of the 6 SugarCube scoring categories to apply (default: all 6)",
+          "title": "Scoring Categories"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Seconds per model call (overrides model_parameters.timeout)",
+          "title": "Timeout"
+        },
+        "retry_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RetryPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "max_input_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Input Tokens"
+        },
+        "max_output_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Output Tokens"
+        },
+        "random_seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Random Seed"
+        },
+        "repetitions": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of repeated runs for variance analysis",
+          "title": "Repetitions"
+        },
+        "model_eligibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelEligibility"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "required_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Tools",
+          "type": "array"
+        },
+        "dependencies": {
+          "description": "Prerequisite test IDs that must pass first",
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "skip_conditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditions under which to skip this test",
+          "title": "Skip Conditions"
+        },
+        "expected_failure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If True, a FAIL is the expected outcome (negative test)",
+          "title": "Expected Failure"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {},
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Matrix dimensions: {dim_name: [val1, val2, ...]}",
+          "title": "Parameters"
+        },
+        "matrix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MatrixConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "TestConfig",
+      "type": "object"
+    },
+    "TestDocument": {
+      "additionalProperties": false,
+      "description": "Individual test document \u2014 a single test definition.\n\n``id`` is required.  All other fields are optional with sensible defaults\napplied by the loader during merge.",
+      "properties": {
+        "schema_version": {
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "kind": {
+          "const": "test",
+          "default": "test",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable unique test identifier (required)",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enabled"
+        },
+        "capability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capability"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "subcategory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subcategory"
+        },
+        "difficulty": {
+          "anyOf": [
+            {
+              "enum": [
+                "easy",
+                "medium",
+                "hard",
+                "expert"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Difficulty"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "system_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Instructions"
+        },
+        "prompt_template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "input_variables": {
+          "additionalProperties": true,
+          "title": "Input Variables",
+          "type": "object"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpectedBehavior"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvaluatorReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatasetReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model_parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelParameters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scoring_categories": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "markup_compliance",
+                  "variable_scoping",
+                  "passage_structure",
+                  "macro_usage",
+                  "naked_interpolation",
+                  "link_setter_syntax"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scoring Categories"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "retry_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RetryPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "max_input_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Input Tokens"
+        },
+        "max_output_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Output Tokens"
+        },
+        "random_seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Random Seed"
+        },
+        "repetitions": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repetitions"
+        },
+        "model_eligibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelEligibility"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "required_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Tools",
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "skip_conditions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skip Conditions"
+        },
+        "expected_failure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Failure"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {},
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "matrix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MatrixConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "merge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MergePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "TestDocument",
+      "type": "object"
+    },
+    "TestMetadata": {
+      "additionalProperties": false,
+      "description": "Provenance and lifecycle metadata for a test.",
+      "properties": {
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "created": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO-8601 creation timestamp",
+          "title": "Created"
+        },
+        "modified": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO-8601 last-modified timestamp",
+          "title": "Modified"
+        },
+        "deprecated": {
+          "default": false,
+          "title": "Deprecated",
+          "type": "boolean"
+        },
+        "deprecation_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deprecation Message"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "title": "TestMetadata",
+      "type": "object"
+    }
+  },
+  "title": "SugarCube Benchmark Test Configuration Schema",
+  "description": "Declarative test configuration schema (v1.0.0). See tests/DESIGN_NOTE.md.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "test_config.schema.json"
+}

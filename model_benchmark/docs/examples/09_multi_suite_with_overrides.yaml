@@ -1,0 +1,115 @@
+# =============================================================================
+# Example 09: Multi-Suite with Overrides (Layered Config)
+# =============================================================================
+# Demonstrates the full config hierarchy: global defaults -> suite
+# defaults -> individual test. This is a multi-doc YAML file with all
+# three document kinds. Shows how suite-level defaults override global
+# defaults, and how tags union across layers.
+#
+# This is a self-contained version of the reference example in
+# tests/examples/full_feature_example.yaml, simplified to show the merge
+# hierarchy clearly.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/09_multi_suite_with_overrides.yaml
+# List:  uv run python -m model_benchmark.cli list --config-dir docs/examples/ --select "suite:docs_demo"
+# =============================================================================
+
+---
+# ── Global defaults ────────────────────────────────────────────────────
+schema_version: "1.0.0"
+kind: defaults
+
+defaults:
+  enabled: true
+  difficulty: medium
+  repetitions: 1
+  tags: ["sugarcube"]          # inherited by ALL tests; tags always union
+
+  model_parameters:
+    base_url: "http://localhost:11434"
+    timeout: 120
+    num_predict: 640
+    temperature: 0.2          # global default
+
+  evaluation:
+    name: exact_match
+    pass_threshold: 1.0
+    max_score: 1.0
+
+merge:
+  list_strategy: replace
+  field_overrides:
+    tags: append              # tags accumulate, not replace
+
+---
+# ── Suite with overrides ────────────────────────────────────────────────
+schema_version: "1.0.0"
+kind: suite
+
+name: docs_demo
+description: >
+  Demonstration suite showing layered config. Suite defaults override
+  global defaults; individual tests override suite defaults.
+
+defaults:
+  capability: sugarcube_compliance
+  tags: ["core", "demo"]      # unions with global -> [sugarcube, core, demo]
+  model_parameters:
+    temperature: 0.0          # override global 0.2 -> 0.0 for this suite
+    num_predict: 512          # override global 640 -> 512
+  repetitions: 2              # 2 runs per case for variance
+
+tags: ["suite-level"]         # also inherited by members
+
+tests:
+  # Reference by ID — the test below (third document in this file).
+  - override_demo_test
+
+---
+# ── Individual test ────────────────────────────────────────────────────
+schema_version: "1.0.0"
+kind: test
+
+id: override_demo_test
+name: Override demonstration test
+description: >
+  This test inherits suite defaults (temperature=0.0, num_predict=512,
+  repetitions=2, tags=[sugarcube, core, demo, suite-level]) and adds its
+  own overrides (difficulty=hard, its own tags, its own evaluator).
+
+category: markup_compliance
+difficulty: hard             # overrides suite default (medium)
+tags: ["override", "hard"]   # unions -> [sugarcube, core, demo, suite-level, override, hard]
+
+input: |
+  Generate a SugarCube passage with complex macro nesting.
+  Use <<if>>, <<for>>, and <<set>> macros.
+
+expected:
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  not_contains:
+    - "**"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: substring_regex
+  type: regex
+  params:
+    mode: all
+  pass_threshold: 1.0
+
+# Override model_parameters at the test level
+model_parameters:
+  temperature: 0.1            # overrides suite 0.0 -> 0.1
+  num_predict: 256            # overrides suite 512 -> 256
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"
+
+merge:
+  field_overrides:
+    tags: append

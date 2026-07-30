@@ -1,0 +1,62 @@
+# =============================================================================
+# Example 05: Pairwise Matrix Strategy
+# =============================================================================
+# Demonstrates the pairwise matrix strategy, which reduces case count for
+# 3+ dimensions. Instead of the full Cartesian product, it generates a
+# minimal set of cases such that every pair of values from any two
+# dimensions appears in at least one case.
+#
+# With 3 dimensions of 3 values each, the full product is 27 cases.
+# Pairwise typically produces ~9 cases covering all pairs.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/05_pairwise_matrix.yaml
+# Plan:  uv run python -m model_benchmark.cli run --plan-only --select "id:matrix_pairwise_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: matrix_pairwise_example
+name: Pairwise matrix test
+description: >
+  Uses pairwise (all-pairs) strategy to cover all dimension pairs with
+  fewer cases than the full product. Three dimensions (variant, direction,
+  difficulty) with 3 values each: full product = 27, pairwise ~9.
+
+capability: sugarcube_compliance
+category: passage_structure
+difficulty: medium
+tags: ["matrix", "pairwise"]
+
+input: |
+  Generate a SugarCube passage for direction {direction} using the
+  {variant} format at {difficulty} difficulty.
+
+prompt_template:
+  variant: compact
+
+expected:
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+
+evaluation:
+  name: substring_regex
+  params:
+    mode: all
+  pass_threshold: 1.0
+
+# Three dimensions — pairwise reduces 27 -> ~9
+parameters:
+  variant: ["compact", "full", "json"]
+  direction: ["A", "B", "C"]
+  difficulty: ["easy", "medium", "hard"]
+
+matrix:
+  strategy: pairwise
+  max_cases: 50
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

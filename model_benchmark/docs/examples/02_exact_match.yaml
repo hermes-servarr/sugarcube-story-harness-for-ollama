@@ -1,0 +1,47 @@
+# =============================================================================
+# Example 02: Exact Match with Parameters
+# =============================================================================
+# Demonstrates the built-in exact_match evaluator with explicit parameters.
+# The evaluator is case-insensitive by default; here we set case_sensitive
+# to true and trim_response to false to show how params override defaults.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/02_exact_match.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:exact_match_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: exact_match_example
+name: Exact match with parameters
+description: >
+  Uses exact_match with case_sensitive=true and trim_response=false.
+  The expected answer is case-sensitive, so "paris" would fail but
+  "Paris" passes.
+
+capability: trivia
+category: geography
+difficulty: easy
+tags: ["smoke", "exact_match"]
+
+input: |
+  What is the capital of France? Reply with just the city name.
+
+expected:
+  answer: Paris
+  answer_type: exact
+
+evaluation:
+  name: exact_match
+  type: exact_match
+  params:
+    case_sensitive: true
+    strip_whitespace: true
+    trim_response: false
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

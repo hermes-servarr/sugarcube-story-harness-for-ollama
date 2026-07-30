@@ -1,0 +1,58 @@
+# =============================================================================
+# Example 07: Dataset-Driven Test (CSV)
+# =============================================================================
+# Demonstrates referencing an external CSV dataset. Each row in the dataset
+# becomes a parameterized test case. The qa_simple.csv file contains
+# question/answer pairs; the test checks exact_match against the answer
+# column. The filter restricts to easy-difficulty rows only.
+#
+# Dataset file: model_benchmark/tests/datasets/qa_simple.csv
+# Columns: question, answer, difficulty, category
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/07_dataset_driven.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:dataset_csv_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: dataset_csv_example
+name: Dataset-driven test (CSV)
+description: >
+  References a CSV dataset of Q&A pairs. Each row becomes a parameterized
+  test case: the question column feeds the prompt, the answer column is
+  the expected answer. The filter restricts to easy-difficulty rows.
+
+capability: trivia
+category: geography
+difficulty: easy
+tags: ["dataset", "csv", "exact_match"]
+
+input: "{question}"
+input_variables:
+  question: ""
+
+expected:
+  answer_type: exact
+
+evaluation:
+  name: exact_match
+  type: exact_match
+  params:
+    case_sensitive: false
+    strip_whitespace: true
+    trim_response: true
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+dataset:
+  name: qa_simple
+  format: csv
+  path: datasets/qa_simple.csv
+  filters:
+    difficulty: easy
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

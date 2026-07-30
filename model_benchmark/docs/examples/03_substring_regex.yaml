@@ -1,0 +1,58 @@
+# =============================================================================
+# Example 03: Substring and Regex Evaluation
+# =============================================================================
+# Demonstrates the substring_regex evaluator, which checks that the response
+# contains required substrings, does NOT contain forbidden substrings, and
+# matches required regex patterns. Scoring is fractional: N of M checks pass
+# -> score = N, max_score = M. pass_threshold=1.0 requires all checks to pass.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/03_substring_regex.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:substring_regex_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: substring_regex_example
+name: Substring and regex evaluation
+description: >
+  Checks that a SugarCube passage response contains the required section
+  headers (PROSE:, CHOICES:, SUMMARY:), does NOT contain Markdown formatting
+  (**bold**, *italic*), and matches a regex for SugarCube variable syntax.
+
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: medium
+tags: ["regex", "markup", "smoke"]
+
+input: |
+  Generate a short SugarCube passage where the player examines an object.
+  Use a SugarCube variable $hasKey and set it via <<set>>.
+  Output the PROSE, CHOICES, and SUMMARY sections.
+
+expected:
+  answer_type: structured
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  not_contains:
+    - "**"
+    - "*italic*"
+  regex:
+    - '<<set\s+\$hasKey\s+to\s+(true|false)>>'
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: substring_regex
+  type: regex
+  params:
+    case_sensitive: false
+    mode: all
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

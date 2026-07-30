@@ -1,0 +1,55 @@
+# =============================================================================
+# Example 08: Inline Dataset
+# =============================================================================
+# Demonstrates the inline dataset format — rows defined directly in the
+# config, no external file needed. Useful for small datasets or
+# self-contained examples. Each row in inline_data becomes a
+# parameterized test case.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/08_inline_dataset.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:inline_dataset_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: inline_dataset_example
+name: Inline dataset test
+description: >
+  Uses an inline dataset — rows defined directly in the config. Each row
+  provides a question and expected answer. No external file needed.
+
+capability: trivia
+difficulty: easy
+tags: ["dataset", "inline", "exact_match"]
+
+input: "{question}"
+input_variables:
+  question: ""
+
+expected:
+  answer_type: exact
+
+evaluation:
+  name: exact_match
+  type: exact_match
+  params:
+    case_sensitive: false
+    strip_whitespace: true
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+dataset:
+  name: inline_qa
+  format: inline
+  inline_data:
+    - {question: "What is 2+2?", answer: "4"}
+    - {question: "What is 3+3?", answer: "6"}
+    - {question: "What is the capital of Japan?", answer: "Tokyo"}
+    - {question: "What is the chemical symbol for gold?", answer: "Au"}
+    - {question: "Who painted the Mona Lisa?", answer: "Leonardo da Vinci"}
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

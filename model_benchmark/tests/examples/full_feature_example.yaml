@@ -1,0 +1,307 @@
+# =============================================================================
+# SugarCube Benchmark Test Configuration — Reference Example (schema v1.0.0)
+# =============================================================================
+# This file demonstrates EVERY feature of the declarative test config schema.
+# It is structured as three YAML documents separated by `---` (multi-doc):
+#   1. Global defaults (kind: defaults)
+#   2. A test suite (kind: suite)
+#   3. An individual test (kind: test)
+#
+# See DESIGN_NOTE.md for merge semantics and versioning policy.
+# See test_config.schema.json for the formal JSON Schema.
+#
+# The loader (t_172dd683) reads multi-doc YAML files, parses each document by
+# `kind`, and merges layers: built-in -> global defaults -> suite -> test -> CLI.
+#
+# In practice, each document kind usually lives in its own file (defaults.yaml,
+# suites/core.yaml, cases/<id>.yaml). This single-file multi-doc format is
+# shown for demonstration; the loader supports both.
+# =============================================================================
+
+---
+# ── 1. GLOBAL DEFAULTS ───────────────────────────────────────────────────
+# Applied to ALL tests in ALL suites unless overridden by a higher layer.
+schema_version: "1.0.0"
+kind: defaults
+
+defaults:
+  # Sensible defaults so a minimal test needs only `id` + `input` + `expected`.
+  enabled: true
+  difficulty: medium
+  repetitions: 1
+  tags: ["sugarcube"]          # inherited by all tests; tags always union
+
+  model_parameters:
+    base_url: "http://localhost:11434"
+    timeout: 120
+    num_predict: 640
+    temperature: 0.2
+
+  evaluation:
+    name: exact_match
+    pass_threshold: 1.0
+    max_score: 1.0
+
+  retry_policy:
+    max_retries: 2
+    backoff: exponential
+    initial_delay: 1.0
+    max_delay: 60.0
+    retry_on: ["timeout", "network_error", "rate_limit"]
+
+  metadata:
+    owner: benchmark-team
+    source: model_benchmark/tests
+
+# Merge policy for how list fields in these defaults combine with children.
+# `replace` is the default; `tags` is overridden to `append` so inherited tags
+# accumulate rather than clobber.
+merge:
+  list_strategy: replace
+  field_overrides:
+    tags: append
+
+---
+# ── 2. TEST SUITE ────────────────────────────────────────────────────────
+# A named collection. Suite-level `defaults` override global defaults but are
+# overridden by individual test config. `tests` lists test IDs (string refs to
+# files in cases/) or inline TestConfig definitions.
+schema_version: "1.0.0"
+kind: suite
+
+name: sugarcube_core
+description: >
+  Core SugarCube compliance suite — covers all 6 scoring categories across
+  the 3 prompt variants (compact, full, json) and 3 direction prompts (A, B, C).
+
+# Suite-level overrides: apply to every test in this suite.
+defaults:
+  capability: sugarcube_compliance
+  tags: ["core", "regression"]    # unions with global tags -> [sugarcube, core, regression]
+  scoring_categories:             # which of the 6 categories to score
+    - markup_compliance
+    - variable_scoping
+    - passage_structure
+    - macro_usage
+    - naked_interpolation
+    - link_setter_syntax
+  model_parameters:
+    temperature: 0.0              # override global 0.2 -> 0.0 for deterministic suite
+    num_predict: 512              # override global 640 -> 512
+  repetitions: 3                  # 3 runs per case for variance analysis
+
+# Tests: mix of string references (to cases/*.yaml) and inline definitions.
+tests:
+  # Reference by ID — loader finds the file containing this test ID.
+  - sugarcube_markup_001
+
+  # Reference by ID — a parameterized matrix test.
+  - sugarcube_direction_matrix
+
+  # Inline test definition (all fields shown).
+  - id: sugarcube_inline_macro
+    name: Inline macro nesting test
+    description: >
+      Verifies that container macros (<<if>>, <<for>>) are balanced.
+      Inline definitions are valid inside suites but one-test-per-file is
+      preferred for maintainability (see CONTRIBUTING.md).
+    category: macro_usage
+    subcategory: nesting
+    difficulty: hard
+    tags: ["inline", "nesting"]   # unions -> [sugarcube, core, regression, inline, nesting]
+    input: |
+      Write a SugarCube passage where the player has met the king.
+      Use a conditional that references $hasMetKing and shows different text
+      for each branch. Include a <<for>> loop over $inventory items.
+    prompt_template:
+      variant: full               # use the built-in build_full_passage_prompt
+      input_variables:
+        direction: "Include a conditional and a for-loop"
+    expected:
+      behavior:
+        - 'Uses <<if $hasMetKing>> with matching <</if>>'
+        - 'Uses <<for>> with matching <</for>>'
+        - 'No unclosed container macros'
+      must_parse_as: sugarcube_passage
+    evaluation:
+      name: llm_judge
+      type: llm_judge
+      version: "1.0"
+      params:
+        model: llama3.1:8b
+        temperature: 0.0
+      prompt: |
+        You are evaluating a SugarCube passage for macro nesting correctness.
+        Return JSON: {"pass": true|false, "score": 0.0-1.0, "reasoning": "..."}
+      pass_threshold: 0.8
+      deterministic: false
+    timeout: 180
+    model_eligibility:
+      required: ["llama3.1:8b", "qwen2.5:7b"]
+      min_context_length: 4096
+    metadata:
+      owner: alice
+      created: "2026-07-29T00:00:00Z"
+      modified: "2026-07-29T22:00:00Z"
+
+tags: ["suite-level"]             # suite-level tags also inherited by members
+
+merge:
+  list_strategy: replace
+  field_overrides:
+    tags: append
+
+---
+# ── 3. INDIVIDUAL TEST (standalone file equivalent) ──────────────────────
+# A complete test definition that could live in its own file under cases/.
+# Demonstrates: dataset reference, parameterized matrix, custom evaluator,
+# model eligibility, retry policy, dependencies, and full metadata.
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_direction_matrix
+name: Direction-following across prompt variants and directions
+description: >
+  Parameterized matrix test: evaluates all 3 prompt variants x 3 direction
+  prompts. Generates 9 concrete cases with deterministic IDs:
+    sugarcube_direction_matrix__variant-compact__dir-A, etc.
+version: "1.0.0"
+enabled: true
+capability: sugarcube_compliance
+category: passage_structure
+difficulty: medium
+tags: ["matrix", "parametrized"]
+
+# ── Prompt ──
+input: |
+  Generate a SugarCube passage based on the direction and variant specified
+  in the input variables. Follow the harness prompt template format exactly.
+prompt_template:
+  variant: compact               # default; overridden per-matrix-cell below
+  input_variables:
+    direction: "A"
+    context:
+      premise: "The protagonist enters a dimly lit tavern."
+      story_points: ["Find the informant", "Avoid the guards"]
+
+# ── Expected behavior ──
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+    - "Variables use <<set $var to value>> syntax"
+  constraints:
+    - "No raw [[links]] in choice text"
+    - "No setup. variables in prose"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  not_contains:
+    - "**"
+    - "*italic*"
+  must_parse_as: sugarcube_passage
+
+# ── Evaluator (custom plugin) ──
+evaluation:
+  name: sugarcube_rubric          # custom evaluator registered in plugin registry
+  type: rubric
+  version: "2.0"
+  params:
+    strict: true
+    categories: ["markup_compliance", "passage_structure"]
+  prompt_template_ref: prompts/evaluator_v3.txt
+  pass_threshold: 0.85
+  max_score: 1.0
+  deterministic: true
+
+# ── Dataset reference (external) ──
+dataset:
+  name: sugarcube_directions
+  version: "1.2.0"
+  split: test
+  path: datasets/directions.jsonl
+  format: jsonl
+  filters:
+    enabled: true
+    difficulty: ["easy", "medium"]
+  sample: 100                     # random sample 100 rows
+  seed: 42
+  checksum: "sha256:abc123def456"
+
+# ── Model parameters ──
+model_parameters:
+  base_url: "http://localhost:11434"
+  timeout: 90
+  num_predict: 512
+  temperature: 0.0
+  top_p: 0.9
+  seed: 42
+
+# ── Scoring ──
+scoring_categories:
+  - markup_compliance
+  - passage_structure
+  - macro_usage
+
+# ── Execution ──
+timeout: 90                        # overrides model_parameters.timeout for this test
+retry_policy:
+  max_retries: 3
+  backoff: exponential
+  initial_delay: 2.0
+  max_delay: 120.0
+  retry_on: ["timeout", "network_error", "rate_limit", "evaluator_error"]
+max_input_tokens: 2048
+max_output_tokens: 1024
+random_seed: 42
+repetitions: 5                     # 5 runs per case for variance analysis
+
+# ── Model eligibility ──
+model_eligibility:
+  required: ["llama3.1:8b", "qwen2.5:7b", "mistral:7b"]
+  excluded: ["gpt-4"]              # not testing proprietary models here
+  min_context_length: 4096
+  min_parameters: 7000000000      # 7B+
+  required_capabilities: ["instruction_following"]
+
+# ── Dependencies ──
+dependencies: ["sugarcube_markup_001"]   # must pass before this test runs
+skip_conditions:
+  - "ollama_unreachable"
+  - "model_not_in_required_list"
+expected_failure: false
+
+# ── Parameterized matrix ──
+# Expands into N concrete cases. Deterministic IDs encode the dimension values.
+parameters:
+  variant: ["compact", "full", "json"]    # PromptVariant values
+  direction: ["A", "B", "C"]              # DirectionKey values
+  difficulty: ["easy", "medium"]          # override difficulty per cell
+
+matrix:
+  strategy: full                  # full Cartesian product: 3 x 3 x 2 = 18 cases
+  max_cases: 100                  # safety cap (prevents explosion if dims grow)
+  # For pairwise testing, use: strategy: pairwise
+  # For explicit combos, use:
+  #   strategy: explicit
+  #   explicit_combinations:
+  #     - {variant: compact, direction: A}
+  #     - {variant: json, direction: C}
+
+# ── Metadata ──
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_direction_matrix.yaml
+  created: "2026-07-29T00:00:00Z"
+  modified: "2026-07-29T22:30:00Z"
+  deprecated: false
+  notes: >
+    Covers the full variant x direction matrix. Uses an external dataset
+    for direction prompts and a custom rubric evaluator.
+
+merge:
+  list_strategy: replace
+  field_overrides:
+    tags: append

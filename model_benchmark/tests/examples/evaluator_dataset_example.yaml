@@ -1,0 +1,148 @@
+# =============================================================================
+# SugarCube Benchmark — Evaluator + Dataset Integration Example (schema v1.0.0)
+# =============================================================================
+#
+# This file demonstrates the evaluator plugin interface and dataset integration
+# (task t_b8e82f29). It shows how to:
+#
+# 1. Reference a built-in evaluator (exact_match) with parameters.
+# 2. Reference a custom evaluator (section_presence) discovered as a plugin.
+# 3. Reference an LLM-judge evaluator (llm_judge) in stub mode for CI.
+# 4. Reference datasets (CSV, JSONL) that inject rows as parameterized inputs.
+#
+# See PLUGIN_GUIDE.md for how to write custom evaluators.
+# See tests/datasets/ for the sample dataset files used here.
+# =============================================================================
+
+---
+# ── 1. TEST USING BUILT-IN EXACT_MATCH EVALUATOR + CSV DATASET ──────────
+schema_version: "1.0.0"
+kind: test
+
+id: qa_exact_match_example
+name: QA exact match with CSV dataset
+description: >
+  Uses the built-in exact_match evaluator on a CSV dataset of simple
+  Q&A pairs. Each row becomes a parameterized test case — the `answer`
+  column is the expected answer, and the evaluator checks for exact
+  string equality.
+version: "1.0.0"
+enabled: true
+difficulty: easy
+tags: ["evaluator", "dataset", "exact_match"]
+
+input: "{question}"
+input_variables:
+  question: ""  # filled from dataset row
+
+expected:
+  answer_type: exact
+  # answer is injected from the dataset row at runtime
+
+evaluation:
+  name: exact_match
+  type: exact_match
+  params:
+    case_sensitive: false
+    strip_whitespace: true
+    trim_response: true
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+dataset:
+  name: qa_simple
+  format: csv
+  path: datasets/qa_simple.csv
+  filters:
+    difficulty: easy
+
+---
+# ── 2. TEST USING CUSTOM SECTION_PRESENCE EVALUATOR + JSONL DATASET ────
+# The section_presence evaluator is auto-discovered from
+# tests/evaluators/section_presence.py — no installation needed.
+schema_version: "1.0.0"
+kind: test
+
+id: section_presence_example
+name: Section presence with custom evaluator
+description: >
+  Uses the custom section_presence evaluator (a drop-in plugin in
+  tests/evaluators/) to check that model responses contain all required
+  SugarCube section headers (PROSE:, CHOICES:, SUMMARY:). The dataset
+  provides the prompts and expected sections for each test case.
+version: "1.0.0"
+enabled: true
+difficulty: medium
+tags: ["evaluator", "dataset", "custom-evaluator", "section_presence"]
+
+input: "{prompt}"
+input_variables:
+  prompt: ""
+
+expected:
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: section_presence
+  type: section_check
+  params:
+    case_sensitive: false
+    partial_match: false
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+dataset:
+  name: directions
+  format: jsonl
+  path: datasets/directions.jsonl
+  filters:
+    variant: compact
+
+---
+# ── 3. TEST USING LLM_JUDGE (STUB MODE) + DATASET ──────────────────────
+# The llm_judge evaluator in stub mode uses heuristics (no model call)
+# so it works in CI. In production, set mode=api and provide a model.
+schema_version: "1.0.0"
+kind: test
+
+id: llm_judge_stub_example
+name: LLM judge (stub) with dataset
+description: >
+  Uses the llm_judge evaluator in stub mode — it checks whether the
+  expected answer appears as a substring and whether behavioral
+  descriptors are satisfied via keyword matching. No model call is
+  made, so this runs in CI without Ollama.
+version: "1.0.0"
+enabled: true
+difficulty: hard
+tags: ["evaluator", "dataset", "llm_judge", "stub"]
+
+input: "{prompt}"
+
+expected:
+  answer_type: free_text
+  behavior:
+    - "Response contains all required sections"
+    - "Uses SugarCube markup not markdown"
+
+evaluation:
+  name: llm_judge
+  type: llm_judge
+  params:
+    mode: stub
+  pass_threshold: 0.8
+  max_score: 1.0
+  deterministic: false
+
+dataset:
+  name: directions
+  format: jsonl
+  path: datasets/directions.jsonl
+  sample: 3
+  seed: 42

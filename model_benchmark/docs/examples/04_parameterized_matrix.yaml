@@ -1,0 +1,66 @@
+# =============================================================================
+# Example 04: Parameterized Matrix (Full Cartesian)
+# =============================================================================
+# Demonstrates a parameterized matrix test. The `parameters` block defines
+# dimensions; `matrix.strategy: full` generates the Cartesian product.
+# This test produces 3 variants x 3 directions = 9 concrete instances, each
+# with a deterministic ID like:
+#   matrix_full_example__direction-A__variant-compact
+#
+# The `max_cases` cap prevents explosion if dimensions grow.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/04_parameterized_matrix.yaml
+# Plan:  uv run python -m model_benchmark.cli run --plan-only --select "id:matrix_full_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: matrix_full_example
+name: Full Cartesian matrix test
+description: >
+  Parameterized test: evaluates 3 prompt variants x 3 directions = 9
+  concrete cases. Each case gets a deterministic ID encoding its
+  dimension values. Uses the substring_regex evaluator to check
+  section headers.
+
+capability: sugarcube_compliance
+category: passage_structure
+difficulty: medium
+tags: ["matrix", "parametrized"]
+
+input: |
+  Generate a SugarCube passage for direction {direction} using the
+  {variant} prompt format. Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: compact
+  input_variables:
+    direction: "A"
+
+expected:
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: substring_regex
+  type: regex
+  params:
+    mode: all
+  pass_threshold: 1.0
+
+# Matrix dimensions: 3 x 3 = 9 cases
+parameters:
+  variant: ["compact", "full", "json"]
+  direction: ["A", "B", "C"]
+
+matrix:
+  strategy: full
+  max_cases: 100
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

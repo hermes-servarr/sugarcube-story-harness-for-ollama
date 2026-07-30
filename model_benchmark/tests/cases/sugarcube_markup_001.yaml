@@ -1,0 +1,49 @@
+# Individual test definition — referenced by the sugarcube_core suite.
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_markup_001
+name: Basic SugarCube markup compliance
+description: >
+  Verifies that the model produces SugarCube-formatted markup (not Markdown)
+  with correct variable scoping and balanced macros.
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: easy
+tags: ["markup", "smoke"]
+
+input: |
+  Generate a short SugarCube passage where the player examines an object.
+  Use a SugarCube variable ``$hasKey`` and set it via ``<<set>>``.
+  Output the PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Examine object and set a variable"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+    - "Variables use <<set $var to value>> syntax"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  not_contains:
+    - "**"
+    - "*italic*"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_markup_001.yaml
+  created: "2026-07-29T00:00:00Z"
+  modified: "2026-07-29T23:00:00Z"

@@ -1,0 +1,55 @@
+# =============================================================================
+# Example 06: Custom Evaluator (Drop-in Plugin)
+# =============================================================================
+# Demonstrates referencing a custom evaluator that is auto-discovered from
+# model_benchmark/tests/evaluators/. The section_presence evaluator checks
+# that required section headers (PROSE:, CHOICES:, SUMMARY:) are present
+# at the start of a line in the response.
+#
+# The plugin file: model_benchmark/tests/evaluators/section_presence.py
+# It is auto-discovered — no installation or registration code needed
+# beyond the @register decorator in the plugin file.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/06_custom_evaluator.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:custom_evaluator_example" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: custom_evaluator_example
+name: Custom evaluator (section_presence)
+description: >
+  Uses the section_presence custom evaluator (a drop-in plugin) to check
+  that the response contains all required SugarCube section headers. The
+  evaluator is auto-discovered from tests/evaluators/section_presence.py.
+
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: easy
+tags: ["custom-evaluator", "section_presence", "smoke"]
+
+input: |
+  Generate a SugarCube passage where the player examines an object.
+  Output the PROSE, CHOICES, and SUMMARY sections.
+
+expected:
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: section_presence
+  type: section_check
+  params:
+    case_sensitive: false
+    partial_match: false
+  pass_threshold: 1.0
+  max_score: 1.0
+  deterministic: true
+
+metadata:
+  owner: docs
+  created: "2026-07-30T00:00:00Z"

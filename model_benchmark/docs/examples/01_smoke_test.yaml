@@ -1,0 +1,26 @@
+# =============================================================================
+# Example 01: Smoke Test (Minimal)
+# =============================================================================
+# The smallest valid test: just an id, input, and expected answer.
+# Everything else (enabled, difficulty, evaluator, model params) falls back
+# to built-in defaults. This is the starting point for any new test.
+#
+# Run:   uv run python -m model_benchmark.cli validate docs/examples/01_smoke_test.yaml
+# Dry-run: uv run python -m model_benchmark.cli run --dry-run --select "id:smoke_test_001" --config-dir docs/examples/
+# =============================================================================
+
+schema_version: "1.0.0"
+kind: test
+
+id: smoke_test_001
+name: Minimal smoke test
+description: >
+  The smallest valid test. Checks that the model says "Paris" when asked
+  about the capital of France. Uses the built-in exact_match evaluator
+  with default settings (case-insensitive, whitespace-stripped).
+
+input: |
+  What is the capital of France? Reply with just the city name.
+
+expected:
+  answer: Paris
