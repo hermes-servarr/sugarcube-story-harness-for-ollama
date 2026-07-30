@@ -13,7 +13,7 @@
   "commit_message": "Publish anonymized benchmark results",
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
   "variants": ["compact", "full", "json"],
-  "directions": ["A", "B", "C"],
+  "directions": ["A", "B", "C", "D", "E", "F", "G", "H"],
   "runs": 1,
   "timeout": 120,
   "num_predict": 640,

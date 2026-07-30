@@ -48,6 +48,8 @@ uv sync
 Set the real explicit model tags, clone path, `.venv\Scripts\python.exe`, Git
 executable, remote, and branch in the config. Configure non-interactive Git
 pull/push credentials for the dedicated account.
+The example runs all benchmark directions currently defined by the project
+(A–H); reduce that list only if you intentionally want a smaller run.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.
