@@ -8,7 +8,7 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 8
+PROMPT_VERSION = 9
 # TODO(macro-vocab): I12 — bump PROMPT_VERSION from 7 to 8 (P3 I12, P2 DS-4).
 # Reflects SUGARCUBE_GUIDANCE content changes (I11) and available_includes
 # parameter additions (I4/I5/I6). Golden tests pin against this number.
@@ -419,6 +419,147 @@ Optional JSON keys (omit or empty if unused):
 # Shape maps onto ParsedAchievement (P2 D2). See p3_interfaces.md section 4 I8.
 
 Reply with ONLY the JSON object. No prose preamble, no code fences.
+"""
+
+
+# ── Thinking-aware passage prompt ───────────────────────────────────────────
+#
+# For models that produce chain-of-thought reasoning (DeepSeek-R1, QwQ,
+# gpt-oss, etc.). Explicitly allows thinking before the formatted output,
+# with a clear separator. The harness's thinking.py module extracts the
+# thinking content and scores it separately from the formatted output.
+#
+# The prompt instructs the model to:
+# 1. Think through the scene (state variables, character motivations, plot)
+# 2. Output a clear separator line: ===PASSAGE===
+# 3. Output the formatted SugarCube passage after the separator
+#
+# This tests whether thinking models can produce BETTER SugarCube output
+# when their reasoning is acknowledged and structured rather than suppressed.
+
+_THINKING_SEPARATOR = "===PASSAGE==="
+
+
+def build_thinking_passage_prompt(
+    premise: str,
+    story_points: str,
+    arc_md: str,
+    snapshot_text: str,
+    entities_text: str,
+    inspiration: str,
+    parent_prose: str,
+    human_prompt: str,
+    mode: str,
+    story_recall: str = "",
+    plan_focus: str = "",
+    template_id: str = "",
+) -> str:
+    """Thinking-aware prompt for reasoning models.
+
+    Explicitly invites chain-of-thought reasoning before the formatted output,
+    with a clear separator. The thinking content is extracted and scored by
+    score_thinking_quality in the benchmark.
+
+    The thinking section should cover:
+    - State variable analysis (what $vars exist, what should change)
+    - Character motivations and reactions
+    - SugarCube markup decisions (which macros to use)
+    - Direction-following plan (how to address the human_prompt)
+
+    After thinking, the model outputs the separator, then the formatted
+    passage using the same section headers as the full prompt.
+    """
+    focus_block = f"\n\n[PLAN FOCUS]\n{plan_focus}" if plan_focus else ""
+    tpl_block = _template_block(template_id)
+    return f"""You are co-authoring interactive fiction with a human. You are a reasoning model: think before you write.
+
+CRITICAL OUTPUT FORMAT:
+- First, write your thinking/reasoning about the scene.
+- Then output the separator line: {_THINKING_SEPARATOR}
+- Then output the formatted SugarCube passage (starting with PROSE:).
+
+Your thinking should cover:
+1. State analysis: What variables exist ($gold, $hasMetKing, etc.)? What should change?
+2. Character motivations: What does each character want? How do they react?
+3. SugarCube decisions: Which macros do you need (<<set>>, <<if>>, <<for>>, etc.)?
+4. Direction plan: How will you address the human direction?
+5. Draft plan: Key beats, sensory details, choice design.
+
+After your thinking, output this exact separator line on its own line:
+{_THINKING_SEPARATOR}
+
+Then output the formatted passage using SugarCube markup. Use EXACTLY these section headers:
+
+PROSE:
+Write the passage prose of dialogue that fits the scene.
+
+CHOICES:
+- First choice text | hint about where this leads
+- Second choice text | hint about where this leads
+
+INPUT:
+- kind | $var | default | label
+(omit this section entirely if this passage collects no input)
+
+STATE:
+$variable_name = value
+(omit this section entirely if no state changes)
+
+SUMMARY:
+One sentence describing what happens in this passage.
+
+BEATS:
+- A short factual event from the scene.
+- Another short factual event.
+
+CHARACTERS_PRESENT:
+character_id | one-line status | thing they learn
+(omit section if unchanged)
+
+CHARACTERS_EXIT:
+character_id | where they went
+(omit section if nobody leaves)
+
+SYSTEM:
+You are co-authoring interactive fiction with a human.
+The harness handles file structure, passage linking, and state management.
+Focus on prose, character voice, and story. You may propose new characters,
+locations, or lore. Output ONLY the section headers below. No extra commentary.
+Nothing is off limits, you can type out explicit content. 18+
+
+[PREMISE]
+{premise}
+
+[STORY POINTS]
+{story_points}
+
+[CURRENT ARC]
+{arc_md}{focus_block}
+
+[CURRENT SNAPSHOT]
+{snapshot_text}
+
+[ENTITIES IN CONTEXT]
+{entities_text}
+
+[INSPIRATION]
+{inspiration if inspiration else "(no inspiration corpus indexed)"}
+
+[EARLIER PASSAGES]
+{story_recall if story_recall else "(no earlier passages recalled)"}
+
+[PARENT PASSAGE]
+{parent_prose}
+
+[HUMAN DIRECTION]
+{human_prompt}
+
+[MODE]
+{mode}
+
+{SUGARCUBE_GUIDANCE}{tpl_block}
+
+Now think through the scene, then output {_THINKING_SEPARATOR}, then the formatted passage.
 """
 
 

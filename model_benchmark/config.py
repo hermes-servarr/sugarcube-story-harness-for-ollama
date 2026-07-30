@@ -85,7 +85,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # ── Legacy flags (11, preserved from scoring.py main() L873) ────────────
     parser.add_argument("--models", nargs="*", default=[],
                         help="Model tags to test (empty=auto-discover)")
-    parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json"],
+    parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json", "thinking"],
                         default=["compact", "full", "json"], help="Prompt variants")
     parser.add_argument("--directions", nargs="*", choices=["A", "B", "C", "D", "E", "F", "G", "H"],
  default=["A", "B", "C"], help="Directions")

@@ -26,6 +26,7 @@ from harness.prompts import (
     build_compact_passage_prompt,
     build_full_passage_prompt,
     build_json_passage_prompt,
+    build_thinking_passage_prompt,
 )
 
 if TYPE_CHECKING:
@@ -116,6 +117,45 @@ FIXTURE_CYBERPUNK = FixtureContext(
     inspiration="Cyberpunk heist trope with corporate espionage and moral ambiguity.",
 )
 
+# Complex state context (designed for thinking models)
+# Multiple state variables, complex interdependencies that benefit from planning
+FIXTURE_COMPLEX_STATE = FixtureContext(
+    id="complex_state",
+    premise="A rebel leader must coordinate three factions in a besieged city while managing dwindling supplies.",
+    story_points="The leader must decide which faction to trust with a critical mission: the military, the scholars, or the underground.",
+    arc_md="## Chapter 3: The Siege\nThree factions demand action. Supplies run low. Trust is currency.",
+    snapshot="Location: Rebel HQ, besieged city. Time: Dawn. $militaryTrust = 40, $scholarTrust = 60, $undergroundTrust = 20, $supplies = 25, $hasMetGeneral = true, $hasMetScholar = true, $hasMetBroker = false.",
+    entities="Characters: leader (protagonist), general (military faction, pragmatic), scholar (knowledge faction, idealistic), broker (underground faction, opportunistic, not yet met)",
+    parent_prose="The rebel leader stared at the map, three faction markers glowing in the dim light of the command tent. Artillery fire echoed in the distance.",
+    inspiration="Political thriller with multi-faction resource management and trust mechanics.",
+)
+
+# Multi-NPC social context (designed for thinking models)
+# Requires reasoning about character motivations and relationships
+FIXTURE_SOCIAL = FixtureContext(
+    id="social",
+    premise="A diplomat at a gala must navigate a web of alliances, secrets, and hidden agendas to secure a trade deal.",
+    story_points="The diplomat must decide whether to confront a rival about a stolen document or use it as leverage quietly.",
+    arc_md="## Chapter 2: The Gala\nThree nobles hold pieces of the puzzle. One of them is lying.",
+    snapshot="Location: Palace ballroom. Time: Midnight. $hasMetDuke = true, $hasMetCountess = true, $hasMetBaron = false, $knowsSecret = false, $reputation = 70.",
+    entities="Characters: diplomat (protagonist), duke (wealthy, suspicious), countess (charming, secretive), baron (ambitious, dangerous, not yet met)",
+    parent_prose="The diplomat swirled their wine, watching the duke and countess exchange glances across the crowded ballroom. Something was being hidden.",
+    inspiration="Court intrigue with social deduction and relationship tracking.",
+)
+
+# Puzzle context (designed for thinking models)
+# Requires logical reasoning about state and consequences
+FIXTURE_PUZZLE = FixtureContext(
+    id="puzzle",
+    premise="An archaeologist in an ancient temple must solve a sequence puzzle to unlock a chamber, but each wrong attempt triggers a trap.",
+    story_points="The archaeologist must decide which combination of three runes to press based on clues found in the previous rooms.",
+    arc_md="## Chapter 4: The Sealed Chamber\nThree runes. Three clues. One wrong move means death.",
+    snapshot="Location: Temple inner chamber. Time: Unknown. $hasRuneClue1 = true, $hasRuneClue2 = true, $hasRuneClue3 = false, $trapArmed = true, $health = 80, $attempts = 0.",
+    entities="Characters: archaeologist (protagonist), guardian spirit (ancient, enigmatic, bound to the temple)",
+    parent_prose="The archaeologist knelt before the three rune slots, their torch casting flickering shadows on the ancient stone walls. Two clues were deciphered. One was still missing.",
+    inspiration="Tomb Raider style puzzle-adventure with state-dependent consequences and logical deduction.",
+)
+
 # Registry: all available fixture contexts
 FIXTURE_CONTEXTS: dict[str, FixtureContext] = {
     ctx.id: ctx for ctx in [
@@ -124,6 +164,9 @@ FIXTURE_CONTEXTS: dict[str, FixtureContext] = {
         FIXTURE_HORROR,
         FIXTURE_MODERN,
         FIXTURE_CYBERPUNK,
+        FIXTURE_COMPLEX_STATE,
+        FIXTURE_SOCIAL,
+        FIXTURE_PUZZLE,
     ]
 }
 
@@ -199,6 +242,18 @@ def build_fixture_prompt(
             human_prompt=human_prompt,
             mode=ctx.mode,
         )
+    elif variant == "thinking":
+        return build_thinking_passage_prompt(
+            premise=ctx.premise,
+            story_points=ctx.story_points,
+            arc_md=ctx.arc_md,
+            snapshot_text=ctx.snapshot,
+            entities_text=ctx.entities,
+            inspiration=ctx.inspiration,
+            parent_prose=ctx.parent_prose,
+            human_prompt=human_prompt,
+            mode=ctx.mode,
+        )
     raise ValueError(f"Unknown variant: {variant}")
 
 
@@ -206,6 +261,39 @@ def build_fixture_prompt(
 # A deliberately correct SugarCube response that passes all 6 categories,
 # confirming the scoring logic is self-consistent.  Used by main(["--dry-run"]).
 _DRY_RUN_RESPONSE = """PROSE:
+The apprentice examined the tome carefully. ''This is remarkable!'' they whispered.
+$gold glinted in their pouch as they weighed the decision.
+
+<<set $hasReadBook to true>>
+
+CHOICES:
+- Open the book and read | A dangerous choice
+- Return it to the mentor | The safe path
+
+SUMMARY:
+The apprentice discovered a magical tome and faced a moral choice.
+"""
+
+# ── Thinking variant dry-run fixture ──────────────────────────────────
+# A response with chain-of-thought reasoning before the formatted output,
+# separated by ===PASSAGE===. Tests the thinking extraction and scoring.
+_THINKING_DRY_RUN_RESPONSE = """Let me analyze this scene before writing.
+
+1. State analysis: The apprentice has $gold = 15 and $hasMetKing = false. The direction asks me to check inventory and set a flag, so I need to use <<set>> to update a variable. I'll set $hasReadBook to true since the scene involves discovering a tome.
+
+2. Character motivations: The apprentice is curious but cautious. The mentor is absent but their influence is felt. The moral choice is between knowledge (read) and obedience (return).
+
+3. SugarCube decisions: I need <<set $hasReadBook to true>> for the state change. I'll use ''italic'' for emphasis (not markdown). No <<if>> needed for this direction, just a straightforward state set.
+
+4. Direction plan: The direction says "check inventory and set a flag". I'll reference $gold in the prose (naked interpolation) and use <<set>> for the flag.
+
+5. Draft plan:
+- Sensory: dust, moonlight, old leather smell
+- Choice: read vs return (risk vs safety)
+- Summary: discovery + moral choice
+
+===PASSAGE===
+PROSE:
 The apprentice examined the tome carefully. ''This is remarkable!'' they whispered.
 $gold glinted in their pouch as they weighed the decision.
 

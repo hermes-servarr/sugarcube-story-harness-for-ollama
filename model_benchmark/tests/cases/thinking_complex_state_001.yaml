@@ -1,0 +1,52 @@
+schema_version: "1.0.0"
+kind: test
+
+id: thinking_complex_state_001
+name: Thinking model multi-faction state management
+description: >
+  Tests thinking models on complex state management with multiple factions,
+  interdependent trust variables, and resource constraints. The reasoning
+  section should analyze all state variables and plan consequences before
+  writing the passage.
+capability: sugarcube_direction_following
+category: markup_compliance
+difficulty: expert
+tags: ["thinking", "complex-state", "multi-faction", "reasoning"]
+
+input: |
+  Generate a SugarCube passage where the rebel leader addresses all three
+  factions. Use <<if>> conditionals based on $militaryTrust, $scholarTrust,
+  and $undergroundTrust to show different reactions. Set $supplies to
+  decrease by 5 after the decision.
+  Think through the faction dynamics and trust levels before writing.
+  Use the ===PASSAGE=== separator between thinking and formatted output.
+
+prompt_template:
+  variant: thinking
+  input_variables:
+    direction: "Coordinate three factions with interdependent trust variables and resource constraints"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains thinking/reasoning section before formatted output"
+    - "Thinking references state variables ($militaryTrust, $scholarTrust, etc.)"
+    - "Thinking mentions SugarCube macros (<<set>>, <<if>>)"
+    - "Formatted output contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 0.7
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/thinking_complex_state_001.yaml
+  created: "2026-07-30T22:30:00Z"
+  modified: "2026-07-30T22:30:00Z"

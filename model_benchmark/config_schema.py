@@ -42,7 +42,7 @@ DocumentKind = Literal["defaults", "suite", "test"]
 Difficulty = Literal["easy", "medium", "hard", "expert"]
 """Test difficulty levels, ordered easy → expert."""
 
-PromptVariant = Literal["compact", "full", "json"]
+PromptVariant = Literal["compact", "full", "json", "thinking"]
 """Prompt format variant (mirrors harness.prompts builders)."""
 
 DirectionKey = Literal["A", "B", "C", "D", "E", "F", "G", "H"]
@@ -55,8 +55,9 @@ ScoringCategory = Literal[
     "macro_usage",
     "naked_interpolation",
     "link_setter_syntax",
+    "thinking_quality",
 ]
-"""The 6 SugarCube compliance categories (canonical order, INV-9)."""
+"""The 7 SugarCube compliance categories (canonical order, INV-9)."""
 
 StatusClassification = Literal[
     "PASS", "FAIL", "ERROR", "SKIPPED", "INVALID", "TIMEOUT", "CANCELLED",

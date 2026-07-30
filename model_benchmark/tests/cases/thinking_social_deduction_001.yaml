@@ -1,0 +1,52 @@
+schema_version: "1.0.0"
+kind: test
+
+id: thinking_social_deduction_001
+name: Thinking model social deduction and NPC relationships
+description: >
+  Tests thinking models on social scenarios requiring reasoning about
+  NPC motivations, hidden information, and relationship management.
+  The reasoning section should analyze each NPC's potential motivations
+  and plan the social interaction accordingly.
+capability: sugarcube_direction_following
+category: markup_compliance
+difficulty: expert
+tags: ["thinking", "social", "npc", "deduction", "reasoning"]
+
+input: |
+  Generate a SugarCube passage where the diplomat confronts the countess
+  about the stolen document. Use <<if $knowsSecret>> to conditionally show
+  different dialogue. Use <<switch $reputation>> with <<case>> to branch
+  on the diplomat's standing.
+  Think through each noble's motivations and what they might reveal
+  before writing the passage.
+
+prompt_template:
+  variant: thinking
+  input_variables:
+    direction: "Use <<switch>> and <<case>> to branch on the player's current location variable"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains thinking/reasoning section before formatted output"
+    - "Thinking references character motivations (duke, countess, baron)"
+    - "Thinking mentions SugarCube macros"
+    - "Formatted output contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 0.7
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/thinking_social_deduction_001.yaml
+  created: "2026-07-30T22:30:00Z"
+  modified: "2026-07-30T22:30:00Z"
