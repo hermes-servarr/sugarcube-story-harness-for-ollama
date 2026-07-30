@@ -74,8 +74,34 @@ Revert global_suffix to empty string if aggregate pass rate declines below 0.055
 
 ## After Metrics
 
-(pending benchmark run)
+Benchmark did not run. The protected SSH command failed:
+
+    ssh: Could not resolve hostname sugarcube-benchmark: Temporary failure in name resolution
+
+The SSH config at ~/.ssh/config defines `Host windows-pc` (192.168.0.123) but
+no `sugarcube-benchmark` host entry. Per skill safety rules, the SSH hostname
+and remote command must not be altered.
+
+## Stop Condition
+
+**Protected command failed** (DNS resolution failure for `sugarcube-benchmark`).
+Per the goal constraints: "a protected command fails, times out, disconnects,
+reports already-running, or has ambiguous status" triggers an immediate stop.
+
+The overlay change was reverted to the empty baseline and pushed. No experiment
+completed; no benchmark data was produced.
 
 ## Conclusion
 
-(pending)
+Experiment 01 was aborted at step 10 (benchmark invocation). The overlay
+hypothesis (SugarCube formatting + passage structure guidance in global_suffix)
+was never validated. Operator must configure the `sugarcube-benchmark` SSH host
+entry (or correct the hostname) before the campaign can proceed.
+
+## Operator Action Required
+
+1. Add a `sugarcube-benchmark` Host entry to `~/.ssh/config` pointing to the
+   correct benchmark PC address and credentials.
+2. Ensure the benchmark PC is reachable and the forced-command publisher is
+   operational.
+3. Re-issue the `/goal` command to resume the campaign.
