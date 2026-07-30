@@ -1,0 +1,45 @@
+schema_version: "1.0.0"
+kind: test
+
+id: edge_markdown_mixed_001
+name: "Edge case: mixed Markdown and SugarCube markup"
+description: >
+  Tests model behavior when prompted to use both Markdown and SugarCube.
+  The model should still produce SugarCube markup. This tests whether
+  models follow the SugarCube-only constraint when given mixed signals.
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: hard
+tags: ["edge-case", "markup", "mixed-format"]
+
+input: |
+  Generate a SugarCube passage where the protagonist writes in a journal.
+  The journal entries may use both SugarCube markup and some Markdown
+  for emphasis. Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "The protagonist writes a journal entry mixing old and new markup styles"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Predominantly uses SugarCube markup over Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 0.5
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/edge_markdown_mixed_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

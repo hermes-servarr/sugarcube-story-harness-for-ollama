@@ -1025,8 +1025,8 @@ class TestIntegration:
 
     def test_real_select_and_expand(self, loader):
         instances = select_and_expand(loader)
-        # 5 non-matrix tests (1 each) + 1 matrix test (18) = 23.
-        assert len(instances) == 23
+        # 5 non-matrix tests (1 each) + 1 matrix test (18) + 9 new test cases = 32.
+        assert len(instances) == 32
 
     def test_real_dry_run(self, loader):
         specs = loader.resolve_all()
@@ -1034,7 +1034,7 @@ class TestIntegration:
         formatted = result.format()
         assert isinstance(formatted, str)
         assert "DRY RUN" in formatted
-        assert "23" in formatted  # total instances
+        assert "32" in formatted  # total instances
 
     def test_real_select_by_suite(self, loader):
         specs = loader.resolve_all()

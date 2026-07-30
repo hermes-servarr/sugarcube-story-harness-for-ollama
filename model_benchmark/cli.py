@@ -478,7 +478,7 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     p_run.add_argument(
         "--directions",
         nargs="*",
-        choices=["A", "B", "C"],
+        choices=["A", "B", "C", "D", "E", "F", "G", "H"],
         default=["A", "B", "C"],
         help="Directions.",
     )

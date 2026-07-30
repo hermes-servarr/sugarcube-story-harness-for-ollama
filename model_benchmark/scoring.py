@@ -121,7 +121,7 @@ if TYPE_CHECKING:
 
 PromptVariant = Literal["compact", "full", "json"]
 
-DirectionKey = Literal["A", "B", "C"]
+DirectionKey = Literal["A", "B", "C", "D", "E", "F", "G", "H"]
 
 CategoryName = Literal[
     "markup_compliance",
@@ -878,7 +878,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--models", nargs="*", default=[], help="Model tags to test (empty=auto-discover)")
     parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json"],
                         default=["compact", "full", "json"], help="Prompt variants")
-    parser.add_argument("--directions", nargs="*", choices=["A", "B", "C"],
+    parser.add_argument("--directions", nargs="*", choices=["A", "B", "C", "D", "E", "F", "G", "H"],
                         default=["A", "B", "C"], help="Directions")
     parser.add_argument("--base-url", default="http://localhost:11434", help="Ollama base URL")
     parser.add_argument("--timeout", type=int, default=120, help="Seconds per call")

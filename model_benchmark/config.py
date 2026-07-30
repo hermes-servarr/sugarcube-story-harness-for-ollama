@@ -87,8 +87,8 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Model tags to test (empty=auto-discover)")
     parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json"],
                         default=["compact", "full", "json"], help="Prompt variants")
-    parser.add_argument("--directions", nargs="*", choices=["A", "B", "C"],
-                        default=["A", "B", "C"], help="Directions")
+    parser.add_argument("--directions", nargs="*", choices=["A", "B", "C", "D", "E", "F", "G", "H"],
+ default=["A", "B", "C"], help="Directions")
     parser.add_argument("--base-url", default="http://localhost:11434",
                         help="Ollama base URL")
     parser.add_argument("--timeout", type=int, default=120, help="Seconds per call")

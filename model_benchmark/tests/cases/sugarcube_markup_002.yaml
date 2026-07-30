@@ -1,0 +1,49 @@
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_markup_002
+name: SugarCube markup compliance with conditional logic
+description: >
+  Tests SugarCube conditional macros (<<if>>/<<else>>/<<</if>>) and
+  nested branching. Models must produce valid SugarCube markup with
+  proper conditional logic, not Markdown.
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: medium
+tags: ["markup", "conditional", "macro"]
+
+input: |
+  Generate a SugarCube passage where the protagonist encounters a locked door.
+  Use <<if $hasKey>> to conditionally show different choices based on whether
+  the player has a key. Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Include a conditional: if the player has a key, show an unlock choice"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+    - "Uses <<if>> conditional macro"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  not_contains:
+    - "**"
+    - "*italic*"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_markup_002.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

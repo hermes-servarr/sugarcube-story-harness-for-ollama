@@ -1,0 +1,50 @@
+schema_version: "1.0.0"
+kind: test
+
+id: edge_nested_conditionals_001
+name: "Edge case: deeply nested conditional logic"
+description: >
+  Tests that the model produces correctly nested <<if>>/<<else>>/<<</if>>
+  blocks with 3+ levels of nesting. This stress-tests the macro_usage
+  scoring category's nesting balance check.
+capability: sugarcube_compliance
+category: macro_usage
+difficulty: hard
+tags: ["edge-case", "nested", "conditional", "stress-test"]
+
+input: |
+  Generate a SugarCube passage where the protagonist navigates a complex
+  social situation at a royal court. Use nested <<if>>/<<else>> blocks
+  with at least 3 levels of nesting based on:
+  1. Whether the player has met the king ($hasMetKing)
+  2. Whether the player has a diplomatic gift ($hasGift)
+  3. Whether the player is wearing proper attire ($hasFormalWear)
+  Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Create a court scene with 3-level nested conditionals based on player state variables"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses nested <<if>>/<<else>>/<<</if>> with correct nesting"
+    - "All <<if>> blocks have matching <</if>> closures"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/edge_nested_conditionals_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"
