@@ -62,11 +62,16 @@ _ALLOWED_CHECKS = {
     "conversation_layout",
     "min_dialogue_turns",
     "mc_inner_monologue",
+    "exact_dialogue_turns",
+    "alternating_dialogue",
+    "conversation_endpoints",
 }
 _NEEDLES = {
     "archive_code": "7319",
     "treaty_name": "Accord of Glass",
     "witness_name": "Mira Vale",
+    "conversation_opening": "We need to discuss the Accord of Glass.",
+    "conversation_closing": "Then we have an agreement.",
 }
 
 
@@ -173,6 +178,9 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             "conversation_layout": {"check"},
             "min_dialogue_turns": {"check", "count"},
             "mc_inner_monologue": {"check"},
+            "exact_dialogue_turns": {"check", "count"},
+            "alternating_dialogue": {"check"},
+            "conversation_endpoints": {"check"},
         }[kind]
         if set(raw_check) - permitted:
             raise CapabilityCaseError("check contains unknown fields")
@@ -196,12 +204,15 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
                 raise CapabilityCaseError("unknown context needle")
             nontrivial = True
         elif kind in {
-            "min_choices", "max_words", "min_words", "min_dialogue_turns"
+            "min_choices", "max_words", "min_words", "min_dialogue_turns",
+            "exact_dialogue_turns",
         }:
             count = check.get("count")
             upper = (
                 6 if kind == "min_choices"
-                else 12 if kind == "min_dialogue_turns"
+                else 24 if kind in {
+                    "min_dialogue_turns", "exact_dialogue_turns"
+                }
                 else 500
             )
             if not isinstance(count, int) or not 1 <= count <= upper:
@@ -258,10 +269,14 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
     if case.context_size == "S":
         return dataclasses.replace(
             base,
-            story_points="Keep the scene focused.",
             arc_md="## Current scene",
             snapshot="$archiveCode = 7319, $hasKey = false, $gold = 15.",
             entities="Witness: Mira Vale. Treaty: Accord of Glass.",
+            story_points=(
+                'Keep the scene focused. Conversation opening: '
+                '"We need to discuss the Accord of Glass." '
+                'Required closing: "Then we have an agreement."'
+            ),
             parent_prose="The protagonist pauses.",
             inspiration="",
         )
@@ -285,7 +300,9 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
             "$treatySigned = false."
         ),
         entities=(
-            f"{base.entities}; witness Mira Vale; treaty Accord of Glass."
+            f"{base.entities}; witness Mira Vale; treaty Accord of Glass; "
+            'conversation opening "We need to discuss the Accord of Glass."; '
+            'required closing "Then we have an agreement."'
         ),
     )
 
@@ -393,6 +410,36 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
             prose = getattr(parsed, "prose", "") or ""
             inner = prose.partition("INNER MONOLOGUE:")[2]
             ok = re.search(r"(?m)^\s*MC:\s*//[^/\n]+//\s*$", inner) is not None
+        elif kind in {
+            "exact_dialogue_turns", "alternating_dialogue",
+            "conversation_endpoints",
+        }:
+            prose = getattr(parsed, "prose", "") or ""
+            dialogue = prose.partition("DIALOGUE:")[2].partition(
+                "INNER MONOLOGUE:"
+            )[0]
+            turns = re.findall(
+                r'(?m)^\s*([A-Za-z][A-Za-z0-9 _-]*):\s*["“]([^"”\n]+)["”]\s*$',
+                dialogue,
+            )
+            if kind == "exact_dialogue_turns":
+                ok = len(turns) == check["count"]
+            elif kind == "alternating_dialogue":
+                speakers = [speaker.casefold() for speaker, _ in turns]
+                ok = (
+                    len(speakers) >= 2
+                    and "mc" in speakers
+                    and all(
+                        left != right
+                        for left, right in zip(speakers, speakers[1:])
+                    )
+                )
+            else:
+                ok = (
+                    bool(turns)
+                    and turns[0][1].strip() == _NEEDLES["conversation_opening"]
+                    and turns[-1][1].strip() == _NEEDLES["conversation_closing"]
+                )
         passed += int(ok)
         evidence.append(f"{kind}={'pass' if ok else 'fail'}")
     score = passed / len(case.checks)

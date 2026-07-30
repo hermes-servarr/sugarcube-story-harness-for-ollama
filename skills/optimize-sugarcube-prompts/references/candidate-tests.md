@@ -63,6 +63,9 @@ Allowed checks:
 {"check": "conversation_layout"}
 {"check": "min_dialogue_turns", "count": 4}
 {"check": "mc_inner_monologue"}
+{"check": "exact_dialogue_turns", "count": 8}
+{"check": "alternating_dialogue"}
+{"check": "conversation_endpoints"}
 ```
 
 Use 3-12 checks. At least one must be `macro`, `variable`,
@@ -83,7 +86,10 @@ MC: //Private thoughts.//
 `conversation_layout` requires the two labeled blocks in that order inside
 PROSE. `min_dialogue_turns` counts standardized quoted speaker lines before
 the inner-monologue block. `mc_inner_monologue` requires the italicized MC
-line after it.
+line after it. `exact_dialogue_turns` accepts 1-24 turns,
+`alternating_dialogue` rejects consecutive turns from the same speaker, and
+`conversation_endpoints` requires the trusted context opening in the first
+turn and trusted closing in the last turn.
 
 Keep `task` under 1,500 characters. It may describe SugarCube output but must
 not contain URLs, model identities, private data, commands for the operator,

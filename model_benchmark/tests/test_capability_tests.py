@@ -38,7 +38,7 @@ def _candidate(**overrides):
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     cases = load_cases(candidate_dir=None)
-    assert len(cases) == 29
+    assert len(cases) == 33
     retrieval = {
         case.context_size
         for case in cases
@@ -65,6 +65,11 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     }
     assert plain_tiny == {"S", "XL"}
     assert any(case.id == "T9-PLAIN-FALLBACK-XL" for case in cases)
+    tier_zero_plain = next(
+        case for case in cases if case.id == "T0-PLAIN-EXACT"
+    )
+    assert tier_zero_plain.response_mode == "plain_text"
+    assert tier_zero_plain.output_budget == "tiny"
     conversation_variants = {
         case.variant for case in cases if "CONVERSATION" in case.id
     }
@@ -79,6 +84,24 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
         ("M", "K3"),
         ("XL", "K4"),
     }
+    endpoint_turn_counts = {
+        next(
+            check["count"]
+            for check in case.checks
+            if check["check"] == "exact_dialogue_turns"
+        )
+        for case in cases
+        if "CONVERSATION-ENDPOINTS" in case.id
+    }
+    assert endpoint_turn_counts == {4, 8, 16}
+    endpoint_case = next(
+        case for case in cases if case.id == "T9-CONVERSATION-ENDPOINTS-16"
+    )
+    assert "We need to discuss the Accord of Glass." not in endpoint_case.task
+    assert "Then we have an agreement." not in endpoint_case.task
+    endpoint_prompt = _build_prompt(endpoint_case)
+    assert "We need to discuss the Accord of Glass." in endpoint_prompt
+    assert "Then we have an agreement." in endpoint_prompt
 
 
 def test_candidate_schema_rejects_code_fields_and_weak_checks():
@@ -239,3 +262,38 @@ The mentor questioned the protagonist.
     assert passed.passed is True
     assert failed.passed is False
     assert "conversation_layout" in failed.details
+
+
+def test_conversation_endpoints_and_exact_turn_count_are_enforced():
+    case = next(
+        case
+        for case in load_cases(candidate_dir=None)
+        if case.id == "T4-CONVERSATION-ENDPOINTS-4"
+    )
+    valid = """PROSE:
+DIALOGUE:
+Mira Vale: "We need to discuss the Accord of Glass."
+MC: "I am listening."
+Mira Vale: "Then consider these terms."
+MC: "Then we have an agreement."
+INNER MONOLOGUE:
+MC: //The negotiation ended better than expected.//
+
+CHOICES:
+- Sign | Accept the accord
+- Pause | Ask for time
+
+SUMMARY:
+Mira Vale and the protagonist reached an agreement.
+"""
+    wrong_end = valid.replace(
+        'MC: "Then we have an agreement."',
+        'MC: "I need more time."',
+    )
+
+    passed = _score_checks(case, valid, parse_model_output(valid))
+    failed = _score_checks(case, wrong_end, parse_model_output(wrong_end))
+
+    assert passed.passed is True
+    assert failed.passed is False
+    assert "conversation_endpoints" in failed.details

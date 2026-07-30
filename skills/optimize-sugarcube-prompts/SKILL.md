@@ -152,6 +152,10 @@ reasoning.
 - For thinking conversations, compare the S/K2, M/K3, and XL/K4 slope before
   concluding that the problem is thinking mode itself; identify the first tier
   where layout compliance falls away.
+- For conversation-length tests, compare the fixed full-variant 4-, 8-, and
+  16-turn slope. The context supplies exact opening and closing lines. Separate
+  endpoint retrieval, exact turn-count compliance, speaker alternation, and
+  coherent layout failures instead of describing them as one failure.
 - Conversation cases are signed capability tests. Do not weaken their layout,
   turn count, ordering, or SugarCube-italic requirement in an overlay.
 
