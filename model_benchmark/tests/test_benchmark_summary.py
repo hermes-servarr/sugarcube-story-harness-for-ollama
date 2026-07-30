@@ -49,6 +49,29 @@ def test_summary_uses_aliases_and_failure_details(tmp_path):
                     "normalized_score": 1.0,
                     "status": "PASS",
                 },
+                {
+                    "test_id": "Model_A:thinking:H:1",
+                    "model_alias": "Model_A",
+                    "subcategory": "thinking",
+                    "difficulty": "H",
+                    "normalized_score": 0.25,
+                    "status": "FAIL",
+                    "failure_category": "instruction_following",
+                    "scored_result": {
+                        "category_results": [
+                            {
+                                "name": "thinking_quality",
+                                "passed": False,
+                                "details": "Category-level planning metrics.",
+                            },
+                            {
+                                "name": "passage_structure",
+                                "passed": False,
+                                "details": "Final passage was incomplete.",
+                            },
+                        ]
+                    },
+                },
             ]
         ),
         encoding="utf-8",
@@ -56,10 +79,22 @@ def test_summary_uses_aliases_and_failure_details(tmp_path):
 
     summary = MODULE.summarize(path)
 
-    assert summary["total_cases"] == 2
-    assert summary["pass_rate"] == 0.5
+    assert summary["total_cases"] == 3
+    assert summary["pass_rate"] == 0.3333
     assert summary["by_model_alias"]["Model_A"]["passed"] == 0
     assert summary["representative_failures"][0]["failed_categories"][0] == {
-        "name": "markup_compliance",
-        "details": "Used Markdown.",
+        "name": "thinking_quality",
+        "details": "Category-level planning metrics.",
+    }
+    assert summary["thinking_variant"] == {
+        "cases": 1,
+        "passed": 0,
+        "pass_rate": 0.0,
+        "mean_score": 0.25,
+        "failed_evaluator_categories": {
+            "thinking_quality": 1,
+            "passage_structure": 1,
+        },
+        "thinking_quality_failures": 1,
+        "final_passage_structure_failures": 1,
     }

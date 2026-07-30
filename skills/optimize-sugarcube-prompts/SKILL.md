@@ -12,6 +12,8 @@ Perform one complete experiment per goal turn. Use this skill with Hermes
 
 - Outcome: improve the anonymized overall pass rate without weakening grading.
 - Verification: compare consecutive `results_anonymized.json` summaries.
+- Coverage: preserve all configured directions A-H and all four variants:
+  `compact`, `full`, `json`, and `thinking`.
 - Boundaries: edit only `model_benchmark/prompt_overrides.json` and new files
   under `benchmark_optimization/`.
 - Constraints: never edit Python, tests, fixtures, scoring, thresholds,
@@ -40,6 +42,8 @@ five experiments without a new explicit user instruction.
    - failing evaluator categories;
    - affected anonymous model aliases, variants, and directions;
    - observed formatting or instruction-following behavior;
+   - whether thinking failures concern reasoning quality, the final passage, or
+     suspected output-budget exhaustion;
    - one narrow prompt hypothesis that could improve those failures.
 
 5. Create `benchmark_optimization/iteration-NN.md` containing baseline
@@ -75,11 +79,36 @@ On the next goal turn, continue only if a stop condition has not fired.
 - Prefer the smallest instruction change supported by repeated failures.
 - Improve formatting and instruction clarity; do not make expected output
   easier, remove coverage, lower thresholds, or alter evaluators.
-- Evaluate aggregate results and per-alias regressions. Never optimize for a
-  single alias at the expense of the rest.
+- Evaluate aggregate results, the thinking pass rate, each non-thinking
+  variant, and per-alias regressions. Never optimize for a single alias or the
+  thinking variant at the expense of the rest.
 - Revert the last overlay change if aggregate performance declines.
 - Treat unchanged results as non-improving.
 - Do not infer or guess the real identity behind an alias.
+
+## Thinking Variant Rules
+
+Use the summary's `thinking_variant` section; never inspect or reproduce raw
+reasoning.
+
+- When `thinking_quality` fails, adjust only `variants.thinking`. Reinforce the
+  missing planning behavior indicated by category-level metrics: relevant
+  variables, SugarCube macros, direction constraints, structured planning, or
+  supplied context.
+- When final-output categories such as `passage_structure`, markup compliance,
+  or macro correctness fail, adjust only `variants.thinking` to reinforce the
+  `===PASSAGE===` boundary and require one complete, correctly formatted final
+  passage after planning.
+- When thinking cases omit or truncate the final passage, record
+  `suspected output-budget exhaustion` in the iteration note. The anonymized
+  summary cannot prove the cause. Do not claim success, change scoring, or
+  increase `num_predict`; stop the goal and ask the operator to review the
+  private run and GPU-safe token budget.
+- Prefer a thinking-only overlay experiment when failures are concentrated in
+  `thinking`. Do not add thinking instructions to `global_suffix` unless the
+  same repeated failure also affects non-thinking variants.
+- A thinking experiment improves only when its pass rate rises without an
+  aggregate, non-thinking-variant, or material per-alias regression.
 
 ## Safety Rules
 
@@ -92,6 +121,8 @@ On the next goal turn, continue only if a stop condition has not fired.
   forwarding.
 - Never echo raw benchmark output into notes; record concise behavior
   descriptions from the summarizer.
+- Never copy, quote, summarize, or publish chain-of-thought. Record only
+  category-level failure counts and concise externally observable behavior.
 - Never sign commits or access signing keys. Candidate commits are intentionally
   restricted by the PC to data-only paths below a trusted signed code commit.
 - Never modify this skill during an active optimization goal.

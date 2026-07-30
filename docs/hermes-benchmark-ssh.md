@@ -264,3 +264,11 @@ persistent goal:
 Hermes persistent goals automatically continue across turns and enforce their
 configured turn budget. Keep `goals.max_turns` finite; the skill additionally
 caps itself at five expensive GPU experiments.
+
+The optimization skill analyzes the `thinking` variant separately. It may tune
+only the declarative thinking prompt for reasoning-quality or final-passage
+format failures, while checking that `compact`, `full`, and `json` do not
+regress. It never records chain-of-thought. A missing or truncated final passage
+is treated as possible output-budget exhaustion; the goal stops for operator
+review instead of automatically raising `num_predict`, because that setting is
+GPU-sensitive and the anonymized result cannot establish the cause.

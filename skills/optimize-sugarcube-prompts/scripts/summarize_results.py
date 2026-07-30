@@ -28,6 +28,42 @@ def _group(records: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]
     return result
 
 
+def _failed_evaluator_categories(
+    records: list[dict[str, Any]],
+) -> Counter[str]:
+    failures: Counter[str] = Counter()
+    for row in records:
+        scored = row.get("scored_result")
+        if not isinstance(scored, dict):
+            continue
+        categories = scored.get("category_results", [])
+        if not isinstance(categories, list):
+            continue
+        for category in categories:
+            if isinstance(category, dict) and not category.get("passed", False):
+                failures[str(category.get("name") or "unspecified")] += 1
+    return failures
+
+
+def _thinking_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    thinking = [
+        row for row in records if str(row.get("subcategory", "")).lower() == "thinking"
+    ]
+    scores = [float(row.get("normalized_score", 0.0)) for row in thinking]
+    passed = sum(row.get("status") == "PASS" for row in thinking)
+    category_failures = _failed_evaluator_categories(thinking)
+    total = len(thinking)
+    return {
+        "cases": total,
+        "passed": passed,
+        "pass_rate": round(passed / total, 4) if total else 0.0,
+        "mean_score": round(statistics.fmean(scores), 4) if scores else 0.0,
+        "failed_evaluator_categories": dict(category_failures.most_common()),
+        "thinking_quality_failures": category_failures["thinking_quality"],
+        "final_passage_structure_failures": category_failures["passage_structure"],
+    }
+
+
 def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
@@ -78,6 +114,7 @@ def summarize(path: Path) -> dict[str, Any]:
         "by_model_alias": _group(records, "model_alias"),
         "by_variant": _group(records, "subcategory"),
         "by_direction": _group(records, "difficulty"),
+        "thinking_variant": _thinking_summary(records),
         "representative_failures": samples,
     }
 

@@ -37,6 +37,28 @@ def test_applies_global_variant_and_direction_fragments(tmp_path):
     assert "Use the include macro exactly once." in result
 
 
+def test_applies_thinking_variant_fragment(tmp_path):
+    path = tmp_path / "overlay.json"
+    _write(
+        path,
+        {
+            "schema_version": 1,
+            "variants": {
+                "thinking": "Finish planning, then emit a complete passage."
+            },
+        },
+    )
+
+    result = apply_prompt_overlay(
+        "BASE",
+        variant="thinking",
+        direction="H",
+        path=path,
+    )
+
+    assert "Finish planning, then emit a complete passage." in result
+
+
 def test_rejects_unknown_fields(tmp_path):
     path = tmp_path / "overlay.json"
     _write(path, {"schema_version": 1, "run_command": "anything"})
