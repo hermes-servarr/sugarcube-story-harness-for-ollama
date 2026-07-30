@@ -11,3 +11,7 @@ wheels/
 
 # Keep example story outputs
 !examples/
+
+# Keep test story builds (compiled HTML for testing)
+!test_stories/*/build/
+!test_stories/*/build/**
