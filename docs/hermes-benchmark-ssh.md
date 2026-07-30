@@ -9,6 +9,20 @@ Before each run it requires a clean checkout on the configured branch and runs
 the latest fast-forwarded code and refuses dirty checkouts, branch mismatches,
 merge commits needed locally, authentication failures, or pull failures.
 
+## Single-run GPU protection
+
+The publisher acquires an operating-system file lock at
+`<state_dir>/run.lock` before pulling or contacting Ollama and holds it through
+the complete benchmark, anonymization, commit, push, and temporary-file
+cleanup. If another SSH request arrives while that lock is held, it prints
+`A benchmark is already running.`, exits with status 75, and does not start
+another model workload.
+
+The lock is process-owned, so Windows or Linux releases it automatically if
+the publisher crashes or is terminated. All trigger installations must use
+the same fixed `state_dir`; using different state directories would create
+independent locks and defeat this protection.
+
 The security boundary is a dedicated SSH account and a forced command. Give it
 only the platform-specific file access documented below—never an interactive
 shell, Ollama-group membership, unrestricted `sudo`, or access to unrelated
