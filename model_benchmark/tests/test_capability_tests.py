@@ -36,6 +36,7 @@ def _candidate(**overrides):
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     cases = load_cases(candidate_dir=None)
+    assert len(cases) == 22
     retrieval = {
         case.context_size
         for case in cases
@@ -55,6 +56,13 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
         if case.id.startswith("T6-RETRIEVE-")
     }
     assert prompts["S"] < prompts["M"] < prompts["L"] < prompts["XL"]
+    plain_tiny = {
+        case.context_size
+        for case in cases
+        if case.id.startswith("T6-PLAIN-TINY-")
+    }
+    assert plain_tiny == {"S", "XL"}
+    assert any(case.id == "T9-PLAIN-FALLBACK-XL" for case in cases)
 
 
 def test_candidate_schema_rejects_code_fields_and_weak_checks():
@@ -140,3 +148,43 @@ The player used the key.
     assert records[0].scored_result.category_results[-1].name == (
         "capability_observables"
     )
+
+
+def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
+    case = next(
+        case
+        for case in load_cases(candidate_dir=None)
+        if case.id == "T6-PLAIN-TINY-XL"
+    )
+    captured = {}
+
+    def fake_call(config, prompt, **kwargs):
+        captured["prompt"] = prompt
+        captured["config_num_predict"] = config.num_predict
+        captured["call_num_predict"] = kwargs["num_predict"]
+        return "7319"
+
+    monkeypatch.setattr(
+        "model_benchmark.capability_tests.call_ollama_sync",
+        fake_call,
+    )
+    cfg = BenchmarkConfig(
+        models=("private-model",),
+        variants=("compact",),
+        directions=("A",),
+        base_url="http://127.0.0.1:11434",
+        timeout=30,
+        num_predict=640,
+        temperature=0.2,
+        runs=1,
+    )
+
+    record = execute_capability_cases(cfg, [case])[0]
+
+    assert "Answer directly in plain text" in captured["prompt"]
+    assert "PROSE/CHOICES/SUMMARY section labels" in captured["prompt"]
+    assert captured["config_num_predict"] == 32
+    assert captured["call_num_predict"] == 32
+    assert record.status == "PASS"
+    assert record.subcategory == "plain_text"
+    assert len(record.scored_result.category_results) == 1

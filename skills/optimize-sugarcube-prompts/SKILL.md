@@ -45,6 +45,8 @@ five experiments without a new explicit user instruction.
    - observed formatting or instruction-following behavior;
    - whether thinking failures concern reasoning quality, the final passage, or
      suspected output-budget exhaustion;
+   - whether plain-text failures concern retrieval, requested answer length,
+     or inability to fall back from structured generation;
    - one narrow prompt hypothesis that could improve those failures.
 
 5. Create `benchmark_optimization/iteration-NN.md` containing baseline
@@ -121,6 +123,21 @@ reasoning.
   same repeated failure also affects non-thinking variants.
 - A thinking experiment improves only when its pass rate rises without an
   aggregate, non-thinking-variant, or material per-alias regression.
+
+## Plain-Text Capability Rules
+
+- Use the summary's `plain_text` section to compare tiny, short, and longer
+  direct answers across context profiles. These signed cases deliberately
+  bypass SugarCube passage formatting.
+- Their `tiny`, `short`, and `medium` generation budgets are protected caps
+  that only lower the operator-configured `num_predict`. Never raise or remove
+  those caps.
+- Treat plain-text cases as capability diagnostics. Do not change
+  `prompt_overrides.json` in response to them because the passage overlay is
+  intentionally not applied to direct-answer probes.
+- Compare paired M/XL or S/XL cases before attributing a failure to context
+  length. A word-limit failure is instruction following; a missing known
+  context needle is retrieval.
 
 ## Candidate Test Rules
 

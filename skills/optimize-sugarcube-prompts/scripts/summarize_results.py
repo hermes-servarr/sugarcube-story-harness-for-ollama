@@ -64,6 +64,23 @@ def _thinking_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _plain_text_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    plain = [
+        row for row in records if str(row.get("subcategory", "")).lower() == "plain_text"
+    ]
+    grouped = _group(plain, "dataset")
+    aggregate = (
+        next(iter(grouped.values()))
+        if grouped else
+        {"cases": 0, "passed": 0, "pass_rate": 0.0, "mean_score": 0.0}
+    )
+    return {
+        **aggregate,
+        "by_context_profile": _group(plain, "split"),
+        "by_tier": _group(plain, "difficulty"),
+    }
+
+
 def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
@@ -122,7 +139,9 @@ def summarize(path: Path) -> dict[str, Any]:
         "by_model_alias": _group(objective_records, "model_alias"),
         "by_variant": _group(objective_records, "subcategory"),
         "by_direction": _group(objective_records, "difficulty"),
+        "by_context_profile": _group(objective_records, "split"),
         "thinking_variant": _thinking_summary(objective_records),
+        "plain_text": _plain_text_summary(objective_records),
         "candidate_tests": {
             "diagnostic_only": True,
             **(

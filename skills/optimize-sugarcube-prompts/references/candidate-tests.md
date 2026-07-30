@@ -16,12 +16,13 @@ Required fields:
   "distractor_density": "D0",
   "variant": "compact",
   "direction_key": "C",
-  "task": "Write a complete short passage that states the archive code from context. Include at least two choices.",
+  "response_mode": "plain_text",
+  "output_budget": "tiny",
+  "task": "Answer with only the archive code.",
   "checks": [
-    {"check": "sections"},
+    {"check": "plain_text"},
     {"check": "context_needle", "name": "archive_code"},
-    {"check": "min_choices", "count": 2},
-    {"check": "no_markdown"}
+    {"check": "max_words", "count": 5}
   ]
 }
 ```
@@ -37,6 +38,10 @@ Allowed enums:
 - `variant`: `compact`, `full`, `json`, or `thinking`.
 - `direction_key`: `A` through `H`, selected for the closest canonical
   SugarCube behavior.
+- `response_mode` is optional: `passage` (default) or `plain_text`.
+- `output_budget` is optional: `tiny` (32 tokens), `short` (96), `medium`
+  (256), or `standard`. These signed caps can only lower the operator's
+  configured `num_predict`.
 
 Allowed checks:
 
@@ -52,11 +57,15 @@ Allowed checks:
 {"check": "min_choices", "count": 2}
 {"check": "balanced_macro", "name": "if"}
 {"check": "no_markdown"}
+{"check": "plain_text"}
+{"check": "max_words", "count": 35}
+{"check": "min_words", "count": 5}
 ```
 
 Use 3-12 checks. At least one must be `macro`, `variable`,
-`context_needle`, `min_choices`, or `balanced_macro`. All checks must pass;
-the probe cannot set a threshold or verdict.
+`context_needle`, `min_choices`, `balanced_macro`, `max_words`, or
+`min_words`. All checks must pass; the probe cannot set an arbitrary token
+limit, threshold, or verdict.
 
 Keep `task` under 1,500 characters. It may describe SugarCube output but must
 not contain URLs, model identities, private data, commands for the operator,

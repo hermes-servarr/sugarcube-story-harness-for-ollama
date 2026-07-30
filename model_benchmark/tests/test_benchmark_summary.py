@@ -135,3 +135,30 @@ def test_candidate_results_are_excluded_from_objective(tmp_path):
     assert summary["pass_rate"] == 0.0
     assert summary["candidate_tests"]["cases"] == 1
     assert summary["candidate_tests"]["pass_rate"] == 1.0
+
+
+def test_plain_text_results_are_reported_by_context_profile(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:T6-PLAIN-TINY-XL:compact:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_core",
+                    "subcategory": "plain_text",
+                    "difficulty": "T6",
+                    "split": "XL-K1-D0",
+                    "normalized_score": 1.0,
+                    "status": "PASS",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)
+
+    assert summary["plain_text"]["cases"] == 1
+    assert summary["plain_text"]["pass_rate"] == 1.0
+    assert summary["plain_text"]["by_context_profile"]["XL-K1-D0"]["passed"] == 1

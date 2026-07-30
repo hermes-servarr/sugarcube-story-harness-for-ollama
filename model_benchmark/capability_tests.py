@@ -39,6 +39,13 @@ _ALLOWED_CONTEXTS = set(FIXTURE_CONTEXTS)
 _ALLOWED_SIZES = {"S", "M", "L", "XL"}
 _ALLOWED_COMPLEXITIES = {"K1", "K2", "K3", "K4"}
 _ALLOWED_DISTRACTORS = {"D0", "D1"}
+_ALLOWED_RESPONSE_MODES = {"passage", "plain_text"}
+_OUTPUT_BUDGETS = {
+    "tiny": 32,
+    "short": 96,
+    "medium": 256,
+    "standard": None,
+}
 _ALLOWED_CHECKS = {
     "sections",
     "contains",
@@ -49,6 +56,9 @@ _ALLOWED_CHECKS = {
     "min_choices",
     "balanced_macro",
     "no_markdown",
+    "plain_text",
+    "max_words",
+    "min_words",
 }
 _NEEDLES = {
     "archive_code": "7319",
@@ -69,6 +79,8 @@ class CapabilityCase:
     direction_key: str
     task: str
     checks: tuple[dict[str, Any], ...]
+    response_mode: str
+    output_budget: str
     source: str
 
 
@@ -90,7 +102,7 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
     allowed = {
         "schema_version", "id", "tier", "context_ref", "context_size",
         "task_complexity", "distractor_density", "variant", "direction_key",
-        "task", "checks",
+        "task", "checks", "response_mode", "output_budget",
     }
     if set(data) - allowed:
         raise CapabilityCaseError("case contains unknown fields")
@@ -110,6 +122,8 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
     distractors = data.get("distractor_density")
     variant = data.get("variant")
     direction_key = data.get("direction_key")
+    response_mode = data.get("response_mode", "passage")
+    output_budget = data.get("output_budget", "standard")
     if context_ref not in _ALLOWED_CONTEXTS:
         raise CapabilityCaseError("unknown context_ref")
     if context_size not in _ALLOWED_SIZES:
@@ -122,6 +136,10 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
         raise CapabilityCaseError("unknown variant")
     if direction_key not in set("ABCDEFGH"):
         raise CapabilityCaseError("direction_key must be A-H")
+    if response_mode not in _ALLOWED_RESPONSE_MODES:
+        raise CapabilityCaseError("unknown response_mode")
+    if output_budget not in _OUTPUT_BUDGETS:
+        raise CapabilityCaseError("unknown output_budget")
     task = _bounded_string(data.get("task"), "task", 1_500)
     if re.search(r"https?://", task, re.IGNORECASE):
         raise CapabilityCaseError("task must not contain URLs")
@@ -146,6 +164,9 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             "min_choices": {"check", "count"},
             "balanced_macro": {"check", "name"},
             "no_markdown": {"check"},
+            "plain_text": {"check"},
+            "max_words": {"check", "count"},
+            "min_words": {"check", "count"},
         }[kind]
         if set(raw_check) - permitted:
             raise CapabilityCaseError("check contains unknown fields")
@@ -168,10 +189,11 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             if check.get("name") not in _NEEDLES:
                 raise CapabilityCaseError("unknown context needle")
             nontrivial = True
-        elif kind == "min_choices":
+        elif kind in {"min_choices", "max_words", "min_words"}:
             count = check.get("count")
-            if not isinstance(count, int) or not 1 <= count <= 6:
-                raise CapabilityCaseError("min_choices count must be 1 to 6")
+            upper = 6 if kind == "min_choices" else 500
+            if not isinstance(count, int) or not 1 <= count <= upper:
+                raise CapabilityCaseError(f"{kind} count must be 1 to {upper}")
             nontrivial = True
         checked.append(check)
     if candidate and not nontrivial:
@@ -187,6 +209,8 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
         direction_key=direction_key,
         task=task,
         checks=tuple(checked),
+        response_mode=response_mode,
+        output_budget=output_budget,
         source=source,
     )
 
@@ -256,6 +280,19 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
 
 def _build_prompt(case: CapabilityCase) -> str:
     ctx = _sized_context(case)
+    if case.response_mode == "plain_text":
+        return (
+            "CONTEXT\n"
+            f"Premise: {ctx.premise}\n"
+            f"Story points: {ctx.story_points}\n"
+            f"Arc notes:\n{ctx.arc_md}\n"
+            f"Snapshot: {ctx.snapshot}\n"
+            f"Entities: {ctx.entities}\n"
+            f"Prior prose: {ctx.parent_prose}\n\n"
+            f"TASK\n{case.task}\n\n"
+            "Answer directly in plain text. Do not use SugarCube macros, "
+            "JSON, or PROSE/CHOICES/SUMMARY section labels."
+        )
     kwargs = dict(
         premise=ctx.premise,
         story_points=ctx.story_points,
@@ -315,6 +352,16 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
             ) > 0
         elif kind == "no_markdown":
             ok = not re.search(r"\*\*[^*]+\*\*|(?<!\*)\*[^*]+\*(?!\*)", text)
+        elif kind == "plain_text":
+            ok = not re.search(
+                r"<<|^PROSE:|^CHOICES:|^SUMMARY:|^\s*[\{\[]",
+                text,
+                re.MULTILINE,
+            )
+        elif kind == "max_words":
+            ok = len(re.findall(r"\b[\w'-]+\b", text)) <= check["count"]
+        elif kind == "min_words":
+            ok = len(re.findall(r"\b[\w'-]+\b", text)) >= check["count"]
         passed += int(ok)
         evidence.append(f"{kind}={'pass' if ok else 'fail'}")
     score = passed / len(case.checks)
@@ -335,34 +382,42 @@ def execute_capability_cases(
     for model in cfg.models:
         for case in cases:
             prompt = _build_prompt(case)
+            configured_cap = _OUTPUT_BUDGETS[case.output_budget]
+            case_num_predict = (
+                cfg.num_predict
+                if configured_cap is None
+                else min(cfg.num_predict, configured_cap)
+            )
             harness_cfg = HarnessConfig(
                 ollama_model=model,
                 ollama_base_url=cfg.base_url,
                 temperature=cfg.temperature,
-                num_predict=cfg.num_predict,
+                num_predict=case_num_predict,
             )
             started = time.monotonic()
             error = ""
             try:
                 kwargs: dict[str, Any] = {}
-                if case.variant == "json":
+                if case.variant == "json" and case.response_mode == "passage":
                     kwargs["format_spec"] = "json"
                 raw = call_ollama_sync(
                     harness_cfg,
                     prompt,
                     timeout=cfg.timeout,
                     temperature=cfg.temperature,
-                    num_predict=cfg.num_predict,
+                    num_predict=case_num_predict,
                     label=f"capability-{case.id}",
                     **kwargs,
                 )
                 parsed = (
                     parse_model_output_json(raw)
-                    if case.variant == "json"
+                    if case.variant == "json" and case.response_mode == "passage"
                     else parse_model_output(raw)
                 )
-                categories = score_response(
-                    raw, parsed, case.variant, case.direction_key
+                categories = (
+                    score_response(raw, parsed, case.variant, case.direction_key)
+                    if case.response_mode == "passage"
+                    else []
                 )
                 categories.append(_score_checks(case, raw, parsed))
             except Exception as exc:
@@ -397,7 +452,11 @@ def execute_capability_cases(
                     test_version="capability-v1",
                     capability="sugarcube_capability_ladder",
                     category="capability_observables",
-                    subcategory=case.variant,
+                    subcategory=(
+                        case.variant
+                        if case.response_mode == "passage"
+                        else "plain_text"
+                    ),
                     difficulty=f"T{case.tier}",
                     dataset=f"capability_{case.source}",
                     split=(

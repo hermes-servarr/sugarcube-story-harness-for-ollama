@@ -32,6 +32,8 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 - Task complexity: K1 | K2 | K3 | K4
 - Distractor density: D0 | D1
 - Variant: compact | full | json | thinking
+- Response mode: passage | plain_text
+- Output budget: tiny | short | medium | standard
 - Paired control: PROP-ID or `needed`
 - Hypothesis: One falsifiable capability claim.
 - Controlled change: The single axis changed relative to the paired control.

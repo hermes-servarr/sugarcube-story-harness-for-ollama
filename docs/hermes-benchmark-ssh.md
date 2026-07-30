@@ -96,9 +96,13 @@ pull/push credentials for the dedicated account.
 The example runs all benchmark directions currently defined by the project
 (A–H) and all variants, including `thinking`; reduce those lists only if you
 intentionally want a smaller run.
-It also enables the signed 15-case capability ladder. Those additional calls
+It also enables the signed 22-case capability ladder. Those additional calls
 run sequentially for each configured model and cover T0 atomic syntax through
 T9 harness-scale context, including matched S/M/L/XL retrieval probes.
+The ladder includes direct plain-text fallbacks at tiny, short, and medium
+output budgets. Per-case caps can only reduce the configured `num_predict`;
+they measure concise-answer compliance and longer explanations without
+increasing GPU memory requirements.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.
