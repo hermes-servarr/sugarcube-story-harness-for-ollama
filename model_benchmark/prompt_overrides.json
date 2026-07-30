@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "global_suffix": "Format your output using SugarCube markup, not Markdown.\n\nUse these required passage sections in this order:\n===CHOICES===\n===PROSE===\n===SUMMARY===\n\nFor text emphasis, use SugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.",
+  "global_suffix": "",
   "variants": {
     "compact": "",
     "full": "",
