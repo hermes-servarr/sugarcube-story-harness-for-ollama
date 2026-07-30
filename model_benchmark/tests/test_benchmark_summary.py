@@ -98,3 +98,40 @@ def test_summary_uses_aliases_and_failure_details(tmp_path):
         "thinking_quality_failures": 1,
         "final_passage_structure_failures": 1,
     }
+    assert summary["candidate_tests"]["cases"] == 0
+
+
+def test_candidate_results_are_excluded_from_objective(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:compact:A:1",
+                    "model_alias": "Model_A",
+                    "dataset": "sugarcube_fixtures",
+                    "subcategory": "compact",
+                    "difficulty": "A",
+                    "normalized_score": 0.0,
+                    "status": "FAIL",
+                },
+                {
+                    "test_id": "Model_A:CAND-T0-EASY:compact:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_candidate",
+                    "subcategory": "compact",
+                    "difficulty": "T0",
+                    "normalized_score": 1.0,
+                    "status": "PASS",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)
+
+    assert summary["total_cases"] == 1
+    assert summary["pass_rate"] == 0.0
+    assert summary["candidate_tests"]["cases"] == 1
+    assert summary["candidate_tests"]["pass_rate"] == 1.0

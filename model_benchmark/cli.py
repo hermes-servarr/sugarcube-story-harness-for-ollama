@@ -489,6 +489,16 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help="N runs per model×variant×direction.",
     )
     p_run.add_argument(
+        "--capability-tests",
+        action="store_true",
+        help="Also run the signed capability ladder and validated candidate probes.",
+    )
+    p_run.add_argument(
+        "--candidate-test-dir",
+        default="benchmark_optimization/candidate_tests",
+        help="Directory containing data-only candidate capability probes.",
+    )
+    p_run.add_argument(
         "--debug",
         action="store_true",
         help=(
@@ -1083,6 +1093,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
         results = runner.execute()
     else:
         results = runner.execute()
+
+    if getattr(args, "capability_tests", False) and not cfg.dry_run:
+        from model_benchmark.capability_tests import (
+            execute_capability_cases,
+            load_cases,
+        )
+        cases = load_cases(
+            candidate_dir=Path(getattr(args, "candidate_test_dir"))
+        )
+        results.extend(execute_capability_cases(cfg, cases))
 
     if debug:
         _debug_model_io(results)

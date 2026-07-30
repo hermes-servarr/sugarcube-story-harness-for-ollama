@@ -24,6 +24,8 @@
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
   "variants": ["compact", "full", "json", "thinking"],
   "directions": ["A", "B", "C", "D", "E", "F", "G", "H"],
+  "capability_tests": true,
+  "candidate_test_dir": "benchmark_optimization/candidate_tests",
   "runs": 1,
   "timeout": 120,
   "num_predict": 640,

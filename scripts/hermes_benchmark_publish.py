@@ -324,6 +324,14 @@ def _candidate_path_allowed(path: str, patterns: list[Any]) -> bool:
 def _validate_candidate_files(repo: Path, changed_paths: list[str]) -> None:
     if len(changed_paths) > 100:
         raise PublishError("candidate commit changed too many files")
+    candidate_tests = [
+        name for name in changed_paths
+        if name.replace("\\", "/").startswith(
+            "benchmark_optimization/candidate_tests/"
+        )
+    ]
+    if len(candidate_tests) > 20:
+        raise PublishError("candidate commit contains too many test files")
     for relative_name in changed_paths:
         path = repo / relative_name
         if not path.exists():
@@ -336,6 +344,10 @@ def _validate_candidate_files(repo: Path, changed_paths: list[str]) -> None:
         ) else 262_144
         if normalized == "model_benchmark/prompt_overrides.json":
             limit = 40_000
+        if normalized.startswith("benchmark_optimization/candidate_tests/"):
+            if path.suffix.casefold() != ".json":
+                raise PublishError("candidate tests must be JSON files")
+            limit = 32_768
         if path.stat().st_size > limit:
             raise PublishError("candidate file exceeds its size limit")
 
@@ -421,6 +433,11 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
             args.extend([flag, str(config[key])])
     for config_dir in config.get("config_dirs", []):
         args.extend(["--config-dir", str(config_dir)])
+    if bool(config.get("capability_tests", False)):
+        args.append("--capability-tests")
+        candidate_dir = config.get("candidate_test_dir")
+        if candidate_dir:
+            args.extend(["--candidate-test-dir", str(candidate_dir)])
     return args
 
 

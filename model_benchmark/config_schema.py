@@ -56,8 +56,9 @@ ScoringCategory = Literal[
     "naked_interpolation",
     "link_setter_syntax",
     "thinking_quality",
+    "capability_observables",
 ]
-"""The 7 SugarCube compliance categories (canonical order, INV-9)."""
+"""The canonical SugarCube categories plus signed capability observables."""
 
 StatusClassification = Literal[
     "PASS", "FAIL", "ERROR", "SKIPPED", "INVALID", "TIMEOUT", "CANCELLED",

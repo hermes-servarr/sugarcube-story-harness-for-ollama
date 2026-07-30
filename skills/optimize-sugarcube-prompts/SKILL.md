@@ -14,9 +14,10 @@ Perform one complete experiment per goal turn. Use this skill with Hermes
 - Verification: compare consecutive `results_anonymized.json` summaries.
 - Coverage: preserve all configured directions A-H and all four variants:
   `compact`, `full`, `json`, and `thinking`.
-- Boundaries: edit only `model_benchmark/prompt_overrides.json` and new files
-  under `benchmark_optimization/`.
-- Constraints: never edit Python, tests, fixtures, scoring, thresholds,
+- Boundaries: edit only `model_benchmark/prompt_overrides.json`, iteration
+  notes, and new JSON probes under
+  `benchmark_optimization/candidate_tests/`.
+- Constraints: never edit Python, canonical tests, fixtures, scoring, thresholds,
   anonymization, publisher code, SSH configuration, or existing result data.
 - Stop when: five experiments complete, target pass rate is reached, two
   consecutive experiments fail to improve, any protected command fails, or
@@ -52,17 +53,23 @@ five experiments without a new explicit user instruction.
 6. Make one narrow edit to `model_benchmark/prompt_overrides.json`. Guidance
    may be global, variant-specific, or direction-specific. Do not include
    model-specific instructions.
+   If the failure cannot be localized with existing results, optionally add
+   one new diagnostic probe by following
+   [references/candidate-tests.md](references/candidate-tests.md). A probe is
+   an exploration artifact, not part of the optimization objective.
 7. Validate with:
 
    ```bash
    python -m json.tool model_benchmark/prompt_overrides.json >/dev/null
+   uv run python -c "from model_benchmark.capability_tests import load_cases; load_cases()"
    uv run pytest -q model_benchmark/tests/test_prompt_overlay.py
    ```
 
 8. Run `git diff --name-only`. Stop if any changed path is outside
-   `model_benchmark/prompt_overrides.json` and `benchmark_optimization/`.
-9. Commit only the overlay and the new iteration note, then push to the
-   configured branch. Never force-push.
+   `model_benchmark/prompt_overrides.json`, the new iteration note, and one
+   new JSON file under `benchmark_optimization/candidate_tests/`.
+9. Commit only the overlay, the new iteration note, and the optional single
+   new candidate probe, then push to the configured branch. Never force-push.
 10. Invoke `$run-sugarcube-benchmark` exactly once and wait for completion.
     If it reports already-running, failure, timeout, disconnect, or ambiguous
     status, stop this experiment without retrying.
@@ -110,6 +117,25 @@ reasoning.
 - A thinking experiment improves only when its pass rate rises without an
   aggregate, non-thinking-variant, or material per-alias regression.
 
+## Candidate Test Rules
+
+- Add a candidate probe only to distinguish competing explanations such as
+  task complexity, context retrieval, distractor sensitivity, or truncation.
+- Candidate probes are diagnostic-only. Their pass rate is excluded from
+  `total_cases`, `pass_rate`, stop conditions, targets, and rollback decisions.
+- Add at most one new uniquely named `CAND-` JSON file per experiment. Never
+  edit, delete, disable, replace, or copy an existing candidate or canonical
+  test.
+- Use only the signed schema and check vocabulary in
+  [references/candidate-tests.md](references/candidate-tests.md). Never add
+  code, regex, thresholds, scoring weights, expected verdicts, model names,
+  URLs, private data, or raw model output.
+- Prefer paired probes: hold the task fixed while changing S/M/L/XL context,
+  or hold context M while increasing K1/K2/K3/K4 complexity. Do not interpret
+  a combined large-context/hard-task failure as evidence for either cause.
+- A newly added probe has no before result. Record its first result as a
+  baseline observation, not an improvement or regression.
+
 ## Safety Rules
 
 - Never inspect Git history, deleted files, private logs, mappings, checkpoints,
@@ -125,7 +151,7 @@ reasoning.
   category-level failure counts and concise externally observable behavior.
 - Never sign commits or access signing keys. Candidate commits are intentionally
   restricted by the PC to data-only paths below a trusted signed code commit.
-- Never modify this skill during an active optimization goal.
+- Never modify this skill or its references during an active optimization goal.
 - Never parallelize experiments; the GPU may not fit concurrent models.
 
 ## Starting the Goal

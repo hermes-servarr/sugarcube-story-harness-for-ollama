@@ -131,6 +131,7 @@ CategoryName = Literal[
     "naked_interpolation",
     "link_setter_syntax",
     "thinking_quality",
+    "capability_observables",
 ]
 
 # Canonical category order (INV-9). Used by score_response, build_model_report,

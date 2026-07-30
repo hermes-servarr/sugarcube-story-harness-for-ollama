@@ -266,3 +266,32 @@ def test_candidate_files_reject_oversized_overlay(tmp_path):
             tmp_path,
             ["model_benchmark/prompt_overrides.json"],
         )
+
+
+def test_candidate_test_files_must_be_bounded_json(tmp_path):
+    candidate = tmp_path / "benchmark_optimization" / "candidate_tests" / "probe.py"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_text("print('unsafe')", encoding="utf-8")
+
+    with pytest.raises(publisher.PublishError, match="JSON"):
+        publisher._validate_candidate_files(
+            tmp_path,
+            ["benchmark_optimization/candidate_tests/probe.py"],
+        )
+
+
+def test_benchmark_args_enable_capability_ladder(tmp_path):
+    args = publisher._benchmark_args(
+        {
+            "models": ["private-model"],
+            "capability_tests": True,
+            "candidate_test_dir": "benchmark_optimization/candidate_tests",
+        },
+        tmp_path,
+    )
+
+    assert "--capability-tests" in args
+    assert args[-2:] == [
+        "--candidate-test-dir",
+        "benchmark_optimization/candidate_tests",
+    ]

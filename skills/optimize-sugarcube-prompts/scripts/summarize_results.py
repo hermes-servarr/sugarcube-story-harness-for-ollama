@@ -69,16 +69,24 @@ def summarize(path: Path) -> dict[str, Any]:
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
         raise ValueError("expected a JSON array of result objects")
     records: list[dict[str, Any]] = data
-    scores = [float(row.get("normalized_score", 0.0)) for row in records]
-    passed = sum(row.get("status") == "PASS" for row in records)
+    candidate_records = [
+        row for row in records if row.get("dataset") == "capability_candidate"
+    ]
+    objective_records = [
+        row for row in records if row.get("dataset") != "capability_candidate"
+    ]
+    scores = [
+        float(row.get("normalized_score", 0.0)) for row in objective_records
+    ]
+    passed = sum(row.get("status") == "PASS" for row in objective_records)
     failures = Counter(
         str(row.get("failure_category") or "unspecified")
-        for row in records
+        for row in objective_records
         if row.get("status") != "PASS"
     )
     samples = []
     for row in sorted(
-        (item for item in records if item.get("status") != "PASS"),
+        (item for item in objective_records if item.get("status") != "PASS"),
         key=lambda item: float(item.get("normalized_score", 0.0)),
     )[:8]:
         category_details = []
@@ -104,17 +112,26 @@ def summarize(path: Path) -> dict[str, Any]:
                 "failed_categories": category_details[:4],
             }
         )
-    total = len(records)
+    total = len(objective_records)
     return {
         "total_cases": total,
         "passed": passed,
         "pass_rate": round(passed / total, 4) if total else 0.0,
         "mean_score": round(statistics.fmean(scores), 4) if scores else 0.0,
         "failure_categories": dict(failures.most_common()),
-        "by_model_alias": _group(records, "model_alias"),
-        "by_variant": _group(records, "subcategory"),
-        "by_direction": _group(records, "difficulty"),
-        "thinking_variant": _thinking_summary(records),
+        "by_model_alias": _group(objective_records, "model_alias"),
+        "by_variant": _group(objective_records, "subcategory"),
+        "by_direction": _group(objective_records, "difficulty"),
+        "thinking_variant": _thinking_summary(objective_records),
+        "candidate_tests": {
+            "diagnostic_only": True,
+            **(
+                next(iter(_group(candidate_records, "dataset").values()))
+                if candidate_records else
+                {"cases": 0, "passed": 0, "pass_rate": 0.0, "mean_score": 0.0}
+            ),
+            "by_tier": _group(candidate_records, "difficulty"),
+        },
         "representative_failures": samples,
     }
 

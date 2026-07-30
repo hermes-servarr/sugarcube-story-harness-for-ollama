@@ -96,6 +96,9 @@ pull/push credentials for the dedicated account.
 The example runs all benchmark directions currently defined by the project
 (A–H) and all variants, including `thinking`; reduce those lists only if you
 intentionally want a smaller run.
+It also enables the signed 15-case capability ladder. Those additional calls
+run sequentially for each configured model and cover T0 atomic syntax through
+T9 harness-scale context, including matched S/M/L/XL retrieval probes.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.
@@ -272,3 +275,11 @@ regress. It never records chain-of-thought. A missing or truncated final passage
 is treated as possible output-budget exhaustion; the goal stops for operator
 review instead of automatically raising `num_predict`, because that setting is
 GPU-sensitive and the anonymized result cannot establish the cause.
+
+Hermes may add one data-only diagnostic probe per optimization experiment
+under `benchmark_optimization/candidate_tests/`. The PC validates these JSON
+files against a signed closed schema: they select trusted contexts and
+deterministic check primitives, but cannot add code, regex evaluators,
+thresholds, verdicts, model identities, or scoring changes. Candidate metrics
+are reported separately and excluded from the optimization pass rate and stop
+conditions, so adding easy probes cannot inflate the objective.
