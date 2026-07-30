@@ -10,11 +10,11 @@ import os
 import json
 import inspect
 
-# Ensure model_benchmark/ is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+# Ensure the repo root is importable (so `model_benchmark` resolves).
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pytest
-from benchmark import (
+from model_benchmark.benchmark import (
     # Data structures
     CategoryResult,
     ModelRunResult,
@@ -416,7 +416,7 @@ class TestReportAssembly:
 class TestDryRun:
     def test_dry_run_passes(self):
         from harness.parsers import parse_model_output
-        from benchmark import _DRY_RUN_RESPONSE, score_response
+        from model_benchmark.benchmark import _DRY_RUN_RESPONSE, score_response
         parsed = parse_model_output(_DRY_RUN_RESPONSE)
         results = score_response(_DRY_RUN_RESPONSE, parsed, "compact")
         passed = all(r.passed for r in results)
@@ -424,7 +424,7 @@ class TestDryRun:
 
     def test_dry_run_all_variants(self):
         from harness.parsers import parse_model_output, parse_model_output_json
-        from benchmark import _DRY_RUN_RESPONSE, score_response
+        from model_benchmark.benchmark import _DRY_RUN_RESPONSE, score_response
         # The dry-run response works for delimited parsing
         parsed = parse_model_output(_DRY_RUN_RESPONSE)
         for variant in ("compact", "full"):
@@ -497,7 +497,7 @@ class TestInvariants:
         We check import statements and call sites, not the module docstring
         (which mentions the invariant name itself).
         """
-        import benchmark
+        import model_benchmark.benchmark as benchmark
         import ast
         # Parse the module AST and check for generate_story_output in
         # ImportFrom nodes and Call nodes (not in docstrings/comments).
@@ -535,7 +535,7 @@ class TestInvariants:
 
     def test_inv2_no_io_in_scorer_bodies(self):
         """INV-2: no I/O imports (urllib, http, open, requests) in scorer bodies."""
-        import benchmark
+        import model_benchmark.benchmark as benchmark
         # The I/O imports (urllib.request) are module-level; verify scorers
         # don't reference them by checking their source for I/O calls.
         scorer_names = [
@@ -559,7 +559,7 @@ class TestInvariants:
         assert hasattr(harness.prompts, "build_full_passage_prompt")
         assert hasattr(harness.prompts, "build_json_passage_prompt")
         # Verify build_fixture_prompt imports and calls them (source contains the calls)
-        import benchmark
+        import model_benchmark.benchmark as benchmark
         source = inspect.getsource(benchmark.build_fixture_prompt)
         assert "build_compact_passage_prompt(" in source
         assert "build_full_passage_prompt(" in source
@@ -601,7 +601,7 @@ class TestInvariants:
         assert ret == 0
         # Also verify directly via score_response
         from harness.parsers import parse_model_output
-        from benchmark import _DRY_RUN_RESPONSE
+        from model_benchmark.benchmark import _DRY_RUN_RESPONSE
         parsed = parse_model_output(_DRY_RUN_RESPONSE)
         results = score_response(_DRY_RUN_RESPONSE, parsed, "compact")
         assert len(results) == 6

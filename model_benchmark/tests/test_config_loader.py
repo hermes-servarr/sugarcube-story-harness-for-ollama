@@ -691,7 +691,6 @@ class TestExampleConfigs:
     def example_path(self) -> Path:
         return (
             Path(__file__).parent
-            / "tests"
             / "examples"
             / "full_feature_example.yaml"
         )

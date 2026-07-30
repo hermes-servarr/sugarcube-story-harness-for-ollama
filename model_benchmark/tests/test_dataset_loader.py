@@ -19,7 +19,7 @@ from model_benchmark.dataset_loader import DatasetLoader, LoadedDataset
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
-DATASETS_DIR = Path(__file__).parent / "tests" / "datasets"
+DATASETS_DIR = Path(__file__).parent / "datasets"
 
 
 # ── Inline format ────────────────────────────────────────────────────────

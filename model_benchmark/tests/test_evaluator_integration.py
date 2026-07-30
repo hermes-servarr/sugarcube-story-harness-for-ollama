@@ -154,7 +154,7 @@ class TestIntegrationConfigLoadAndRun:
         test_config = resolve_test(BUILTIN_DEFAULTS, doc.to_test_config())
 
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
         assert len(loaded.rows) > 0
@@ -184,7 +184,7 @@ class TestIntegrationConfigLoadAndRun:
 
         # 2. Load dataset
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
         assert len(loaded.rows) > 0
@@ -226,7 +226,7 @@ class TestIntegrationConfigLoadAndRun:
         test_config = resolve_test(BUILTIN_DEFAULTS, doc.to_test_config())
 
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
 
@@ -269,7 +269,7 @@ class TestIntegrationCustomEvaluatorAndDataset:
         test_config = resolve_test(BUILTIN_DEFAULTS, doc.to_test_config())
 
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
         assert len(loaded.rows) > 0
@@ -285,7 +285,7 @@ class TestIntegrationCustomEvaluatorAndDataset:
 
         # 2. Load dataset
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
         assert len(loaded.rows) > 0
@@ -342,7 +342,7 @@ dataset:
         test_config = resolve_test(BUILTIN_DEFAULTS, doc.to_test_config())
 
         loader = DatasetLoader(
-            base_dir=__import__("pathlib").Path(__file__).parent / "tests"
+            base_dir=__import__("pathlib").Path(__file__).parent
         )
         loaded = loader.load(test_config.dataset)
         assert len(loaded.rows) == 5

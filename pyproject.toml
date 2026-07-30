@@ -26,6 +26,19 @@ playtest = ["playwright>=1.40"]
 
 # TODO(e2e-test-runner): register the "e2e" pytest marker to suppress unknown-marker warnings
 [tool.pytest.ini_options]
+# Tests live in three trees:
+#   - tests/                     top-level harness / story-engine tests
+#   - model_benchmark/tests/    benchmark unit tests (moved out of model_benchmark/)
+#   - scripts/                  E2E player-flow helper scripts collected by pytest
+testpaths = [
+    "tests",
+    "model_benchmark/tests",
+    "scripts",
+]
+# Put the repo root on sys.path so absolute imports (`from model_benchmark...`,
+# `from harness...`) resolve regardless of where pytest is invoked from, without
+# each test file needing its own sys.path.insert hack.
+pythonpath = ["."]
 markers = [
     "e2e: end-to-end tests that exercise the full stack (server + Ollama + Tweego)",
 ]

@@ -299,7 +299,7 @@ class TestReferenceExample:
     @pytest.fixture(scope="class")
     def example_docs(self):
         import pathlib
-        path = pathlib.Path(__file__).parent / "tests" / "examples" / "full_feature_example.yaml"
+        path = pathlib.Path(__file__).parent / "examples" / "full_feature_example.yaml"
         with open(path) as f:
             return list(yaml.safe_load_all(f))
 

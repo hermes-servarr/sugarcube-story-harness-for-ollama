@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 
 # Ensure the repo root is on sys.path (run from anywhere).
-_REPO = Path(__file__).resolve().parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
