@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optimize SugarCube Prompts"
+  short_description: "Iteratively improve prompts from anonymized results"
+  default_prompt: "Use $optimize-sugarcube-prompts to run a bounded benchmark improvement loop."

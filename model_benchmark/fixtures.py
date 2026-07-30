@@ -28,6 +28,7 @@ from harness.prompts import (
     build_json_passage_prompt,
     build_thinking_passage_prompt,
 )
+from model_benchmark.prompt_overlay import apply_prompt_overlay
 
 if TYPE_CHECKING:
     # Referenced only in annotations (string form thanks to
@@ -209,7 +210,7 @@ def build_fixture_prompt(
     # INV-3: delegates to the real harness.prompts builders — no inline prompt text.
     human_prompt = _DIRECTION_PROMPTS[direction]
     if variant == "compact":
-        return build_compact_passage_prompt(
+        prompt = build_compact_passage_prompt(
             premise=ctx.premise,
             story_points=ctx.story_points,
             arc_notes=ctx.arc_md,
@@ -219,7 +220,7 @@ def build_fixture_prompt(
             human_prompt=human_prompt,
         )
     elif variant == "full":
-        return build_full_passage_prompt(
+        prompt = build_full_passage_prompt(
             premise=ctx.premise,
             story_points=ctx.story_points,
             arc_md=ctx.arc_md,
@@ -231,7 +232,7 @@ def build_fixture_prompt(
             mode=ctx.mode,
         )
     elif variant == "json":
-        return build_json_passage_prompt(
+        prompt = build_json_passage_prompt(
             premise=ctx.premise,
             story_points=ctx.story_points,
             arc_md=ctx.arc_md,
@@ -243,7 +244,7 @@ def build_fixture_prompt(
             mode=ctx.mode,
         )
     elif variant == "thinking":
-        return build_thinking_passage_prompt(
+        prompt = build_thinking_passage_prompt(
             premise=ctx.premise,
             story_points=ctx.story_points,
             arc_md=ctx.arc_md,
@@ -254,7 +255,9 @@ def build_fixture_prompt(
             human_prompt=human_prompt,
             mode=ctx.mode,
         )
-    raise ValueError(f"Unknown variant: {variant}")
+    else:
+        raise ValueError(f"Unknown variant: {variant}")
+    return apply_prompt_overlay(prompt, variant=variant, direction=direction)
 
 
 # ── INV-8: Dry-run fixture ──────────────────────────────────────────────

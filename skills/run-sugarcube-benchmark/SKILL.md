@@ -46,9 +46,10 @@ the Git pull, single-run lock, benchmark, anonymization, commit, and push.
 - Never read or expose SSH configuration, private keys, PC-side configuration,
   private logs, raw benchmark outputs, anonymization mappings, or repository
   history.
-- Never pull, inspect, or transform benchmark results from the Hermes server.
-  The PC-side publisher is the only authority for anonymization and Git
-  publication.
+- Do not pull, inspect, or transform benchmark results as part of this
+  one-shot action. Result analysis belongs only to
+  `$optimize-sugarcube-prompts`; the PC-side publisher remains the only
+  authority for anonymization and Git publication.
 - Do not repeat unexpected SSH diagnostics verbatim if they may contain host,
   user, path, or credential information. Summarize them generically.
 

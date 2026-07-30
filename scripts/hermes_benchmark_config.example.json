@@ -13,9 +13,16 @@
   "trusted_commit_signers": [
     "REPLACE_WITH_TRUSTED_SIGNING_KEY_FINGERPRINT"
   ],
+  "allow_unsigned_candidate_commits": true,
+  "trusted_code_commit": "REPLACE_WITH_SIGNED_TRUSTED_COMMIT_SHA",
+  "candidate_paths": [
+    "model_benchmark/prompt_overrides.json",
+    "benchmark_anon/results_anonymized.json",
+    "benchmark_optimization/**"
+  ],
   "commit_message": "Publish anonymized benchmark results",
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
-  "variants": ["compact", "full", "json"],
+  "variants": ["compact", "full", "json", "thinking"],
   "directions": ["A", "B", "C", "D", "E", "F", "G", "H"],
   "runs": 1,
   "timeout": 120,

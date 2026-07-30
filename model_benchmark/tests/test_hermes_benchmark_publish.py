@@ -151,3 +151,118 @@ def test_update_checkout_rejects_untrusted_signer(monkeypatch, tmp_path):
             git="git",
             log_handle=io.StringIO(),
         )
+
+
+def test_candidate_mode_allows_only_data_paths(monkeypatch, tmp_path):
+    captured = iter(
+        (
+            "",
+            "main",
+            "abc123",
+            "AA BB CC",
+            "\n".join(
+                (
+                    "model_benchmark/prompt_overrides.json",
+                    "benchmark_optimization/iteration-01.md",
+                    "benchmark_anon/results_anonymized.json",
+                )
+            ),
+        )
+    )
+    logged_commands = []
+    monkeypatch.setattr(
+        publisher,
+        "_run_captured",
+        lambda command, cwd: next(captured),
+    )
+    monkeypatch.setattr(
+        publisher,
+        "_run_logged",
+        lambda command, **kwargs: logged_commands.append(command),
+    )
+
+    publisher._update_checkout(
+        {
+            "git_branch": "main",
+            "require_signed_commit": True,
+            "trusted_commit_signers": ["aabbcc"],
+            "allow_unsigned_candidate_commits": True,
+            "trusted_code_commit": "abc123",
+        },
+        repo=tmp_path,
+        git="git",
+        log_handle=io.StringIO(),
+    )
+
+    assert ["git", "merge-base", "--is-ancestor", "abc123", "HEAD"] in logged_commands
+
+
+def test_candidate_mode_rejects_python_change(monkeypatch, tmp_path):
+    captured = iter(("", "main", "abc123", "AABBCC", "harness/prompts.py"))
+    monkeypatch.setattr(
+        publisher,
+        "_run_captured",
+        lambda command, cwd: next(captured),
+    )
+    monkeypatch.setattr(publisher, "_run_logged", lambda command, **kwargs: None)
+
+    with pytest.raises(publisher.PublishError, match="protected path"):
+        publisher._update_checkout(
+            {
+                "git_branch": "main",
+                "require_signed_commit": True,
+                "trusted_commit_signers": ["AABBCC"],
+                "allow_unsigned_candidate_commits": True,
+                "trusted_code_commit": "abc123",
+            },
+            repo=tmp_path,
+            git="git",
+            log_handle=io.StringIO(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("model_benchmark/prompt_overrides.json", True),
+        ("benchmark_optimization/iteration-01.md", True),
+        ("benchmark_optimization", True),
+        ("model_benchmark/scoring.py", False),
+        ("benchmark_optimization-evil/file", False),
+    ],
+)
+def test_candidate_path_matching(path, expected):
+    patterns = [
+        "model_benchmark/prompt_overrides.json",
+        "benchmark_optimization/**",
+    ]
+
+    assert publisher._candidate_path_allowed(path, patterns) is expected
+
+
+def test_candidate_files_reject_symlink(tmp_path):
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}", encoding="utf-8")
+    candidate = tmp_path / "prompt_overrides.json"
+    try:
+        candidate.symlink_to(outside)
+    except OSError:
+        pytest.skip("symlink creation is unavailable")
+
+    with pytest.raises(publisher.PublishError, match="regular file"):
+        publisher._validate_candidate_files(
+            tmp_path,
+            ["prompt_overrides.json"],
+        )
+
+
+def test_candidate_files_reject_oversized_overlay(tmp_path):
+    candidate = tmp_path / "model_benchmark" / "prompt_overrides.json"
+    candidate.parent.mkdir()
+    candidate.write_bytes(b"x" * 40_001)
+
+    with pytest.raises(publisher.PublishError, match="size limit"):
+        publisher._validate_candidate_files(
+            tmp_path,
+            ["model_benchmark/prompt_overrides.json"],
+        )

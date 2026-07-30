@@ -248,26 +248,122 @@ def _update_checkout(
         log_handle=log_handle,
         env=_git_environment(),
     )
-    if bool(config.get("require_signed_commit", True)):
-        trusted_signers = config.get("trusted_commit_signers", [])
-        if not isinstance(trusted_signers, list) or not trusted_signers:
-            raise PublishError("no trusted commit signers are configured")
+    if not bool(config.get("require_signed_commit", True)):
+        return
+
+    trusted_signers = config.get("trusted_commit_signers", [])
+    if not isinstance(trusted_signers, list) or not trusted_signers:
+        raise PublishError("no trusted commit signers are configured")
+
+    if bool(config.get("allow_unsigned_candidate_commits", False)):
+        trusted_ref = str(config.get("trusted_code_commit", "")).strip()
+        if not trusted_ref:
+            raise PublishError("trusted_code_commit is required")
+        trusted_commit = _run_captured(
+            [git, "rev-parse", "--verify", f"{trusted_ref}^{{commit}}"],
+            cwd=repo,
+        )
+        _verify_trusted_commit(
+            trusted_commit,
+            trusted_signers=trusted_signers,
+            repo=repo,
+            git=git,
+            log_handle=log_handle,
+        )
         _run_logged(
-            [git, "verify-commit", "HEAD"],
+            [git, "merge-base", "--is-ancestor", trusted_commit, "HEAD"],
             cwd=repo,
             log_handle=log_handle,
-            env=_git_environment(),
         )
-        signer = _run_captured(
-            [git, "log", "-1", "--format=%GF"],
+        changed_paths = _run_captured(
+            [git, "diff", "--name-only", trusted_commit, "HEAD"],
             cwd=repo,
+        ).splitlines()
+        allowed_paths = config.get(
+            "candidate_paths",
+            [
+                "model_benchmark/prompt_overrides.json",
+                "benchmark_anon/results_anonymized.json",
+                "benchmark_optimization/**",
+            ],
         )
-        allowed = {
-            str(fingerprint).replace(" ", "").casefold()
-            for fingerprint in trusted_signers
-        }
-        if not signer or signer.replace(" ", "").casefold() not in allowed:
-            raise PublishError("commit signer is not trusted")
+        if not isinstance(allowed_paths, list) or not allowed_paths:
+            raise PublishError("candidate_paths must be a non-empty array")
+        rejected = [
+            path
+            for path in changed_paths
+            if not _candidate_path_allowed(path, allowed_paths)
+        ]
+        if rejected:
+            raise PublishError("candidate commits changed a protected path")
+        _validate_candidate_files(repo, changed_paths)
+        return
+
+    _verify_trusted_commit(
+        "HEAD",
+        trusted_signers=trusted_signers,
+        repo=repo,
+        git=git,
+        log_handle=log_handle,
+    )
+
+
+def _candidate_path_allowed(path: str, patterns: list[Any]) -> bool:
+    normalized = path.replace("\\", "/")
+    for raw_pattern in patterns:
+        pattern = str(raw_pattern).replace("\\", "/")
+        if pattern.endswith("/**"):
+            prefix = pattern[:-3].rstrip("/")
+            if normalized == prefix or normalized.startswith(prefix + "/"):
+                return True
+        elif normalized == pattern:
+            return True
+    return False
+
+
+def _validate_candidate_files(repo: Path, changed_paths: list[str]) -> None:
+    if len(changed_paths) > 100:
+        raise PublishError("candidate commit changed too many files")
+    for relative_name in changed_paths:
+        path = repo / relative_name
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file():
+            raise PublishError("candidate path is not a regular file")
+        normalized = relative_name.replace("\\", "/")
+        limit = 20_000_000 if normalized == (
+            "benchmark_anon/results_anonymized.json"
+        ) else 262_144
+        if normalized == "model_benchmark/prompt_overrides.json":
+            limit = 40_000
+        if path.stat().st_size > limit:
+            raise PublishError("candidate file exceeds its size limit")
+
+
+def _verify_trusted_commit(
+    commit: str,
+    *,
+    trusted_signers: list[Any],
+    repo: Path,
+    git: str,
+    log_handle: Any,
+) -> None:
+    _run_logged(
+        [git, "verify-commit", commit],
+        cwd=repo,
+        log_handle=log_handle,
+        env=_git_environment(),
+    )
+    signer = _run_captured(
+        [git, "log", "-1", "--format=%GF", commit],
+        cwd=repo,
+    )
+    allowed = {
+        str(fingerprint).replace(" ", "").casefold()
+        for fingerprint in trusted_signers
+    }
+    if not signer or signer.replace(" ", "").casefold() not in allowed:
+        raise PublishError("commit signer is not trusted")
 
 
 def _git_environment() -> dict[str, str]:

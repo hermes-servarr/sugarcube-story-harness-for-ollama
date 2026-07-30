@@ -50,6 +50,31 @@ Disabling `require_signed_commit` is unsafe when Hermes can push to the
 configured branch: it could change the pulled Python benchmark and bypass the
 anonymization layer.
 
+### Data-only optimization commits
+
+For the autonomous optimization skill, configure:
+
+```json
+{
+  "require_signed_commit": true,
+  "trusted_commit_signers": ["TRUSTED_KEY_FINGERPRINT"],
+  "allow_unsigned_candidate_commits": true,
+  "trusted_code_commit": "FULL_SIGNED_COMMIT_SHA",
+  "candidate_paths": [
+    "model_benchmark/prompt_overrides.json",
+    "benchmark_anon/results_anonymized.json",
+    "benchmark_optimization/**"
+  ]
+}
+```
+
+The trusted commit must contain the publisher, prompt-overlay loader, and both
+skills and must be signed by an allowlisted key. Candidate commits may then be
+unsigned only when the trusted commit is their ancestor and every accumulated
+change is confined to those data/result/note paths. Any Python, scoring, test,
+fixture, skill, SSH, or configuration change blocks the run before Ollama is
+contacted.
+
 ## Install on a Windows benchmark PC
 
 Use a dedicated local, non-administrator Windows account for the SSH key and a
@@ -69,7 +94,8 @@ Set the real explicit model tags, clone path, `.venv\Scripts\python.exe`, Git
 executable, remote, and branch in the config. Configure non-interactive Git
 pull/push credentials for the dedicated account.
 The example runs all benchmark directions currently defined by the project
-(A–H); reduce that list only if you intentionally want a smaller run.
+(A–H) and all variants, including `thinking`; reduce those lists only if you
+intentionally want a smaller run.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.
@@ -227,3 +253,14 @@ If Hermes needs repository write access for other work, retain
 `write_approval: true` and review skill edits before committing them. The
 PC-side forced SSH command and signed-commit allowlist remain the enforcement
 boundaries even if the model ignores or edits skill instructions.
+
+For a bounded optimization loop, invoke the second included skill through a
+persistent goal:
+
+```text
+/goal Use /optimize-sugarcube-prompts to run at most five sequential experiments. Stop at the first of: target pass rate reached, two non-improving experiments, any regression that is not reverted, or any safety/verification failure.
+```
+
+Hermes persistent goals automatically continue across turns and enforce their
+configured turn budget. Keep `goals.max_turns` finite; the skill additionally
+caps itself at five expensive GPU experiments.
