@@ -1,0 +1,52 @@
+schema_version: "1.0.0"
+kind: test
+
+id: thinking_puzzle_logic_001
+name: Thinking model logical puzzle and consequence planning
+description: >
+  Tests thinking models on logical puzzle scenarios requiring reasoning
+  about consequences, state-dependent traps, and multi-step deduction.
+  The reasoning section should analyze the clues, plan the rune sequence,
+  and consider trap consequences before writing.
+capability: sugarcube_direction_following
+category: markup_compliance
+difficulty: expert
+tags: ["thinking", "puzzle", "logic", "consequence", "reasoning"]
+
+input: |
+  Generate a SugarCube passage where the archaeologist attempts to solve
+  the rune puzzle. Use <<if $hasRuneClue1>> and <<if $hasRuneClue2>>
+  conditionals to show available clues. Use <<set $attempts to $attempts + 1>>
+  for each attempt. Use <<if $trapArmed>> to show trap consequences.
+  Think through the logical deduction and consequences before writing.
+
+prompt_template:
+  variant: thinking
+  input_variables:
+    direction: "Use <<switch>> and <<case>> to branch on the player's current location variable"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains thinking/reasoning section before formatted output"
+    - "Thinking references puzzle clues and logical deduction"
+    - "Thinking considers trap consequences ($trapArmed, $health)"
+    - "Thinking mentions SugarCube macros"
+    - "Formatted output contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 0.7
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/thinking_puzzle_logic_001.yaml
+  created: "2026-07-30T22:30:00Z"
+  modified: "2026-07-30T22:30:00Z"

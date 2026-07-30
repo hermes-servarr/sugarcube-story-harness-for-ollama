@@ -471,7 +471,7 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     p_run.add_argument(
         "--variants",
         nargs="*",
-        choices=["compact", "full", "json"],
+        choices=["compact", "full", "json", "thinking"],
         default=["compact", "full", "json"],
         help="Prompt variants.",
     )

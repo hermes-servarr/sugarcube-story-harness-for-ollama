@@ -3,6 +3,7 @@
 **Date:** 2026-07-30  
 **Data source:** `benchmark_anon/results_anonymized.json` (108 results, 12 models, 3 variants x 3 directions)  
 **Anonymized:** Model names replaced with `Model_A` through `Model_12`
+**Thinking model update:** 2026-07-30 -- Added thinking detection, thinking variant, and thinking_quality category
 
 ---
 
@@ -321,3 +322,123 @@ The benchmark needs:
 4. More runs per case to measure variance
 
 The harness improvements (parser fixes, new scoring categories) should wait until we have a larger dataset from the improved benchmark to validate that the changes actually improve discrimination.
+
+---
+
+## 11. Thinking Model Analysis (2026-07-30 update)
+
+### 11.1 The Problem
+
+Three models (Model_J, Model_11, Model_A) produce chain-of-thought reasoning before their formatted output. The original benchmark treated this as a format failure: 100% of their thinking content was scored as "thinking preamble" and they failed passage_structure because the thinking consumed the entire token budget.
+
+But the thinking content is genuinely good reasoning:
+
+```
+1.  **Analyze the Request:**
+    *   **Genre/Setting:** Fantasy/Magical, Apprentice setting in a wizard's tower attic (dusty).
+    *   **Characters:** Apprentice (protagonist), Mentor (wise old wizard).
+    *   **Plot Arc:** Discovery of a forbidden book.
+    *   **Inventory Check:** He has $gold = 15, $hasMetKing = false. This is crucial for the choice later.
+
+2.  **Drafting the Scene - The Encounter:**
+    *   *Setting:* Late evening in a tower attic. Dust motes dancing.
+    *   *Action:* Apprentice climbs stairs. Finds something strange.
+    *   *Option A:* Return (Too risky if he doesn't know what they mean).
+    *   *Option B:* Read it (Usually implies danger).
+
+5.  **Drafting the Choices:**
+    *   Option A: Return.
+        *   Label: `choice text | $var`
+        *   Hint: It's a safe choice, but he might miss something important.
+```
+
+This reasoning correctly identifies:
+- State variables ($gold, $hasMetKing) and their values
+- Character motivations (curiosity vs obedience)
+- Choice design (risk vs safety, with hints)
+- The need for SugarCube markup (though it references Markdown in the thinking itself)
+
+### 11.2 Thinking Model Statistics
+
+| Model | Thinking lines (avg) | Total lines (avg) | Thinking ratio | Thinking detected | Avg thinking_quality |
+|-------|---------------------|-------------------|----------------|-------------------|---------------------|
+| Model_J | 36 | 38 | 95% | 6/9 cases | 0.80 |
+| Model_11 | 37 | 39 | 95% | 7/9 cases | 0.80 |
+| Model_A | 40 | 45 | 89% | 6/9 cases | 0.73 |
+| Model_E | 0 | 0 | 0% | 0/9 cases | 1.0 (neutral) |
+
+### 11.3 Thinking Detection
+
+The `model_benchmark/thinking.py` module detects and extracts thinking content:
+
+1. **Explicit tags**: `<thinking>...</thinking>`,  delighted to... (R1 style)
+2. **Preamble before sections**: Text before first `PROSE:` header with COT patterns
+3. **Preamble before JSON**: Text before `{` with COT patterns
+4. **COT-only responses**: Entire response is reasoning, no formatted output
+
+For Model_J compact/A, the thinking is detected as "cot_only_no_output" (100% thinking, no formatted output). For Model_J compact/B, thinking is "preamble_before_section" (90% thinking, then `PROSE:` appears).
+
+### 11.4 Thinking Quality Scoring
+
+The `thinking_quality` category (7th category, added to scoring) evaluates 5 sub-checks:
+
+| Sub-check | What it measures | Model_J | Model_11 | Model_A |
+|-----------|-------------------|---------|---------|---------|
+| State variable references | Mentions $vars in thinking | 5 found | 5 found | 2 found |
+| SugarCube macro mentions | References <<set>>, <<if>>, etc. | 0 found | 0 found | 0 found |
+| Direction-specific planning | Plans the feature for the direction | 1 hit | 1 hit | 1 hit |
+| Structured analysis | >=3 numbered/bulleted/header items | 30 markers | 30 markers | 28 markers |
+| Story context references | >=2 context keywords | 6 hits | 6 hits | 6 hits |
+
+**Key finding:** Thinking models reference state variables extensively but do NOT mention SugarCube macros in their reasoning. They plan the narrative but not the markup. This is a prompt design issue: the thinking prompt should explicitly ask models to plan which macros they'll use.
+
+### 11.5 What We Added
+
+**Thinking-aware prompt variant** (`build_thinking_passage_prompt` in `harness/prompts.py`):
+- Explicitly invites reasoning before the formatted output
+- Uses `===PASSAGE===` separator between thinking and passage
+- Asks the model to plan state variables, character motivations, SugarCube macro choices, and direction strategy
+- PROMPT_VERSION bumped from 8 to 9
+
+**Thinking detection utilities** (`model_benchmark/thinking.py`):
+- `extract_thinking(raw)` -- separates thinking from formatted output
+- `detect_thinking_model(raw)` -- quick boolean check for model classification
+- Handles explicit thinking tags, R1-style markers, COT preambles, and COT-only responses
+
+**Thinking quality scoring** (`score_thinking_quality` in `scoring.py`):
+- 5 sub-checks: state vars, macros, direction planning, structure, context
+- Pass threshold: 3/5 checks (60%)
+- Neutral pass (1.0) for non-thinking responses (no penalty for non-thinking models)
+
+**Thinking-specific fixture contexts** (in `fixtures.py`):
+- `complex_state`: Multi-faction siege with 7 state variables and interdependent trust
+- `social`: Court gala with 3 NPCs, hidden information, and relationship management
+- `puzzle`: Ancient temple with logical deduction, state-dependent traps, and consequences
+
+**Thinking test case YAMLs**:
+- `thinking_complex_state_001`: Multi-faction state management
+- `thinking_social_deduction_001`: Social deduction and NPC relationships
+- `thinking_puzzle_logic_001`: Logical puzzle and consequence planning
+
+### 11.6 Expected Impact
+
+For thinking models, the thinking variant should:
+1. Allow them to reason openly (no more 100% thinking ratio = total failure)
+2. Produce better formatted output after reasoning (the thinking serves as planning)
+3. Score on thinking_quality, giving them a dimension where they can outperform non-thinking models
+4. The `===PASSAGE===` separator ensures the formatted output is cleanly extractable
+
+For non-thinking models, the thinking variant should:
+1. Work as a normal full prompt (they'll skip the thinking section and go straight to PROSE:)
+2. Score 1.0 on thinking_quality (neutral, no penalty)
+3. Some may produce brief planning notes before the separator, which is fine
+
+### 11.7 Benchmark Matrix (Updated)
+
+Per model, with all variants and directions:
+- 3 original variants (compact, full, json) x 8 directions (A-H) = 24 cases
+- 1 thinking variant x 8 directions (A-H) = 8 cases
+- 8 fixture contexts (5 genre + 3 thinking-specific) for extra coverage
+- Total: 32+ cases per model (up from 9 in original benchmark)
+
+With `--runs 5` for variance measurement: 160+ calls per model.

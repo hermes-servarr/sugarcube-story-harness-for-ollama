@@ -119,7 +119,7 @@ if TYPE_CHECKING:
 
 # ── P2 Data Structures ───────────────────────────────────────────────────
 
-PromptVariant = Literal["compact", "full", "json"]
+PromptVariant = Literal["compact", "full", "json", "thinking"]
 
 DirectionKey = Literal["A", "B", "C", "D", "E", "F", "G", "H"]
 
@@ -130,6 +130,7 @@ CategoryName = Literal[
     "macro_usage",
     "naked_interpolation",
     "link_setter_syntax",
+    "thinking_quality",
 ]
 
 # Canonical category order (INV-9). Used by score_response, build_model_report,
@@ -141,6 +142,7 @@ _CATEGORY_ORDER: tuple[CategoryName, ...] = (
     "macro_usage",
     "naked_interpolation",
     "link_setter_syntax",
+    "thinking_quality",
 )
 
 
@@ -636,16 +638,128 @@ def score_link_setter_syntax(raw: str, parsed: ModelOutput) -> CategoryResult:
 
 # ── P3 Scoring Orchestrator ─────────────────────────────────────────────
 
-def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant) -> list[CategoryResult]:
-    """Run all 6 scorers on one response; returns exactly 6 CategoryResult (one per category)."""
-    # INV-9: exactly 6 results in canonical category order.
+def score_thinking_quality(thinking_text: str, direction: DirectionKey) -> CategoryResult:
+    """Score Category 7: thinking/reasoning quality for thinking models.
+
+    Evaluates the chain-of-thought reasoning that thinking models produce
+    before their formatted output. Checks whether the reasoning:
+    - References state variables ($var)
+    - Mentions SugarCube macros (<<set>>, <<if>>, etc.)
+    - Plans the direction-specific feature
+    - Shows structured analysis (multiple reasoning steps)
+    - References the story context (premise, entities, etc.)
+
+    For non-thinking responses (empty thinking_text), returns a passing
+    result with score 1.0 so it doesn't penalize non-thinking models.
+    The category is only meaningful for the "thinking" prompt variant.
+    """
+    if not thinking_text or not thinking_text.strip():
+        # Non-thinking response: neutral pass, no penalty
+        return CategoryResult(
+            name="thinking_quality",
+            passed=True,
+            score=1.0,
+            details="No thinking content (non-thinking variant or model).",
+        )
+
+    # Sub-checks (INV-10): 5 checks
+    sub_checks = 5
+    passed_checks = 0
+    evidence: list[str] = []
+
+    # 1. References state variables ($var)
+    var_mentions = re.findall(r'\$\w+', thinking_text)
+    if var_mentions:
+        passed_checks += 1
+        evidence.extend(var_mentions[:3])
+
+    # 2. Mentions SugarCube macros
+    macro_mentions = re.findall(r'<<\w+>>', thinking_text)
+    if macro_mentions:
+        passed_checks += 1
+        evidence.extend(macro_mentions[:3])
+
+    # 3. Direction-specific planning
+    direction_features = {
+        "A": [r'<<set', r'inventory', r'flag'],
+        "B": [r'<<if', r'conditional', r'king'],
+        "C": [r'gold', r'stat', r'<<print'],
+        "D": [r'<<include', r'shared', r'passage'],
+        "E": [r'<<capture', r'<<for', r'loop'],
+        "F": [r'<<textbox', r'<<radiobutton', r'input'],
+        "G": [r'<<for', r'<<print', r'inventory'],
+        "H": [r'<<switch', r'<<case', r'location'],
+    }
+    direction_patterns = direction_features.get(direction, [])
+    direction_hits = 0
+    for pat in direction_patterns:
+        if re.search(pat, thinking_text, re.IGNORECASE):
+            direction_hits += 1
+    if direction_hits >= 1:
+        passed_checks += 1
+        evidence.append(f"direction_{direction}_planning")
+
+    # 4. Structured analysis (multiple reasoning steps)
+    # Count numbered items, bullet points, or section headers in thinking
+    structured_markers = len(re.findall(r'^\s*\d+\.\s', thinking_text, re.MULTILINE))
+    structured_markers += len(re.findall(r'^\s*[-*]\s', thinking_text, re.MULTILINE))
+    structured_markers += len(re.findall(r'^\s*#{1,3}\s', thinking_text, re.MULTILINE))
+    if structured_markers >= 3:
+        passed_checks += 1
+        evidence.append(f"structured_markers={structured_markers}")
+
+    # 5. References story context (premise, entities, character names)
+    context_keywords = ['apprentice', 'mentor', 'pilot', 'journalist', 'detective',
+                        'netrunner', 'character', 'protagonist', 'scene', 'passage',
+                        'story', 'narrative']
+    context_hits = sum(1 for kw in context_keywords if kw in thinking_text.lower())
+    if context_hits >= 2:
+        passed_checks += 1
+        evidence.append(f"context_refs={context_hits}")
+
+    score = passed_checks / sub_checks
+    # thinking_quality passes if at least 3/5 checks pass (quality threshold)
+    passed = passed_checks >= 3
+
+    details = (
+        f"vars={len(var_mentions)}, macros={len(macro_mentions)}, "
+        f"direction_hits={direction_hits}, structured={structured_markers}, "
+        f"context_refs={context_hits}"
+    )
+
+    return CategoryResult(
+        name="thinking_quality",
+        passed=passed,
+        score=score,
+        details=details,
+        evidence=tuple(evidence),
+    )
+
+
+def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant,
+                   direction: DirectionKey = "A") -> list[CategoryResult]:
+    """Run all scorers on one response; returns exactly 7 CategoryResult (one per category).
+
+    For thinking variants, extracts thinking content and scores it separately.
+    The existing 6 scorers run on the stripped output (without thinking preamble).
+    """
+    # Extract thinking content for thinking_quality scoring
+    from model_benchmark.thinking import extract_thinking
+    extraction = extract_thinking(raw)
+    thinking_text = extraction.thinking_text if extraction.has_thinking else ""
+
+    # For the 6 format scorers, use the stripped output if thinking was detected
+    format_raw = extraction.output_text if extraction.has_thinking else raw
+
+    # INV-9: exactly 7 results in canonical category order.
     results = [
-        score_markup_compliance(raw),
-        score_variable_scoping(raw),
-        score_passage_structure(raw, parsed),
-        score_macro_usage(raw),
-        score_naked_interpolation(parsed.prose or raw),
-        score_link_setter_syntax(raw, parsed),
+        score_markup_compliance(format_raw),
+        score_variable_scoping(format_raw),
+        score_passage_structure(format_raw, parsed),
+        score_macro_usage(format_raw),
+        score_naked_interpolation(parsed.prose or format_raw),
+        score_link_setter_syntax(format_raw, parsed),
+        score_thinking_quality(thinking_text, direction),
     ]
     return results
 
@@ -696,7 +810,7 @@ def run_single_model(
             parsed = parse_model_output(raw)
         elapsed = time.monotonic() - t0
 
-        results = score_response(raw, parsed, variant)
+        results = score_response(raw, parsed, variant, direction)
         overall = all(r.passed for r in results)
 
         return ModelRunResult(
@@ -876,7 +990,7 @@ def main(argv: list[str] | None = None) -> int:
         description="SugarCube Direction-Following Benchmark",
     )
     parser.add_argument("--models", nargs="*", default=[], help="Model tags to test (empty=auto-discover)")
-    parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json"],
+    parser.add_argument("--variants", nargs="*", choices=["compact", "full", "json", "thinking"],
                         default=["compact", "full", "json"], help="Prompt variants")
     parser.add_argument("--directions", nargs="*", choices=["A", "B", "C", "D", "E", "F", "G", "H"],
                         default=["A", "B", "C"], help="Directions")
@@ -908,7 +1022,7 @@ def main(argv: list[str] | None = None) -> int:
     if cfg.dry_run:
         # INV-8: score the fixture response without calling Ollama.
         parsed = parse_model_output(_DRY_RUN_RESPONSE)
-        results = score_response(_DRY_RUN_RESPONSE, parsed, "compact")
+        results = score_response(_DRY_RUN_RESPONSE, parsed, "compact", "A")
         run = ModelRunResult(
             model_name="(dry-run)",
             variant="compact",
