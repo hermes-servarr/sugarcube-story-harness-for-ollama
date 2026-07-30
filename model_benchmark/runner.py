@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import sys
 import tempfile
@@ -130,6 +131,7 @@ __all__ = [
     "make_test_id",
     "register_signal_handler",
     "unregister_signal_handler",
+    "render_progress",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -180,12 +182,12 @@ class PlanItem:
 #     state if the file is absent or corrupt.  (P3 module-level function,
 #     not the BenchmarkRunner.resume_from_checkpoint method.)
 #
-#   def render_progress(event: ProgressEvent, verbose: bool = False,
-#                       quiet: bool = False) -> str:
-#     Format a ProgressEvent into a single terminal line (empty string if
-#     quiet suppresses it).  The current _render_progress_stderr is the
-#     stderr-writing version; P3 wants a pure formatting function returning
-#     a string.
+#   def render_progress(event: ProgressEvent, *, verbose: bool = False,
+#                       quiet: bool = False, width: int | None = None,
+#                       color: bool | None = None) -> str:
+#     Format a ProgressEvent into a single terminal progress line/bar (empty string when quiet).
+#     Implemented below as a pure function (no I/O, no env queries); the
+#     _render_progress_stderr wrapper performs TTY/width/color detection.
 #
 # Also: run_single_model and discover_models (P3 §2.3, preserved signatures)
 # move from scoring.py to runner.py.  Add them here and re-export from
@@ -505,31 +507,131 @@ def result_record_from_model_run(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _render_progress_stderr(event: ProgressEvent, verbose: bool) -> None:
-    """Render a :class:`ProgressEvent` to ``stderr`` as a single line.
+def _format_eta(seconds: float) -> str:
+    """Format an ETA in seconds as --:-- (unknown), MM:SS (<1h), or H:MM:SS (>=1h)."""
+    if seconds < 0:
+        return "--:--"
+    seconds = int(round(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
 
-    ``tqdm`` is not a project dependency, so we emit a compact progress line.
-    In verbose mode we include the current case; otherwise just the counters.
-    Output goes to ``stderr`` so stdout stays clean for reports.
-    """
+
+def _supports_color() -> bool:
+    """Return True if stderr is a TTY, NO_COLOR is unset, and TERM is not dumb."""
+    if not os.isatty(sys.stderr.fileno()):
+        return False
+    if "NO_COLOR" in os.environ:
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    return True
+
+
+# ANSI color codes (pure byte sequences, no dependency).
+_ANSI_RESET = "\033[0m"
+_ANSI_GREEN = "\033[32m"
+_ANSI_RED = "\033[31m"
+_ANSI_YELLOW = "\033[33m"
+_ANSI_DIM = "\033[2m"
+
+# Bar character set (ASCII-only, universally safe).
+_BAR_FILL = "="
+_BAR_HEAD = ">"
+_BAR_EMPTY = " "
+
+_DEFAULT_WIDTH = 80
+_MIN_WIDTH = 20
+_MAX_WIDTH = 120
+
+
+def render_progress(
+    event: ProgressEvent,
+    *,
+    verbose: bool = False,
+    quiet: bool = False,
+    width: int | None = None,
+    color: bool | None = None,
+) -> str:
+    """Format a ProgressEvent into a single terminal progress line/bar (empty string when quiet)."""
+    if quiet:
+        return ""
+
+    # Resolve display config with safe fallbacks (no env queries here).
+    w = _DEFAULT_WIDTH if width is None else max(_MIN_WIDTH, min(width, _MAX_WIDTH))
+    use_color = bool(color)
+
+    # Build the status-counts segment.
+    def _colorize(text: str, code: str) -> str:
+        if use_color:
+            return f"{code}{text}{_ANSI_RESET}"
+        return text
+
+    counts = (
+        f"pass={_colorize(str(event.pass_count), _ANSI_GREEN)} "
+        f"fail={_colorize(str(event.fail_count), _ANSI_RED)} "
+        f"err={_colorize(str(event.error_count), _ANSI_YELLOW)} "
+        f"skip={_colorize(str(event.skipped_count), _ANSI_DIM)}"
+    )
+
     pct = event.percent
-    if verbose:
-        line = (
-            f"[{event.stage}] {event.completed}/{event.total} ({pct:5.1f}%) "
-            f"eta={event.eta_seconds:.0f}s "
-            f"model={event.model_alias} v={event.variant} "
-            f"dir={event.direction} rep={event.repetition} "
-            f"pass={event.pass_count} fail={event.fail_count} "
-            f"err={event.error_count} skip={event.skipped_count}"
+    eta_str = _format_eta(event.eta_seconds)
+
+    # Build the right-side text: pct, counts, eta, (optional verbose case label).
+    completed_total = f"{event.completed}/{event.total}"
+    right = f"{pct:5.1f}% {completed_total} {eta_str} {counts}"
+
+    if verbose and event.current_test:
+        case_label = (
+            f" {event.model_alias} v={event.variant} "
+            f"dir={event.direction} rep={event.repetition}"
         )
+        right += case_label
+
+    # Build the bar.  Reserve space for the right-side text + brackets.
+    # Format: [====>   ] <right>
+    bracket_overhead = 4  # "[", "] ", space after ]
+    bar_max = max(10, w - len(right) - bracket_overhead)
+
+    if event.total > 0:
+        filled = int(bar_max * event.completed / event.total)
+        filled = min(filled, bar_max)
     else:
-        line = (
-            f"[{event.stage}] {event.completed}/{event.total} ({pct:5.1f}%) "
-            f"eta={event.eta_seconds:.0f}s "
-            f"pass={event.pass_count} fail={event.fail_count} "
-            f"err={event.error_count} skip={event.skipped_count}"
-        )
-    sys.stderr.write(line + "\n")
+        filled = 0
+
+    bar = _BAR_FILL * filled
+    if filled < bar_max:
+        bar += _BAR_HEAD
+        bar += _BAR_EMPTY * (bar_max - filled - 1)
+
+    line = f"[{bar}] {right}"
+    return line
+
+
+def _render_progress_stderr(
+    event: ProgressEvent,
+    verbose: bool,
+    quiet: bool,
+) -> None:
+    """Write a formatted ProgressEvent to stderr with TTY-aware in-place refresh (no-op when quiet)."""
+    if quiet:
+        return
+
+    is_tty = os.isatty(sys.stderr.fileno())
+    w = shutil.get_terminal_size().columns if is_tty else _DEFAULT_WIDTH
+    use_color = _supports_color() if is_tty else False
+
+    line = render_progress(
+        event, verbose=verbose, quiet=False, width=w, color=use_color
+    )
+    if not line:
+        return
+
+    prefix = "\r" if is_tty else ""
+    suffix = "" if is_tty else "\n"
+    sys.stderr.write(prefix + line + suffix)
     sys.stderr.flush()
 
 
@@ -726,7 +828,12 @@ class BenchmarkRunner:
             # Final checkpoint.
             self._maybe_checkpoint(force=True)
 
+            # Bar hygiene: when an in-place \r progress bar has been rendering
+            # (TTY + non-quiet), emit a newline so the [done] summary starts
+            # on a fresh line instead of overwriting the bar.
             if not self.quiet:
+                if os.isatty(sys.stderr.fileno()):
+                    sys.stderr.write("\n")
                 elapsed = time.monotonic() - self._start_time
                 sys.stderr.write(
                     f"[done] {self._completed}/{total} in {elapsed:.1f}s "
@@ -957,8 +1064,7 @@ class BenchmarkRunner:
                 self.progress_callback(event)
             except Exception:
                 pass  # a callback error must not abort the run
-        if not self.quiet:
-            _render_progress_stderr(event, self.verbose)
+        _render_progress_stderr(event, self.verbose, self.quiet)
 
     def _maybe_checkpoint(self, *, force: bool) -> None:
         """Persist a checkpoint if the count or time interval trigger fires.
