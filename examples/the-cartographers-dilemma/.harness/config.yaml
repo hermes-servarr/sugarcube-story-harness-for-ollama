@@ -4,15 +4,15 @@ model_mode: compact
 num_ctx: 4096
 num_predict: 1024
 ollama_base_url: http://localhost:11434
-ollama_model: mistralai/Mistral-Medium-3.5-128B
+ollama_model: llama3.2
 output_format: delimited
 rag_enabled: true
 rag_min_score: 0.3
 rag_top_k: 3
 repeat_penalty: 1.15
 story_format: SugarCube
-story_ifid: FA86D8CA-636C-4D54-9F42-0D565A99E903
-story_title: Shadows of Thornwood
+story_ifid: 562723BB-C4D9-4E16-AFC0-6F3D87EB8C3C
+story_title: The Cartographer Dilemma
 sugarcube_path: ''
 temperature: 0.7
 template_id: ''

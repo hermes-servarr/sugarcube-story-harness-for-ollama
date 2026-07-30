@@ -1,149 +1,1031 @@
 {
   "version": 1,
   "start_passage": "Start",
-  "passages": {},
+  "passages": {
+    "Castle": {
+      "file": "arcs/castle/castle_tower.tw",
+      "arc": "castle",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$inventory"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Ending": {
+      "file": "arcs/castle/ending_seal.tw",
+      "arc": "castle",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$has_amulet",
+        "$level"
+      ],
+      "state_reads": [
+        "$agility",
+        "$gold",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$level",
+        "$max_hp",
+        "$player_class",
+        "$player_name",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_problem",
+        "$strength",
+        "$visited_locations",
+        "$vitality",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Final": {
+      "file": "arcs/castle/final_confrontation.tw",
+      "arc": "castle",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$garrett_betrayed",
+        "$intelligence",
+        "$maras_secret_known"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Examine": {
+      "file": "arcs/forest/examine_altar.tw",
+      "arc": "forest",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Forest": {
+      "file": "arcs/forest/forest_river.tw",
+      "arc": "forest",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$quest_lost_traveler"
+      ],
+      "state_reads": [
+        "$met_elara",
+        "$quest_artifact",
+        "$quest_lost_traveler"
+      ],
+      "media_slots": [
+        "slot_beach"
+      ],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Shrine": {
+      "file": "arcs/forest/shrine_meditation.tw",
+      "arc": "forest",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$hp"
+      ],
+      "state_reads": [
+        "$max_hp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Take": {
+      "file": "arcs/forest/take_amulet.tw",
+      "arc": "forest",
+      "parents": [],
+      "children": [
+        "Mara"
+      ],
+      "state_writes": [
+        "$amulet_recovered",
+        "$has_amulet",
+        "$quest_artifact"
+      ],
+      "state_reads": [
+        "$inventory",
+        "$quest_lost_traveler",
+        "$quest_wolf_problem",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Wolf": {
+      "file": "arcs/forest/wolf_sneak.tw",
+      "arc": "forest",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$agility"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Character": {
+      "file": "arcs/main/character_sheet.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$agility",
+        "$amulet_recovered",
+        "$castle_explored",
+        "$elara_trust",
+        "$forest_cleared",
+        "$garrett_betrayed",
+        "$garrett_trust",
+        "$gold",
+        "$has_amulet",
+        "$has_healing_potion",
+        "$has_iron_sword",
+        "$has_lantern",
+        "$has_map",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$level",
+        "$mara_trust",
+        "$maras_secret_known",
+        "$max_hp",
+        "$player_class",
+        "$player_name",
+        "$strength",
+        "$visited_locations",
+        "$vitality",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Defeat": {
+      "file": "arcs/main/defeat.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$gold",
+        "$max_hp",
+        "$player_class",
+        "$player_name",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Inventory": {
+      "file": "arcs/main/inventory_view.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$gold",
+        "$has_amulet",
+        "$has_healing_potion",
+        "$has_iron_sword",
+        "$has_lantern",
+        "$has_map",
+        "$inventory"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Mage": {
+      "file": "arcs/main/mage_setup.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$has_iron_sword",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_class",
+        "$strength",
+        "$vitality"
+      ],
+      "state_reads": [
+        "$agility",
+        "$gold",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_name",
+        "$strength",
+        "$vitality"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Quest": {
+      "file": "arcs/main/quest_log.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$amulet_recovered",
+        "$garrett_betrayed",
+        "$maras_secret_known",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_kills",
+        "$quest_wolf_problem"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Quick": {
+      "file": "arcs/main/quick_start.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$has_healing_potion",
+        "$has_iron_sword",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_class",
+        "$player_name",
+        "$strength",
+        "$vitality"
+      ],
+      "state_reads": [
+        "$agility",
+        "$gold",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$strength",
+        "$vitality"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Rogue": {
+      "file": "arcs/main/rogue_setup.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$has_iron_sword",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_class",
+        "$strength",
+        "$vitality"
+      ],
+      "state_reads": [
+        "$agility",
+        "$gold",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_name",
+        "$strength",
+        "$vitality"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Start": {
+      "file": "arcs/main/start.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$amulet_recovered",
+        "$castle_explored",
+        "$elara_trust",
+        "$forest_cleared",
+        "$garrett_betrayed",
+        "$garrett_trust",
+        "$gold",
+        "$has_amulet",
+        "$has_healing_potion",
+        "$has_iron_sword",
+        "$has_lantern",
+        "$has_map",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$level",
+        "$mara_trust",
+        "$maras_secret_known",
+        "$max_hp",
+        "$met_elara",
+        "$met_garrett",
+        "$met_mara",
+        "$player_class",
+        "$player_name",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_kills",
+        "$quest_wolf_problem",
+        "$strength",
+        "$visited_locations",
+        "$vitality",
+        "$xp"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "StoryData": {
+      "file": "arcs/main/story_meta.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$amulet_recovered",
+        "$castle_explored",
+        "$elara_trust",
+        "$forest_cleared",
+        "$garrett_betrayed",
+        "$garrett_trust",
+        "$gold",
+        "$has_amulet",
+        "$has_healing_potion",
+        "$has_iron_sword",
+        "$has_lantern",
+        "$has_map",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$level",
+        "$mara_trust",
+        "$maras_secret_known",
+        "$max_hp",
+        "$met_elara",
+        "$met_garrett",
+        "$met_mara",
+        "$player_class",
+        "$player_name",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_kills",
+        "$quest_wolf_problem",
+        "$strength",
+        "$visited_locations",
+        "$vitality",
+        "$xp"
+      ],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Use": {
+      "file": "arcs/main/use_potion.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$has_healing_potion",
+        "$hp",
+        "$inventory"
+      ],
+      "state_reads": [
+        "$has_healing_potion",
+        "$hp",
+        "$inventory",
+        "$max_hp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Warrior": {
+      "file": "arcs/main/warrior_setup.tw",
+      "arc": "main",
+      "parents": [],
+      "children": [],
+      "state_writes": [
+        "$agility",
+        "$has_iron_sword",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_class",
+        "$strength",
+        "$vitality"
+      ],
+      "state_reads": [
+        "$agility",
+        "$gold",
+        "$hp",
+        "$intelligence",
+        "$inventory",
+        "$max_hp",
+        "$player_name",
+        "$strength",
+        "$vitality"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Buy": {
+      "file": "arcs/town/buy_shield.tw",
+      "arc": "town",
+      "parents": [],
+      "children": [
+        "Garrett"
+      ],
+      "state_writes": [],
+      "state_reads": [
+        "$gold",
+        "$hp",
+        "$inventory",
+        "$max_hp",
+        "$vitality"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Elara": {
+      "file": "arcs/town/elara.tw",
+      "arc": "town",
+      "parents": [
+        "Town"
+      ],
+      "children": [],
+      "state_writes": [
+        "$elara_trust",
+        "$has_healing_potion",
+        "$met_elara",
+        "$quest_lost_traveler"
+      ],
+      "state_reads": [
+        "$amulet_recovered",
+        "$gold",
+        "$inventory",
+        "$met_elara",
+        "$met_garrett",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_problem",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Garrett": {
+      "file": "arcs/town/garrett.tw",
+      "arc": "town",
+      "parents": [
+        "Buy",
+        "Town"
+      ],
+      "children": [],
+      "state_writes": [
+        "$garrett_betrayed",
+        "$garrett_trust",
+        "$met_garrett"
+      ],
+      "state_reads": [
+        "$garrett_trust",
+        "$inventory",
+        "$met_garrett",
+        "$quest_lost_traveler"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Mara": {
+      "file": "arcs/town/mara.tw",
+      "arc": "town",
+      "parents": [
+        "Take",
+        "Maras",
+        "Town"
+      ],
+      "children": [],
+      "state_writes": [
+        "$has_lantern",
+        "$mara_trust",
+        "$maras_secret_known",
+        "$met_mara",
+        "$quest_artifact",
+        "$quest_wolf_problem"
+      ],
+      "state_reads": [
+        "$amulet_recovered",
+        "$gold",
+        "$inventory",
+        "$mara_trust",
+        "$maras_secret_known",
+        "$met_mara",
+        "$quest_wolf_kills",
+        "$quest_wolf_problem",
+        "$xp"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Maras": {
+      "file": "arcs/town/maras_secret.tw",
+      "arc": "town",
+      "parents": [],
+      "children": [
+        "Mara"
+      ],
+      "state_writes": [],
+      "state_reads": [],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Tavern": {
+      "file": "arcs/town/tavern_rumors.tw",
+      "arc": "town",
+      "parents": [
+        "Town"
+      ],
+      "children": [],
+      "state_writes": [],
+      "state_reads": [
+        "$gold"
+      ],
+      "media_slots": [],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    },
+    "Town": {
+      "file": "arcs/town/town_square.tw",
+      "arc": "town",
+      "parents": [],
+      "children": [
+        "Garrett",
+        "Mara",
+        "Elara",
+        "Tavern"
+      ],
+      "state_writes": [
+        "$met_mara"
+      ],
+      "state_reads": [
+        "$forest_cleared",
+        "$has_lantern",
+        "$met_elara",
+        "$met_garrett",
+        "$quest_artifact",
+        "$quest_lost_traveler",
+        "$quest_wolf_problem",
+        "$visited_locations"
+      ],
+      "media_slots": [
+        "slot_village"
+      ],
+      "location": "",
+      "summary": "",
+      "beats": [],
+      "plan_beats": [],
+      "snapshot": {
+        "characters_present": [],
+        "characters_offscreen": [],
+        "world_state": [],
+        "open_threads": []
+      },
+      "snapshot_delta": null,
+      "passage_type": "normal",
+      "entry_condition": "",
+      "fallback_passage": "",
+      "exits": {},
+      "event_odds": 100,
+      "dialogue_npc": ""
+    }
+  },
   "state_variables": {
-    "$player_name": {
-      "type": "str",
-      "default": "Hero",
-      "declared_in": "Start"
-    },
-    "$player_class": {
-      "type": "str",
-      "default": "Warrior",
-      "declared_in": "Start"
-    },
-    "$strength": {
-      "type": "int",
-      "default": 10,
-      "declared_in": "Start"
-    },
     "$agility": {
       "type": "int",
       "default": 10,
       "declared_in": "Start"
     },
-    "$intelligence": {
-      "type": "int",
-      "default": 10,
-      "declared_in": "Start"
-    },
-    "$vitality": {
-      "type": "int",
-      "default": 10,
-      "declared_in": "Start"
-    },
-    "$max_hp": {
-      "type": "int",
-      "default": 50,
-      "declared_in": "Start"
-    },
-    "$hp": {
-      "type": "int",
-      "default": 50,
-      "declared_in": "Start"
-    },
-    "$xp": {
-      "type": "int",
-      "default": 0,
-      "declared_in": "Start"
-    },
-    "$level": {
-      "type": "int",
-      "default": 1,
-      "declared_in": "Start"
-    },
-    "$gold": {
-      "type": "int",
-      "default": 25,
-      "declared_in": "Start"
-    },
-    "$inventory": {
-      "type": "str",
-      "default": [],
-      "declared_in": "Start"
-    },
-    "$visited_locations": {
-      "type": "str",
-      "default": [],
-      "declared_in": "Start"
-    },
-    "$quest_wolf_problem": {
-      "type": "str",
-      "default": "not_started",
-      "declared_in": "Start"
-    },
-    "$quest_wolf_kills": {
-      "type": "int",
-      "default": 0,
-      "declared_in": "Start"
-    },
-    "$quest_lost_traveler": {
-      "type": "str",
-      "default": "not_started",
-      "declared_in": "Start"
-    },
-    "$quest_artifact": {
-      "type": "str",
-      "default": "not_started",
-      "declared_in": "Start"
-    },
-    "$met_mara": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$met_garrett": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$met_elara": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$mara_trust": {
-      "type": "int",
-      "default": 0,
-      "declared_in": "Start"
-    },
-    "$garrett_trust": {
-      "type": "int",
-      "default": 0,
-      "declared_in": "Start"
-    },
-    "$elara_trust": {
-      "type": "int",
-      "default": 0,
-      "declared_in": "Start"
-    },
-    "$has_map": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$has_lantern": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$has_amulet": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$has_iron_sword": {
-      "type": "bool",
-      "default": true,
-      "declared_in": "Start"
-    },
-    "$has_healing_potion": {
-      "type": "bool",
-      "default": false,
-      "declared_in": "Start"
-    },
-    "$forest_cleared": {
+    "$amulet_recovered": {
       "type": "bool",
       "default": false,
       "declared_in": "Start"
@@ -153,12 +1035,12 @@
       "default": false,
       "declared_in": "Start"
     },
-    "$amulet_recovered": {
-      "type": "bool",
-      "default": false,
+    "$elara_trust": {
+      "type": "int",
+      "default": 0,
       "declared_in": "Start"
     },
-    "$maras_secret_known": {
+    "$forest_cleared": {
       "type": "bool",
       "default": false,
       "declared_in": "Start"
@@ -166,6 +1048,141 @@
     "$garrett_betrayed": {
       "type": "bool",
       "default": false,
+      "declared_in": "Start"
+    },
+    "$garrett_trust": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$gold": {
+      "type": "int",
+      "default": 25,
+      "declared_in": "Start"
+    },
+    "$has_amulet": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_healing_potion": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_iron_sword": {
+      "type": "bool",
+      "default": true,
+      "declared_in": "Start"
+    },
+    "$has_lantern": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_map": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$hp": {
+      "type": "int",
+      "default": 50,
+      "declared_in": "Start"
+    },
+    "$intelligence": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$inventory": {
+      "type": "str",
+      "default": [],
+      "declared_in": "Start"
+    },
+    "$level": {
+      "type": "int",
+      "default": 1,
+      "declared_in": "Start"
+    },
+    "$mara_trust": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$maras_secret_known": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$max_hp": {
+      "type": "int",
+      "default": 50,
+      "declared_in": "Start"
+    },
+    "$met_elara": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$met_garrett": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$met_mara": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$player_class": {
+      "type": "str",
+      "default": "Warrior",
+      "declared_in": "Start"
+    },
+    "$player_name": {
+      "type": "str",
+      "default": "Hero",
+      "declared_in": "Start"
+    },
+    "$quest_artifact": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$quest_lost_traveler": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$quest_wolf_kills": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$quest_wolf_problem": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$strength": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$visited_locations": {
+      "type": "str",
+      "default": [],
+      "declared_in": "Start"
+    },
+    "$vitality": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$xp": {
+      "type": "int",
+      "default": 0,
       "declared_in": "Start"
     }
   },
