@@ -28,6 +28,7 @@ from harness.validation import (
     _reachable_unset,
     check_macro_pairing,
     run_validation,
+    validate_compiled_html,
 )
 
 
@@ -559,6 +560,33 @@ class MediaStagingTests(unittest.TestCase):
             content = f"text\n<!-- media:{slot_id} -->\n"
             # empty rel_map → pending/unstaged, comment preserved
             self.assertIn(f"<!-- media:{slot_id} -->", _embed_media(p, content, {}))
+
+    def test_embed_named_slot_resolved(self):
+        """A resolved *named* slot ID (non-hex, e.g. slot_village) must be
+        replaced with an <img> tag, proving the widened regex matches it."""
+        with TemporaryDirectory() as tmp:
+            from harness.compile import _embed_media
+            from harness.media import resolve_slot, stage_media_for_build
+            p, pid, slot_id = self._project_with_media(tmp)
+            # Replace the auto-generated hex ID with a named one that exercises
+            # the [a-z0-9_] alphabet from _clean_id (e.g. slot_village).
+            named_id = "slot_village"
+            from harness.project import load_slots, save_slots
+            slots = load_slots(p)
+            slot = slots.slots[slot_id]
+            slots.slots[named_id] = slot
+            del slots.slots[slot_id]
+            save_slots(p, slots)
+            # Resolve and stage the named slot
+            ok, _ = resolve_slot(p, named_id, "media/scene.png")
+            self.assertTrue(ok)
+            rel_map = stage_media_for_build(p, p.build_dir)
+            self.assertIn(named_id, rel_map)
+            content = f"text\n<!-- media:{named_id} -->\n"
+            result = _embed_media(p, content, rel_map)
+            self.assertIn("<img", result)
+            self.assertIn('src="media/scene.png"', result)
+            self.assertNotIn(f"<!-- media:{named_id} -->", result)
 
 
 class PlanningTests(unittest.TestCase):

@@ -20,7 +20,7 @@ from .models import HarnessConfig, StoryGraph
 #   from .models import HarnessConfig, SettingDef, StoryGraph
 # Alphabetical position: HarnessConfig < SettingDef < StoryGraph.
 from .project import ProjectPaths, load_slots, load_story
-from .validation import run_validation
+from .validation import run_validation, validate_compiled_html
 
 
 # Tweego treats both extensions identically — research notes both are valid
@@ -44,7 +44,7 @@ def _embed_media(p: ProjectPaths, tw_content: str, rel_map: dict[str, dict[str, 
             return m.group(0)  # leave as-is (pending or missing on disk)
         return media_markup(slot, staged["src"], staged.get("poster", ""))
 
-    return re.sub(r'<!-- media:(slot_[a-f0-9]+) -->', replace_slot, tw_content)
+    return re.sub(r'<!-- media:(slot_[a-zA-Z0-9_]+) -->', replace_slot, tw_content)
 
 
 def find_tweego(configured_path: str = "tweego") -> str | None:
@@ -422,6 +422,109 @@ def _build_tweego_argv(
     return cmd
 
 
+def fix_compiled_css(html_path: Path) -> int:
+    """
+    Post-compile CSS patcher — removes VS Code CSS-linter warnings from the
+    SugarCube-bundled CSS embedded in a compiled story HTML file.
+
+    Tweego bundles SugarCube's CSS verbatim, which contains two classes of
+    linter warnings (9 total in a typical compile):
+
+    1. **vendorPrefix** (3): rules using ``-webkit-appearance:X`` without a
+       matching standard ``appearance:X``.  VS Code only flags non-webkit-
+       pseudo-element selectors, so we mirror that: rules whose selector
+       contains ``::-webkit-`` (e.g. ``::-webkit-slider-thumb``) are skipped
+       because ``appearance`` would itself be an invalid-property warning
+       there.  For the rest we append ``appearance:X`` right after the
+       ``-webkit-appearance`` declaration.
+
+    2. **unknownProperties** (6): ``speak:none`` declarations in icon-font
+       (fontello) rules.  The ``speak`` property is a valid CSS2 aural
+       property but VS Code's linter does not recognise it.  We remove the
+       declaration entirely — it has no visual effect on icon glyphs.
+
+    Returns the number of CSS declarations patched (vendor-prefix adds +
+    ``speak`` removals).  The file is only rewritten when at least one
+    patch was applied.  Idempotent: a second call on already-fixed output
+    returns 0 and does not rewrite.
+    """
+    html = html_path.read_text(encoding="utf-8")
+
+    # Match each <style>...</style> block and patch its CSS.
+    # CSS inside these blocks is minified (one rule per run, no newlines),
+    # so we operate rule-by-rule with a regex that captures selector + body.
+    _RULE_RE = re.compile(r"([^{}]*?)\{([^{}]*)\}")
+    # Matches ``-webkit-appearance : value`` up to ``;`` or ``}``.
+    _WEBKIT_APPEARANCE_RE = re.compile(
+        r"-webkit-appearance\s*:\s*([^;}]*)"
+    )
+    # Matches ``speak : value`` (property name on a word boundary).
+    _SPEAK_RE = re.compile(r"\bspeak\s*:\s*[^;]*;?")
+
+    patches = 0
+
+    def _patch_style_block(match: re.Match) -> str:
+        nonlocal patches
+        open_tag = match.group(1)   # e.g. <style id="style-core" type="text/css">
+        css = match.group(2)        # the CSS body
+
+        def _patch_rule(rule_match: re.Match) -> str:
+            nonlocal patches
+            selector = rule_match.group(1)
+            body = rule_match.group(2)
+            changed = False
+
+            # ── vendor-prefix fix ──────────────────────────────────────
+            # Only patch selectors WITHOUT a webkit pseudo-element, since
+            # `appearance` on `::-webkit-*` is itself invalid.
+            is_webkit_pseudo = "::-webkit-" in selector
+            if not is_webkit_pseudo:
+                check_body = re.sub(
+                    r"-(?:webkit|moz|ms|o)-appearance", "", body
+                )
+                if "-webkit-appearance" in body and not re.search(
+                    r"\bappearance\s*:", check_body
+                ):
+                    # Append the standard property after each -webkit-appearance.
+                    def _add_appearance(am: re.Match) -> str:
+                        nonlocal patches, changed
+                        val = am.group(1).strip()
+                        changed = True
+                        patches += 1
+                        return f"{am.group(0)};appearance:{val}"
+
+                    body = _WEBKIT_APPEARANCE_RE.sub(
+                        _add_appearance, body
+                    )
+
+            # ── unknown-property fix ────────────────────────────────────
+            if _SPEAK_RE.search(body):
+                new_body = _SPEAK_RE.sub("", body)
+                # tidy dangling double-semicolons / leading semicolons
+                new_body = re.sub(r";{2,}", ";", new_body)
+                new_body = re.sub(r"^;", "", new_body)
+                if new_body != body:
+                    patches += 1
+                    changed = True
+                    body = new_body
+
+            if changed:
+                return f"{selector}{{{body}}}"
+            return rule_match.group(0)
+
+        new_css = _RULE_RE.sub(_patch_rule, css)
+        return f"{open_tag}{new_css}</style>"
+
+    # Only operate on <style>...</style> blocks (capture open tag, css, close).
+    new_html = re.sub(
+        r"(<style[^>]*>)(.*?)(</style>)", _patch_style_block, html, flags=re.DOTALL
+    )
+
+    if patches and new_html != html:
+        html_path.write_text(new_html, encoding="utf-8")
+    return patches
+
+
 def compile_story(p: ProjectPaths, cfg: HarnessConfig) -> tuple[bool, str]:
     """
     Validate then compile. Returns (success, output_or_error).
@@ -465,6 +568,31 @@ def compile_story(p: ProjectPaths, cfg: HarnessConfig) -> tuple[bool, str]:
 
     if proc.returncode != 0:
         return False, f"Tweego error:\n{proc.stderr}\n{proc.stdout}"
+
+    # Post-compile CSS patcher: strip the 9 SugarCube-bundled CSS linter
+    # warnings (3 vendor-prefix + 6 unknown-property) from the output so
+    # the compiled HTML is warning-free in VS Code / any CSS linter.
+    if out_html.exists():
+        fix_compiled_css(out_html)
+
+    # Post-compile JS validation: re-check the compiled <script> blocks with a
+    # real JS engine (``node --check``). VS Code's tsserver mis-tokenises regex
+    # literals in the minified SugarCube/jQuery bundles and reports ~16 false
+    # "errors"; a real engine tokenises them correctly and reports zero.
+    # Genuine JS errors from the harness's own generators would surface here,
+    # but valid engine bundles (the common case) yield an empty error list.
+    if out_html.exists():
+        js_result = validate_compiled_html(out_html)
+        if js_result.errors:
+            msg = "Post-compile JS validation found errors:\n"
+            for err in js_result.errors:
+                msg += f"  [{err.code}] {err.message}"
+                if err.passage:
+                    msg += f"  ({err.passage})"
+                msg += "\n"
+            # Non-fatal: warn but don't fail the compile (the HTML still runs in
+            # browsers). Surface the diagnostics so problems are visible.
+            return True, f"{out_html}\n\n--- post-compile JS warnings ---\n{msg.strip()}"
 
     # `-l` (log stats) prints to stderr — surface it alongside the output path.
     stats = (proc.stderr or "").strip() if cfg.tweego_log_stats else ""

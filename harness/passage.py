@@ -1115,7 +1115,7 @@ def scan_state_writes(tw_content: str) -> list[str]:
 # ── Rebuild story.json from disk ───────────────────────────────────────────────
 
 _TW_HEADER_RE = re.compile(r'^::\s*(\S+)(?:\s*\[([^\]]*)\])?', re.MULTILINE)
-_MEDIA_SLOT_RE = re.compile(r'<!-- media:(slot_[a-f0-9]+) -->')
+_MEDIA_SLOT_RE = re.compile(r'<!-- media:(slot_[a-zA-Z0-9_]+) -->')
 
 
 def _parse_tw_header(content: str) -> tuple[str, list[str]]:

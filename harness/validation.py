@@ -1,6 +1,11 @@
 """Validation — errors block compile, warnings surface in UI."""
 from __future__ import annotations
+import os
 import re
+import shutil
+import subprocess
+import tempfile
+from html.parser import HTMLParser
 from pathlib import Path
 
 from .models import PASSAGE_TYPES, StoryGraph, Snapshot, ValidationIssue, ValidationResult
@@ -827,4 +832,213 @@ def run_validation(p: ProjectPaths) -> ValidationResult:
             else:
                 result.errors.append(issue)
 
+    return result
+
+
+# ── Post-compile compiled-HTML validation ─────────────────────────────────────
+
+class _BlockExtractor(HTMLParser):
+    """Extract ``<script>`` and ``<style>`` block contents with a real HTML parser.
+
+    Using a real parser (rather than a naive regex) is critical for compiled
+    SugarCube output: the minified jQuery/SugarCube engine code contains regex
+    literals like ``/<style|<link/i`` and ``/<script|<style|<link/i`` that a
+    regex-based extractor would mistake for real tags, producing false
+    positives. The HTML parser only fires ``handle_starttag``/``handle_endtag``
+    for genuine tag tokens.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.scripts: list[tuple[tuple[int, int], dict[str, str], str]] = []
+        self.styles: list[tuple[tuple[int, int], dict[str, str], str]] = []
+        self._current: list[str] | None = None
+        self._tag: str | None = None
+        self._pos: tuple[int, int] = (0, 0)
+        self._attrs: dict[str, str] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self._current = []
+            self._tag = tag
+            self._pos = self.getpos()
+            self._attrs = {k: (v or "") for k, v in attrs}
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == self._tag and self._current is not None:
+            entry = (self._pos, self._attrs, "".join(self._current))
+            if tag == "script":
+                self.scripts.append(entry)
+            else:
+                self.styles.append(entry)
+            self._current = None
+            self._tag = None
+            self._attrs = {}
+
+    def handle_data(self, data: str) -> None:
+        if self._current is not None:
+            self._current.append(data)
+
+
+def _node_check_js(content: str) -> list[ValidationIssue]:
+    """Validate a JS string with ``node --check``.
+
+    ``node`` is a complete JS engine, so regex literals in minified
+    SugarCube/jQuery engine code are tokenised correctly and never reported as
+    syntax errors — unlike VS Code's JS language service (tsserver), which
+    mis-tokenises ``/`` inside regex literals and reports cascading false
+    positives. Returns a list of ``ValidationIssue`` (level='error',
+    code='html_js_syntax'); empty if the JS is valid (or empty/whitespace).
+    """
+    node = shutil.which("node")
+    if not node:
+        return [_issue("error", "html_js_syntax",
+                       "node executable not found; cannot validate compiled JS")]
+    if not content.strip():
+        return []
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".js", delete=False, encoding="utf-8"
+    ) as f:
+        f.write(content)
+        path = f.name
+    try:
+        r = subprocess.run([node, "--check", path], capture_output=True,
+                           text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return [_issue("error", "html_js_syntax",
+                       "node --check timed out (60s) validating compiled JS")]
+    finally:
+        os.unlink(path)
+    if r.returncode == 0:
+        return []
+    # node prints: "<file>:<line>\n\nSyntaxError: <msg>\n    at ..."
+    issues: list[ValidationIssue] = []
+    msg = "JS syntax error"
+    for line in (r.stderr or "").splitlines():
+        m = re.match(r"^(?:\S+:)?(?P<line>\d+)(?::(?P<col>\d+))?\s*$", line)
+        if m:
+            issues.append(_issue("error", "html_js_syntax", msg,
+                                 passage=f"line {m.group('line')}"))
+            continue
+        m = re.match(r"^\s*SyntaxError:\s*(?P<msg>.*)$", line)
+        if m and issues:
+            issues[-1] = _issue("error", "html_js_syntax",
+                                 f"SyntaxError: {m.group('msg').strip()}")
+    if not issues:
+        issues.append(_issue("error", "html_js_syntax",
+                             (r.stderr or "unknown JS error").strip()))
+    return issues
+
+
+# Regex matching a single CSS rule: ``selector{body}``.  Compiled SugarCube
+# CSS is minified (one rule per run, no newlines), so a non-greedy ``[^{}]*``
+# capture per side is sufficient and avoids catastrophic backtracking.
+_CSS_RULE_RE = re.compile(r"([^{}]*?)\{([^{}]*)\}")
+# ``-webkit-appearance : value`` up to ``;`` or ``}``.
+_CSS_WEBKIT_APPEARANCE_RE = re.compile(r"-webkit-appearance\s*:\s*([^;}]*)")
+# Any vendor-prefixed appearance (used to mask prefixes when checking whether
+# a standard ``appearance`` declaration already exists in the same rule).
+_CSS_ANY_PREFIXED_APPEARANCE_RE = re.compile(
+    r"-(?:webkit|moz|ms|o)-appearance"
+)
+# ``speak : value`` (property name on a word boundary), incl. trailing ``;``.
+_CSS_SPEAK_RE = re.compile(r"\bspeak\s*:\s*[^;]*;?")
+
+
+def _check_compiled_css(css: str, label: str) -> list[ValidationIssue]:
+    """Lint a CSS string for the two VS Code CSS-linter warning classes that
+    SugarCube's bundled CSS produces.
+
+    Returns ``ValidationIssue`` list with level='warning':
+
+    * ``html_vendor_prefix`` — a rule uses ``-webkit-appearance:X`` with no
+      matching standard ``appearance:X``.  Rules whose selector contains a
+      ``::-webkit-`` pseudo-element are *not* flagged: VS Code only warns about
+      non-pseudo-element selectors (``appearance`` on ``::-webkit-*`` would
+      itself be an unknown-property warning), so the fixer skips them and the
+      validator mirrors that.
+    * ``html_unknown_property`` — a rule uses ``speak:none`` (a valid CSS2 aural
+      property that VS Code's linter does not recognise, common in fontello
+      icon-font rules).
+
+    ``label`` is a short string identifying the source ``<style>`` block
+    (e.g. ``style#style-core``); it is attached to each issue's ``passage``.
+    """
+    issues: list[ValidationIssue] = []
+    for m in _CSS_RULE_RE.finditer(css):
+        selector = m.group(1).strip()
+        body = m.group(2)
+
+        # ── vendor-prefix check ────────────────────────────────────────
+        # Mirror the fixer: skip selectors containing a webkit pseudo-element.
+        is_webkit_pseudo = "::-webkit-" in selector
+        if not is_webkit_pseudo and "-webkit-appearance" in body:
+            masked = _CSS_ANY_PREFIXED_APPEARANCE_RE.sub("", body)
+            if not re.search(r"\bappearance\s*:", masked):
+                for am in _CSS_WEBKIT_APPEARANCE_RE.finditer(body):
+                    val = am.group(1).strip()
+                    issues.append(_issue(
+                        "warning", "html_vendor_prefix",
+                        f"-webkit-appearance:{val} used without standard "
+                        f"appearance:{val} (selector: {selector[:60]!r})",
+                        passage=label,
+                    ))
+
+        # ── unknown-property check ──────────────────────────────────────
+        if _CSS_SPEAK_RE.search(body):
+            issues.append(_issue(
+                "warning", "html_unknown_property",
+                "speak property is not recognised by VS Code's CSS linter "
+                "(valid CSS2 aural property, no visual effect on icons)",
+                passage=label,
+            ))
+    return issues
+
+
+def validate_compiled_html(html_path: Path) -> ValidationResult:
+    """Post-compile validator for a compiled SugarCube story HTML file.
+
+    Extracts ``<script>`` and ``<style>`` blocks with a real HTML parser (so
+    regex literals that contain ``<script``/``<style`` substrings are not
+    mistaken for real tags) and:
+
+    * validates each ``<script>`` body with ``node --check`` — a real JS
+      engine that tokenises regex literals correctly and therefore reports
+      **zero** false positives on the minified SugarCube/jQuery engine
+      bundles that VS Code's tsserver mis-parses (the source of the 16
+      reported JS "errors").  Genuine JS errors land in ``result.errors``
+      (code ``html_js_syntax``).
+    * lints each ``<style>`` body for the 9 SugarCube-bundled CSS warnings
+      (3 ``vendorPrefix`` + 6 ``unknownProperties``).  These land in
+      ``result.warnings`` (codes ``html_vendor_prefix`` and
+      ``html_unknown_property``).  Warnings do not affect ``result.ok``.
+
+    Valid compiled output (after the post-compile CSS fixer has run) →
+    ``result.ok is True`` with empty error *and* warning lists.
+
+    This is callable standalone::
+
+        from harness.validation import validate_compiled_html
+        r = validate_compiled_html(Path("story.html"))
+        assert r.ok          # zero real JS errors
+        assert not r.warnings  # zero CSS warnings (after fixer)
+    """
+    result = ValidationResult()
+    html = html_path.read_text(encoding="utf-8")
+    extractor = _BlockExtractor()
+    extractor.feed(html)
+    for pos, attrs, body in extractor.scripts:
+        # Annotate issues with the script id when present, for clarity.
+        sid = attrs.get("id", "")
+        label = f"script#{sid}" if sid else "script"
+        for issue in _node_check_js(body):
+            if issue.passage:
+                issue.passage = f"{label} ({issue.passage})"
+            else:
+                issue.passage = label
+            result.errors.append(issue)
+    for pos, attrs, body in extractor.styles:
+        sid = attrs.get("id", "")
+        label = f"style#{sid}" if sid else "style"
+        result.warnings.extend(_check_compiled_css(body, label))
     return result

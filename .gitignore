@@ -9,5 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# pytest cache (incl. self-bootstrapped acorn/css-tree node_modules for
+# tests/test_compiled_html_lint.py — installed on first run, not committed)
+.pytest_cache/
+
+# Build cache (twee source copies from compile runs)
+**/.harness/
+
 # Keep example story outputs
 !examples/
