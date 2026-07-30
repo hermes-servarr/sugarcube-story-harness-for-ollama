@@ -296,7 +296,7 @@ def _original_compiled_story() -> Path | None:
     (unpatched) SugarCube-bundled CSS — i.e. before fix_compiled_css ran.
 
     The shipped file in the repo is already patched, so we recover the
-    pristine version from git (``git show HEAD:<path>``), which contains the
+    pristine version from git (``git show HEAD~1:<path>``), which contains the
     raw Tweego output with all 9 CSS warnings present.  Returns None if git
     is unavailable or the file is not tracked.
     """
@@ -307,7 +307,7 @@ def _original_compiled_story() -> Path | None:
     rel = str(COMPILED_STORY.relative_to(REPO_ROOT))
     try:
         r = subprocess.run(
-            ["git", "show", f"HEAD:{rel}"],
+            ["git", "show", f"HEAD~1:{rel}"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
     except (FileNotFoundError, subprocess.SubprocessError):

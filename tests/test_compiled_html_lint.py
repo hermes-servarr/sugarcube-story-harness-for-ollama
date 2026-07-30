@@ -344,7 +344,7 @@ def test_linter_matches_harness_on_unpatched_original():
     gr: subprocess.CompletedProcess
     try:
         gr = subprocess.run(
-            ["git", "show", f"HEAD:{rel}"],
+            ["git", "show", f"HEAD~1:{rel}"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
     except (FileNotFoundError, subprocess.SubprocessError):
