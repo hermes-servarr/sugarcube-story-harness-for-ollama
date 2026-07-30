@@ -1,0 +1,48 @@
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_inventory_loop_001
+name: SugarCube <<for>> loop for inventory display
+description: >
+  Tests that the model uses <<for>> to iterate over an array variable
+  and displays each item. Combines loop macros with <<print>> for
+  complex expression output.
+capability: sugarcube_compliance
+category: macro_usage
+difficulty: hard
+tags: ["macro", "for-loop", "inventory", "print"]
+
+input: |
+  Generate a SugarCube passage where the protagonist checks their backpack.
+  Use a <<for>> loop to iterate over the $inventory array variable and
+  display each item. Use <<print>> for any complex expressions.
+  Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Iterate over the player's inventory using a <<for>> loop and display each item with <<print>>"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses <<for>> loop macro"
+    - "Uses SugarCube markup, not Markdown"
+    - "Variables use <<set $var to value>> syntax"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_inventory_loop_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

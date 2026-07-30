@@ -1,0 +1,48 @@
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_input_macros_001
+name: SugarCube input macros (form passage)
+description: >
+  Tests that the model correctly uses SugarCube input macros:
+  <<textbox>>, <<radiobutton>>, <<checkbox>>. These are used in
+  form passages for player input collection.
+capability: sugarcube_compliance
+category: macro_usage
+difficulty: medium
+tags: ["macro", "input", "form", "textbox", "radiobutton"]
+
+input: |
+  Generate a SugarCube form passage where the player creates a character.
+  Use <<textbox "$name" "">> for the character name and
+  <<radiobutton "$class" "Fighter">> and <<radiobutton "$class" "Mage">>
+  for class selection. Output PROSE, CHOICES, INPUT, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Create a form passage with input macros: <<textbox>> for a name and <<radiobutton>> for a choice"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses <<textbox>> input macro"
+    - "Uses <<radiobutton>> input macro"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_input_macros_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

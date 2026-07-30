@@ -1,0 +1,46 @@
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_include_macro_001
+name: SugarCube <<include>> macro usage
+description: >
+  Tests that the model correctly uses the <<include>> macro to reference
+  shared passages. This tests one of SugarCube's key features for DRY
+  content reuse.
+capability: sugarcube_compliance
+category: macro_usage
+difficulty: medium
+tags: ["macro", "include", "shared-content"]
+
+input: |
+  Generate a SugarCube passage where the protagonist enters a tavern.
+  Use the <<include "tavern_description">> macro to reference a shared
+  scene description. Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Include a shared scene using the <<include>> macro to reference another passage"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses <<include>> macro"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_include_macro_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

@@ -1,0 +1,49 @@
+schema_version: "1.0.0"
+kind: test
+
+id: sugarcube_for_loop_001
+name: SugarCube <<for>> loop with <<capture>>
+description: >
+  Tests that the model correctly uses <<for>> loops with <<capture>>
+  blocks for loop variable safety. This is one of the most complex
+  SugarCube patterns and tests whether the model understands
+  variable capture semantics.
+capability: sugarcube_compliance
+category: macro_usage
+difficulty: hard
+tags: ["macro", "for-loop", "capture", "complex"]
+
+input: |
+  Generate a SugarCube passage where the protagonist browses a merchant's
+  wares. Use a <<for>> loop to iterate over the $inventory array and
+  <<capture>> to ensure each item link works correctly.
+  Output PROSE, CHOICES, and SUMMARY sections.
+
+prompt_template:
+  variant: full
+  input_variables:
+    direction: "Use a <<capture>> block inside a <<for>> loop iterating over a list of items"
+
+expected:
+  answer_type: structured
+  behavior:
+    - "Response contains PROSE, CHOICES, and SUMMARY sections"
+    - "Uses <<for>> loop macro"
+    - "Uses <<capture>> inside the loop"
+    - "Uses SugarCube markup, not Markdown"
+  contains:
+    - "PROSE:"
+    - "CHOICES:"
+    - "SUMMARY:"
+  must_parse_as: sugarcube_passage
+
+evaluation:
+  name: exact_match
+  pass_threshold: 1.0
+  max_score: 1.0
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/sugarcube_for_loop_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"

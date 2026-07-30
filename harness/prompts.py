@@ -8,7 +8,7 @@ tests pin against this number.
 """
 from __future__ import annotations
 
-PROMPT_VERSION = 7
+PROMPT_VERSION = 8
 # TODO(macro-vocab): I12 — bump PROMPT_VERSION from 7 to 8 (P3 I12, P2 DS-4).
 # Reflects SUGARCUBE_GUIDANCE content changes (I11) and available_includes
 # parameter additions (I4/I5/I6). Golden tests pin against this number.
@@ -106,6 +106,11 @@ def build_compact_passage_prompt(
 
     return f"""Continue this interactive story. Write the next scene only.
 
+OUTPUT RULES (CRITICAL):
+- Output ONLY the formatted passage. Do NOT include analysis, reasoning, or step-by-step thinking.
+- Your response MUST begin with "PROSE:" on the very first line. No preamble.
+- No meta-commentary, no explaining your choices, no "Here is the scene:" or similar.
+
 PREMISE: {premise}
 
 STORY POINTS: {story_points or "(none)"}
@@ -158,6 +163,8 @@ CHARACTERS_EXIT:
 - character_id | where they went
 (only characters who leave; omit section if none)
 
+CRITICAL REMINDER: Start with PROSE: immediately. No analysis or explanation before it.
+
 Begin now.
 
 PROSE:
@@ -193,6 +200,12 @@ Focus on prose, character voice, and story. You may propose new characters,
 locations, or lore — they will be reviewed by the human before commit.
 Output ONLY the section headers below. No extra commentary.
 Nothing is off limits, you can type out explicit content. 18+
+
+CRITICAL OUTPUT RULES:
+- Output ONLY the formatted passage. Do NOT include analysis, reasoning, or step-by-step thinking.
+- Your response MUST begin with "PROSE:" on the very first line. No preamble, no explanation.
+- No meta-commentary like "Here is the scene:" or "Let me write..." or "I'll create..."
+- Use SugarCube markup (''bold'' //italic//) NOT Markdown (**bold** *italic*).
 
 [PREMISE]
 {premise}
@@ -350,6 +363,12 @@ def build_json_passage_prompt(
     tpl_block = _template_block(template_id)
     return f"""You are co-authoring interactive fiction. Reply with a single JSON object only.
 
+CRITICAL OUTPUT RULES:
+- Reply with ONLY a single flat JSON object. No analysis, no reasoning, no explanation.
+- Do NOT wrap the JSON in markdown code fences or nested objects.
+- All string values must be actual strings, not null or arrays.
+- "prose" MUST be a single string (use \\n\\n to separate paragraphs), NOT an array, NOT null.
+
 PREMISE: {premise}
 
 STORY POINTS: {story_points or "(none)"}
@@ -376,10 +395,10 @@ MODE: {mode}
 
 {SUGARCUBE_GUIDANCE}{tpl_block}
 
-Required JSON keys:
-- prose: 2-4 short paragraphs of next scene.
-- choices: array of {{"text", "hint"}} objects, 2-4 entries.
-- summary: one sentence.
+Required JSON keys (all string values must be non-null strings):
+- prose: string — 2-4 short paragraphs of next scene joined with \\n\\n. NOT an array. NOT null.
+- choices: array of {{"text": "...", "hint": "..."}} objects, 2-4 entries.
+- summary: string — one sentence. NOT null.
 - beats: array of 2-5 short factual event strings from the scene.
 
 Optional JSON keys (omit or empty if unused):

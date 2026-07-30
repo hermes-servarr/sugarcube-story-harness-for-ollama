@@ -45,7 +45,7 @@ Difficulty = Literal["easy", "medium", "hard", "expert"]
 PromptVariant = Literal["compact", "full", "json"]
 """Prompt format variant (mirrors harness.prompts builders)."""
 
-DirectionKey = Literal["A", "B", "C"]
+DirectionKey = Literal["A", "B", "C", "D", "E", "F", "G", "H"]
 """Direction prompt key (A: set flag, B: conditional, C: stats)."""
 
 ScoringCategory = Literal[

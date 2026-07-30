@@ -1,0 +1,33 @@
+schema_version: "1.0.0"
+kind: test
+
+id: edge_empty_response_001
+name: "Edge case: empty response handling"
+description: >
+  Tests that the scoring system gracefully handles empty model responses.
+  All categories should fail with appropriate error messages, never raise
+  exceptions. This is a harness robustness test (INV-6).
+capability: sugarcube_compliance
+category: markup_compliance
+difficulty: easy
+tags: ["edge-case", "empty", "robustness"]
+
+input: ""
+
+expected:
+  answer_type: structured
+  behavior:
+    - "All scoring categories fail gracefully"
+    - "No exceptions raised"
+
+evaluation:
+  name: exact_match
+  pass_threshold: 0.0
+  max_score: 1.0
+  deterministic: true
+
+metadata:
+  owner: benchmark-team
+  source: model_benchmark/tests/cases/edge_empty_response_001.yaml
+  created: "2026-07-30T22:00:00Z"
+  modified: "2026-07-30T22:00:00Z"
