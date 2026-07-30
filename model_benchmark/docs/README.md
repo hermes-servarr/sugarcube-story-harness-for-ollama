@@ -62,6 +62,24 @@ uv run python -m model_benchmark.cli run --dry-run --config-dir model_benchmark/
 uv run python -m model_benchmark.cli run --debug --dry-run --config-dir model_benchmark/docs/examples/
 ```
 
+### Progress bar
+
+In a real terminal, an animated progress bar with ANSI colors appears
+automatically on stderr. Use `--verbose` for model/variant/direction detail,
+`--quiet` to suppress. Falls back to line-per-update in non-TTY environments.
+
+### Getting the HTML report
+
+The interactive HTML report (`report_internal.html`) is only generated in
+**legacy flat-flag mode** (no `run` subcommand):
+
+```bash
+uv run python -m model_benchmark.cli --dry-run --config-dir model_benchmark/docs/examples/
+```
+
+Then open `benchmark_outputs/<run-dir>/report_internal.html` in a browser.
+The subcommand `run` mode persists `results_internal.jsonl` only.
+
 ## Related files
 
 | File | Purpose |

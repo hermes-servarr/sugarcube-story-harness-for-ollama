@@ -191,6 +191,19 @@ uv run python -m model_benchmark.cli run --config-dir my_configs/ \
 
 See `config-reference.md` for all `run` flags.
 
+### Progress bar
+
+When running in a real terminal (TTY), an animated progress bar appears
+automatically on stderr:
+
+```
+[=====>    ] 45.0% 9/20 3:42 pass=7 fail=1 err=0 skip=0 llama3.2 v=full dir=A rep=1
+```
+
+Add `--verbose` to show model/variant/direction/repetition in the bar.
+Use `--quiet` to suppress it. In non-TTY environments (pipes, CI), the bar
+falls back to one line per update without colors.
+
 ## 6. Interpret results
 
 ### Text report (default)
@@ -251,12 +264,30 @@ Results are persisted to a timestamped run directory:
 ```
 benchmark_outputs/
   2026-07-30T120000Z_<benchmark-id>_<run-id>/
-    results_internal.jsonl     # machine-readable results
-    run_manifest.json           # reproducibility metadata
-    summary_internal.md        # markdown report
-    report_internal.html        # self-contained HTML report
+    results_internal.jsonl     # machine-readable results (all modes)
+    run_manifest.json           # reproducibility metadata (legacy mode)
+    summary_internal.md        # markdown report (legacy mode)
+    report_internal.html        # self-contained HTML report (legacy mode)
     checkpoint.json             # checkpoint state (for resume)
 ```
+
+**Which files you get depends on how you invoke the CLI:**
+
+| Mode | Files written |
+|------|---------------|
+| Legacy flat-flag (`python -m model_benchmark.cli --dry-run ...`) | All files above including HTML report |
+| Subcommand (`python -m model_benchmark.cli run --dry-run ...`) | `results_internal.jsonl` only |
+
+To get the interactive HTML report with search, filtering, and sortable
+columns, use the legacy flat-flag mode (no `run` subcommand):
+
+```bash
+uv run python -m model_benchmark.cli --dry-run --config-dir my_configs/
+```
+
+Then open `benchmark_outputs/<run-dir>/report_internal.html` in a browser.
+
+The `benchmark_outputs/` directory is gitignored. Run outputs are ephemeral.
 
 ## 7. Debug mode
 

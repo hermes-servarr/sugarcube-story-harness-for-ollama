@@ -11,28 +11,7 @@ This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Al
 ### Dry run (no Ollama needed)
 
 ```bash
-uv run python model_benchmark/benchmark.py --dry-run
-```
-
-Output:
-```
-======================================================================
-SugarCube Direction-Following Benchmark Report
-======================================================================
-Generated: 2026-07-29T22:20:36.450149+00:00
-Prompt Version: 7
-Ollama Reachable: True
-
-Model: (dry-run)
-  Runs: 1/1 passed
-  Overall Score: 100.0%
-  Category Summary:
-    markup_compliance: 1/1 (100.0%)
-    variable_scoping: 1/1 (100.0%)
-    passage_structure: 1/1 (100.0%)
-    macro_usage: 1/1 (100.0%)
-    naked_interpolation: 1/1 (100.0%)
-    link_setter_syntax: 1/1 (100.0%)
+uv run python -m model_benchmark.cli --dry-run --config-dir model_benchmark/docs/examples/
 ```
 
 The dry run scores a known-good fixture response. Use it to verify the scoring logic works without needing a running Ollama server. Good for CI.
@@ -41,16 +20,41 @@ The dry run scores a known-good fixture response. Use it to verify the scoring l
 
 ```bash
 # Auto-discover all installed Ollama models
-uv run python model_benchmark/benchmark.py
+uv run python -m model_benchmark.cli
 
 # Test specific models
-uv run python model_benchmark/benchmark.py --models llama3.1:8b qwen2.5:7b
+uv run python -m model_benchmark.cli --models llama3.1:8b qwen2.5:7b
 
-# Save reports to files
-uv run python model_benchmark/benchmark.py --models llama3.1:8b \
-  --output report.txt \
-  --json-output report.json
+# Save text report to a file
+uv run python -m model_benchmark.cli --models llama3.1:8b --output report.txt
 ```
+
+### Rich Terminal Progress Bar
+
+When running in a real terminal (TTY), the benchmark displays an animated
+progress bar with ANSI colors. No flags needed -- it activates automatically.
+
+```
+[=====>    ] 45.0% 9/20 3:42 pass=7 fail=1 err=0 skip=0 llama3.2 v=full dir=A rep=1
+```
+
+The bar shows:
+- Progress bar with `>` head
+- Percentage and completed/total count
+- ETA (MM:SS or H:MM:SS)
+- Pass/fail/error/skip counts (green/red/yellow/dim when color is supported)
+- Model alias, variant, direction, repetition (in `--verbose` mode)
+
+Flags:
+- `--verbose` -- add model/variant/direction/repetition to the bar
+- `--quiet` -- suppress all progress output
+
+Behavior by environment:
+- **TTY** (interactive terminal): in-place `\r` refresh with ANSI colors
+- **Pipe/CI** (non-TTY): one line per update, no colors
+- `NO_COLOR` env var or `TERM=dumb`: colors disabled, bar still works
+
+Stdlib only -- no tqdm, rich, or other external dependencies.
 
 ## Choosing Models
 
@@ -59,7 +63,7 @@ uv run python model_benchmark/benchmark.py --models llama3.1:8b \
 If you don't pass `--models`, the benchmark queries `<base_url>/api/tags` on your Ollama server and tests every installed model. This is the simplest way to compare all your local models.
 
 ```bash
-uv run python model_benchmark/benchmark.py
+uv run python -m model_benchmark.cli
 ```
 
 ### Specific models
@@ -67,7 +71,7 @@ uv run python model_benchmark/benchmark.py
 Pass model tags as space-separated arguments. These must match tags visible in `ollama list`:
 
 ```bash
-uv run python model_benchmark/benchmark.py --models llama3.1:8b mistral:7b qwen2.5:14b
+uv run python -m model_benchmark.cli --models llama3.1:8b mistral:7b qwen2.5:14b
 ```
 
 ### Remote Ollama server
@@ -75,12 +79,32 @@ uv run python model_benchmark/benchmark.py --models llama3.1:8b mistral:7b qwen2
 Point at a remote server with `--base-url`:
 
 ```bash
-uv run python model_benchmark/benchmark.py \
+uv run python -m model_benchmark.cli \
   --base-url http://192.168.1.100:11434 \
   --models llama3.1:8b
 ```
 
 ## CLI Reference
+
+There are two ways to invoke the CLI:
+
+### Legacy flat-flag mode
+
+Pass flags directly (no subcommand). This is the original interface and the
+only one that generates the full HTML report:
+
+```bash
+uv run python -m model_benchmark.cli --dry-run --config-dir model_benchmark/docs/examples/
+```
+
+### Subcommand mode
+
+Use the `run` subcommand for the newer interface with selection filters and
+output-format control:
+
+```bash
+uv run python -m model_benchmark.cli run --dry-run --config-dir model_benchmark/docs/examples/
+```
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -93,8 +117,17 @@ uv run python model_benchmark/benchmark.py \
 | `--temperature` | `0.2` | Sampling temperature |
 | `--runs` | `1` | Runs per model x variant x direction |
 | `--dry-run` | off | Score a fixture response, skip Ollama (CI mode) |
-| `--output` | stdout | Text report file path |
-| `--json-output` | none | JSON report file path |
+| `--verbose` | off | Show model/variant/direction/repetition in progress bar |
+| `--quiet` | off | Suppress all progress output |
+| `--output` | stdout | Text report file path (legacy mode only) |
+| `--json-output` | none | JSON report file path (legacy mode only) |
+| `--config-dir` | `model_benchmark/tests/` | Config search directory (can repeat) |
+| `--output-dir` | `benchmark_outputs/` | Directory for run outputs |
+| `--output-format` | `text` | Report format: `text`, `json`, or `markdown` (subcommand mode only) |
+| `--select` | (none) | Include filter expression (can repeat, subcommand mode only) |
+| `--exclude` | (none) | Exclude filter expression (can repeat, subcommand mode only) |
+| `--plan-only` | off | Show selection plan without executing (subcommand mode only) |
+| `--debug` | off | Show resolved config, matrix expansion, and model I/O |
 
 ## The 6 Scoring Categories
 
@@ -167,47 +200,117 @@ Pass if: all links valid, no links in choices. Score: 2 sub-checks.
 
 4. **Scoring**: 6 pure scoring functions evaluate the response. Each returns a `CategoryResult` with pass/fail, a 0.0-1.0 score, details, and evidence.
 
-5. **Report**: Aggregates per-model results into pass rates per category and an overall score.
+5. **Report**: Aggregates per-model results into pass rates per category and an overall score. Legacy mode writes text, markdown, and HTML reports to the output directory; subcommand mode prints to stdout and persists JSONL only.
 
 ## Output Formats
 
 ### Text report (default: stdout)
+
 Human-readable summary with per-model pass rates and category breakdown.
 
-### JSON report (`--json-output`)
+### JSON report (`--json-output` in legacy mode, `--output-format json` in subcommand mode)
+
 Full structured report including:
 - Per-model `ModelReport` with every run's raw response, parsed output, and category results
 - `prompt_version` from the live `harness.prompts.PROMPT_VERSION` (traceability)
 - Full run configuration
 
+### HTML report (legacy mode only)
+
+The legacy flat-flag mode generates a self-contained interactive HTML report
+(`report_internal.html`) with inline CSS + vanilla JS, no external
+dependencies. Features client-side full-text search, status filtering, column
+sorting, and expandable per-result detail sections. Color scheme is
+Okabe-Ito color-blind safe; status is always conveyed by text label + icon,
+never color alone.
+
+To get the HTML report, use the legacy mode (no subcommand):
+
+```bash
+uv run python -m model_benchmark.cli --dry-run --config-dir model_benchmark/docs/examples/
+```
+
+Then open `benchmark_outputs/<run-dir>/report_internal.html` in a browser.
+
+### Output directory
+
+All runs persist results to a timestamped directory under `--output-dir`
+(default: `benchmark_outputs/`):
+
+```
+benchmark_outputs/
+  <timestamp>_<run-id>/
+    results_internal.jsonl     # machine-readable results (all modes)
+    run_manifest.json           # reproducibility metadata (legacy mode)
+    summary_internal.md        # markdown report (legacy mode)
+    report_internal.html        # self-contained HTML report (legacy mode)
+    results_anonymized.json     # anonymized results (legacy mode + --anonymize)
+    checkpoint.json             # checkpoint state for resume
+```
+
+This directory is gitignored. Run outputs are ephemeral and not committed.
+
+| Mode | Files written |
+|------|---------------|
+| Legacy flat-flag | `results_internal.jsonl`, `run_manifest.json`, `summary_internal.md`, `report_internal.html` |
+| Subcommand `run` | `results_internal.jsonl` only |
+
+If you need the HTML report from subcommand mode, use the legacy mode instead,
+or copy the results JSONL and generate the report manually.
+
 ## Running the Tests
 
 ```bash
-# From the repo root
-uv run python -m pytest model_benchmark/test_benchmark.py -v
+# All benchmark tests (774 tests: scoring, runner, config, reports, HTML, progress bar)
+uv run python -m pytest model_benchmark/tests/ tests/test_compiled_html_validation.py -v
 
-# Or specific test classes
-uv run python -m pytest model_benchmark/test_benchmark.py::TestScoreMarkupCompliance -v
-uv run python -m pytest model_benchmark/test_benchmark.py::TestInvariants -v
+# Specific test modules
+uv run python -m pytest model_benchmark/tests/test_render_progress.py -v   # progress bar
+uv run python -m pytest model_benchmark/tests/test_scoring.py -v            # scoring
+uv run python -m pytest model_benchmark/tests/test_config_loader.py -v      # config
 ```
 
-63 tests covering:
+Tests cover:
 - All 6 scoring categories (good/bad/empty/garbage inputs)
 - Scoring orchestrator (category count, order, pass logic)
 - Prompt fixture factory (all variants, all directions)
-- Report assembly (text and JSON formatting)
+- Report assembly (text, markdown, HTML generation)
 - Dry run integration
 - Graceful failure on malformed input
-- All 10 invariants (INV-1 through INV-10)
+- Config discovery, merge, and validation
+- HTML report generation and accessibility
+- Progress bar rendering (purity, color gating, width clamping, TTY vs pipe)
+- Compiled HTML story validation
 
 ## File Structure
 
 ```
 model_benchmark/
-  __init__.py          # Package marker
-  benchmark.py         # Benchmark implementation (scoring, CLI, report)
-  test_benchmark.py    # 63 tests including 10 invariant enforcement tests
-  README.md            # This file
+  __init__.py             # Package marker
+  benchmark.py            # Original benchmark implementation (scoring, CLI)
+  cli.py                  # Subcommand CLI (init, new, validate, list, run) + legacy mode
+  runner.py               # Benchmark execution loop + progress bar + checkpoint/resume
+  scoring.py              # 6 SugarCube compliance scoring functions
+  schema.py               # Core data structures (ResultRecord, ProgressEvent, etc.)
+  config.py               # BenchmarkConfig + CLI arg parsing
+  config_schema.py        # Pydantic v2 schema (source of truth)
+  config_loader.py        # Discovery, validation, merge resolution
+  test_selection.py       # Selection expressions + matrix expansion
+  reports.py              # Text + markdown report generators
+  html_report.py          # Self-contained interactive HTML report generator
+  persistence.py          # Run directory creation + JSON/JSONL/manifest writing
+  metadata.py             # Reproducibility metadata collection
+  anonymization.py        # Result + metadata anonymization
+  comparisons.py          # Baseline comparison + regression detection
+  stats.py                # Run statistics (when runs > 1)
+  failures.py             # Failure classification
+  fixtures.py             # Dry-run fixture responses
+  dataset_loader.py       # Dataset loader (CSV, JSONL, JSON, HuggingFace, inline)
+  checkpoint.py           # Checkpoint save/load for resume
+  runner_selfcheck.py     # Runner self-check / sanity tests
+  tests/                  # Test suite (774 tests)
+  docs/                   # Contributor documentation
+  docs/examples/          # Example test configs (01-10)
 ```
 
 ## Invariants
