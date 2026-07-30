@@ -73,15 +73,20 @@ automatically on stderr. Use `--verbose` for model/variant/direction detail,
 
 ### Getting the HTML report
 
-The interactive HTML report (`report_internal.html`) is only generated in
-**legacy flat-flag mode** (no `run` subcommand):
+Both legacy and subcommand `run` modes produce the same set of output files,
+including the interactive HTML report (`report_internal.html`):
 
 ```bash
-uv run python -m model_benchmark.cli --dry-run --config-dir model_benchmark/docs/examples/
+# Subcommand mode
+uv run python -m model_benchmark.cli run --dry-run --config-dir model_benchmark/docs/examples/
+
+# Legacy mode
+uv run python -m model_benchmark.cli --dry-run
 ```
 
 Then open `benchmark_outputs/<run-dir>/report_internal.html` in a browser.
-The subcommand `run` mode persists `results_internal.jsonl` only.
+Both modes also write `results_anonymized.json`, `run_manifest.json`, and
+`summary_internal.md`.
 
 ## Related files
 

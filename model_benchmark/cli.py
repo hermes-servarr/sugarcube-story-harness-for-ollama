@@ -506,6 +506,50 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit detailed per-case progress to stderr.",
     )
+    p_run.add_argument(
+        "--anonymize",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Anonymize model/provider/config names in reports (default True).",
+    )
+    p_run.add_argument(
+        "--baseline",
+        default="",
+        help="Path to a previous run dir for baseline comparison.",
+    )
+    p_run.add_argument(
+        "--seed",
+        default="",
+        help="Explicit random seed for reproducibility.",
+    )
+    p_run.add_argument(
+        "--force-rerun",
+        action="store_true",
+        help="Ignore existing checkpoint and recompute every case.",
+    )
+    p_run.add_argument(
+        "--base-url",
+        default="http://localhost:11434",
+        help="Ollama server URL (default: http://localhost:11434).",
+    )
+    p_run.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Seconds per model call (default 120).",
+    )
+    p_run.add_argument(
+        "--num-predict",
+        type=int,
+        default=640,
+        help="Max tokens to generate (default 640).",
+    )
+    p_run.add_argument(
+        "--temperature",
+        type=float,
+        default=0.2,
+        help="Sampling temperature (default 0.2).",
+    )
 
     # ── models ────────────────────────────────────────────────────────────
     p_models = sub.add_parser(
@@ -1043,11 +1087,86 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if debug:
         _debug_model_io(results)
 
-    # ── Output ─────────────────────────────────────────────────────────────
+    # ── Stats (when runs > 1) ────────────────────────────────────────────
+    from collections import defaultdict
+    stats_map: dict[str, Any] = {}
+    if cfg.runs > 1:
+        from model_benchmark.stats import compute_run_statistics
+        grouped: dict[str, list[float]] = defaultdict(list)
+        grouped_passed: dict[str, list[bool]] = defaultdict(list)
+        for r in results:
+            tid = getattr(r, "test_id", "") or ""
+            score = getattr(r, "normalized_score", getattr(r, "score", 0.0))
+            passed = getattr(r, "status", "FAIL") == "PASS"
+            grouped[tid].append(float(score))
+            grouped_passed[tid].append(bool(passed))
+        for tid, scores in grouped.items():
+            stats_map[tid] = compute_run_statistics(tid, scores, grouped_passed[tid])
+
+    # ── Baseline comparison ─────────────────────────────────────────────
+    comparison = None
+    regressions = None
+    if cfg.baseline_dir:
+        from model_benchmark.comparisons import (
+            load_baseline, compare_runs, detect_regressions,
+        )
+        baseline = load_baseline(cfg.baseline_dir)
+        if baseline:
+            comparison = compare_runs(results, baseline)
+            regressions = detect_regressions(comparison, results, baseline)
+
+    # ── Manifest ─────────────────────────────────────────────────────────
+    from model_benchmark.metadata import collect_reproducibility_metadata
+    manifest = collect_reproducibility_metadata(
+        cfg,
+        run_id=getattr(runner, "run_id", None),
+        repeated_runs_count=cfg.runs,
+        random_seed=cfg.random_seed,
+        argv=sys.argv[1:],
+    )
+
+    # ── Anonymization ───────────────────────────────────────────────────
+    anon_results = results
+    anon_manifest = manifest
+    if cfg.anonymize:
+        from model_benchmark.anonymization import (
+            build_anonymization_mapping,
+            anonymize_results,
+            anonymize_metadata,
+        )
+        mapping = build_anonymization_mapping(results, manifest=manifest, config=cfg)
+        anon_results = anonymize_results(results, mapping)
+        anon_manifest = anonymize_metadata(manifest, mapping)
+
+    # ── Reports ─────────────────────────────────────────────────────────
+    from model_benchmark.reports import (
+        generate_text_report, generate_markdown_report,
+    )
+    from model_benchmark.html_report import generate_html_report
+
+    stats_list = list(stats_map.values()) if stats_map else None
+
+    md_report = generate_markdown_report(
+        anon_results,
+        manifest=anon_manifest,
+        stats=stats_list[0] if stats_list else None,
+        comparison=comparison,
+        regressions=regressions,
+    )
+    html_report = generate_html_report(
+        anon_results,
+        anon_manifest,
+        anonymized=cfg.anonymize,
+        stats=stats_list[0] if stats_list else None,
+        comparison=comparison,
+        regressions=regressions,
+    )
+
+    # ── Output to stdout (respects --output-format) ─────────────────────
     fmt = getattr(args, "output_format", "text")
     if fmt == "json":
         rows = []
-        for r in results:
+        for r in anon_results:
             rows.append({
                 "test_id": getattr(r, "test_id", ""),
                 "status": getattr(r, "status", ""),
@@ -1057,17 +1176,29 @@ def _cmd_run(args: argparse.Namespace) -> int:
             })
         print(json.dumps(rows, indent=2, default=str))
     elif fmt == "markdown":
-        from model_benchmark.reports import generate_markdown_report
-        print(generate_markdown_report(results))
+        print(md_report)
     else:
-        from model_benchmark.reports import generate_text_report
-        print(generate_text_report(results))
+        text_report = generate_text_report(
+            anon_results,
+            manifest=anon_manifest,
+            stats=stats_list[0] if stats_list else None,
+            comparison=comparison,
+            regressions=regressions,
+        )
+        print(text_report)
 
-    # ── Persist outputs ───────────────────────────────────────────────────
+    # ── Persist outputs (full pipeline, same as legacy mode) ─────────────
     try:
-        from model_benchmark.persistence import create_run_dir, write_jsonl
+        from model_benchmark.persistence import (
+            create_run_dir, write_json, write_jsonl, write_manifest,
+        )
         run_dir = create_run_dir(cfg.output_dir, run_id=getattr(runner, "run_id", None))
         write_jsonl(run_dir / "results_internal.jsonl", results)
+        if cfg.anonymize:
+            write_json(run_dir / "results_anonymized.json", anon_results)
+        write_manifest(run_dir / "run_manifest.json", anon_manifest)
+        (run_dir / "summary_internal.md").write_text(md_report, encoding="utf-8")
+        (run_dir / "report_internal.html").write_text(html_report, encoding="utf-8")
         if not quiet:
             sys.stderr.write(f"[output] results written to {run_dir}\n")
     except Exception as exc:  # pragma: no cover — persistence is best-effort.
@@ -1086,6 +1217,16 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
         out.append("--quiet")
     if getattr(args, "verbose", False) or getattr(args, "debug", False):
         out.append("--verbose")
+    if not getattr(args, "anonymize", True):
+        out.append("--no-anonymize")
+    if getattr(args, "force_rerun", False):
+        out.append("--force-rerun")
+    baseline = getattr(args, "baseline", "") or ""
+    if baseline:
+        out += ["--baseline", baseline]
+    seed = getattr(args, "seed", "") or ""
+    if seed:
+        out += ["--seed", seed]
     models = getattr(args, "models", []) or []
     if models:
         out += ["--models", *models]
@@ -1098,6 +1239,18 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
     runs = getattr(args, "runs", 1)
     if runs != 1:
         out += ["--runs", str(runs)]
+    base_url = getattr(args, "base_url", "") or ""
+    if base_url:
+        out += ["--base-url", base_url]
+    timeout = getattr(args, "timeout", None)
+    if timeout is not None:
+        out += ["--timeout", str(timeout)]
+    num_predict = getattr(args, "num_predict", None)
+    if num_predict is not None:
+        out += ["--num-predict", str(num_predict)]
+    temperature = getattr(args, "temperature", None)
+    if temperature is not None:
+        out += ["--temperature", str(temperature)]
     out += ["--output-dir", getattr(args, "output_dir", "benchmark_outputs")]
     return out
 

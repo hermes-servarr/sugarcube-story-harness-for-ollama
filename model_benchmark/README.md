@@ -281,11 +281,13 @@ This directory is gitignored. Run outputs are ephemeral and not committed.
 
 | Mode | Files written |
 |------|---------------|
-| Legacy flat-flag | `results_internal.jsonl`, `run_manifest.json`, `summary_internal.md`, `report_internal.html` |
-| Subcommand `run` | `results_internal.jsonl` only |
+| Legacy flat-flag | `results_internal.jsonl`, `results_anonymized.json`, `run_manifest.json`, `summary_internal.md`, `report_internal.html` |
+| Subcommand `run` | `results_internal.jsonl`, `results_anonymized.json`, `run_manifest.json`, `summary_internal.md`, `report_internal.html` |
 
-If you need the HTML report from subcommand mode, use the legacy mode instead,
-or copy the results JSONL and generate the report manually.
+Both modes now produce the same set of output files. The subcommand mode
+additionally supports `--select`/`--exclude` filters, `--output-format`,
+`--plan-only`, and `--config-dir`. Legacy mode defaults to
+`model_benchmark/tests/` as its config directory.
 
 ## Running the Tests
 

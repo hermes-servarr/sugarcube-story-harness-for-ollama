@@ -290,14 +290,29 @@ benchmark_outputs/
 
 | Mode | Files written |
 |------|---------------|
-| Legacy flat-flag (`python -m model_benchmark.cli --dry-run ...`) | All files above including HTML report |
-| Subcommand (`python -m model_benchmark.cli run --dry-run ...`) | `results_internal.jsonl` only |
+| Legacy flat-flag (`python -m model_benchmark.cli --dry-run ...`) | All files below |
+| Subcommand (`python -m model_benchmark.cli run --dry-run ...`) | All files below |
+
+Both modes produce the same output files:
+
+```
+benchmark_outputs/<run-dir>/
+  results_internal.jsonl     # raw results with real model names
+  results_anonymized.json     # anonymized results (when --anonymize, default)
+  run_manifest.json           # reproducibility metadata
+  summary_internal.md         # markdown report
+  report_internal.html        # self-contained HTML report
+```
 
 To get the interactive HTML report with search, filtering, and sortable
-columns, use the legacy flat-flag mode (no `run` subcommand):
+columns, use either mode:
 
 ```bash
-uv run python -m model_benchmark.cli --dry-run --config-dir my_configs/
+# Subcommand mode (with --config-dir)
+uv run python -m model_benchmark.cli run --dry-run --config-dir my_configs/
+
+# Legacy mode (defaults to model_benchmark/tests/)
+uv run python -m model_benchmark.cli --dry-run
 ```
 
 Then open `benchmark_outputs/<run-dir>/report_internal.html` in a browser.
