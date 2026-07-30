@@ -283,3 +283,9 @@ deterministic check primitives, but cannot add code, regex evaluators,
 thresholds, verdicts, model identities, or scoring changes. Candidate metrics
 are reported separately and excluded from the optimization pass rate and stop
 conditions, so adding easy probes cannot inflate the objective.
+
+Potential tests that are not ready to execute belong in
+`benchmark_optimization/test-proposals.md`. Hermes can accumulate and update
+that review backlog without consuming GPU time. Each proposal records the
+capability and context axes, a paired control, deterministic checks, expected
+resource cost, and the evidence required before operator-reviewed promotion.

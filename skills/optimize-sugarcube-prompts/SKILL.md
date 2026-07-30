@@ -15,7 +15,7 @@ Perform one complete experiment per goal turn. Use this skill with Hermes
 - Coverage: preserve all configured directions A-H and all four variants:
   `compact`, `full`, `json`, and `thinking`.
 - Boundaries: edit only `model_benchmark/prompt_overrides.json`, iteration
-  notes, and new JSON probes under
+  notes, `benchmark_optimization/test-proposals.md`, and new JSON probes under
   `benchmark_optimization/candidate_tests/`.
 - Constraints: never edit Python, canonical tests, fixtures, scoring, thresholds,
   anonymization, publisher code, SSH configuration, or existing result data.
@@ -50,6 +50,9 @@ five experiments without a new explicit user instruction.
 5. Create `benchmark_optimization/iteration-NN.md` containing baseline
    metrics, failure pattern, behavior, hypothesis, exact overlay change, and
    rollback condition.
+   Record useful test ideas in
+   `benchmark_optimization/test-proposals.md` using its template, even when
+   they are not ready or necessary to execute in this experiment.
 6. Make one narrow edit to `model_benchmark/prompt_overrides.json`. Guidance
    may be global, variant-specific, or direction-specific. Do not include
    model-specific instructions.
@@ -67,9 +70,11 @@ five experiments without a new explicit user instruction.
 
 8. Run `git diff --name-only`. Stop if any changed path is outside
    `model_benchmark/prompt_overrides.json`, the new iteration note, and one
-   new JSON file under `benchmark_optimization/candidate_tests/`.
+   new JSON file under `benchmark_optimization/candidate_tests/`, except for
+   an update to `benchmark_optimization/test-proposals.md`.
 9. Commit only the overlay, the new iteration note, and the optional single
-   new candidate probe, then push to the configured branch. Never force-push.
+   new candidate probe and proposal-backlog update, then push to the
+   configured branch. Never force-push.
 10. Invoke `$run-sugarcube-benchmark` exactly once and wait for completion.
     If it reports already-running, failure, timeout, disconnect, or ambiguous
     status, stop this experiment without retrying.
@@ -119,6 +124,14 @@ reasoning.
 
 ## Candidate Test Rules
 
+- Record an idea in `benchmark_optimization/test-proposals.md` before creating
+  its executable candidate JSON. Proposals do not run and may be accumulated
+  without spending GPU time.
+- Give every proposal a unique sequential `PROP-NNNN` ID, a falsifiable
+  hypothesis, an explicit paired control, deterministic checks, and a resource
+  estimate. Preserve its original hypothesis and prior observations.
+- Updating proposal status is allowed; deleting prior proposals or marking one
+  `recommended` without anonymized evidence is not.
 - Add a candidate probe only to distinguish competing explanations such as
   task complexity, context retrieval, distractor sensitivity, or truncation.
 - Candidate probes are diagnostic-only. Their pass rate is excluded from
