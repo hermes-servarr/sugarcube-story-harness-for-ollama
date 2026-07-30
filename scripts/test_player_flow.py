@@ -1,6 +1,6 @@
-"""Comprehensive E2E player flow test for the Shadows of Thornwood RPG sandbox.
+"""Comprehensive E2E player flow test for SugarCube story games.
 
-Tests the complete player journey:
+Tests the complete player journey through a compiled SugarCube HTML game:
 1. Starting a new story
 2. Creating/selecting a character
 3. Entering and revisiting locations
@@ -10,9 +10,21 @@ Tests the complete player journey:
 7. Saving, reloading, and confirming state is preserved
 8. Verifying images display correctly
 9. Testing invalid inputs, incomplete configurations, and edge cases
+
+Originally written for the "Shadows of Thornwood" RPG sandbox. The link
+texts and expected passage names in the test bodies are specific to that
+story. To use with a different story, subclass PlayerFlowTester and
+override the test methods, or write a new test module that imports the
+helper classes (TestResult, PlayerFlowTester).
+
+Usage:
+    uv run python scripts/test_player_flow.py [PROJECT_PATH]
+
+    PROJECT_PATH defaults to test_stories/rpg-sandbox (relative to repo root)
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -26,8 +38,9 @@ os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/data/.playwright")
 
 from playwright.sync_api import sync_playwright, Page, BrowserContext
 
-HTML_PATH = Path("/opt/data/rpg-sandbox/build/story.html")
-REPORT_PATH = Path("/opt/data/rpg-sandbox/e2e_player_report.json")
+# Resolve repo root (scripts/ is one level down)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_PROJECT = REPO_ROOT / "test_stories" / "rpg-sandbox"
 
 
 class TestResult:
@@ -47,10 +60,20 @@ class TestResult:
 
 
 class PlayerFlowTester:
-    def __init__(self):
+    """Reusable test harness for playing through a compiled SugarCube HTML game.
+
+    Provides helpers for clicking links, reading SugarCube state, taking
+    screenshots, and recording pass/fail results. The test sequence itself
+    (run_tests) is story-specific and lives in the main block below.
+    """
+
+    def __init__(self, project_path: Path):
         self.results: list[TestResult] = []
         self.issues: list[dict] = []
-        self.screenshots_dir = Path("/opt/data/rpg-sandbox/test_screenshots")
+        self.project_path = project_path
+        self.html_path = project_path / "build" / "story.html"
+        self.report_path = project_path / "e2e_player_report.json"
+        self.screenshots_dir = project_path / "test_screenshots"
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
         self.screenshot_count = 0
 
@@ -133,9 +156,41 @@ class PlayerFlowTester:
             return img ? img.src : '';
         }""")
 
+    def write_report(self, js_errors: list[str]):
+        """Write the test report to JSON."""
+        passed = sum(1 for r in self.results if r.passed)
+        failed = sum(1 for r in self.results if not r.passed)
+        total = len(self.results)
 
-def run_tests():
-    tester = PlayerFlowTester()
+        report = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "html_path": str(self.html_path),
+            "html_size": self.html_path.stat().st_size if self.html_path.exists() else 0,
+            "total_tests": total,
+            "passed": passed,
+            "failed": failed,
+            "results": [r.to_dict() for r in self.results],
+            "issues": self.issues,
+            "js_errors": js_errors,
+        }
+
+        self.report_path.write_text(json.dumps(report, indent=2))
+        print(f"\n{'='*60}")
+        print(f"PLAYER FLOW TEST RESULTS: {passed}/{total} passed, {failed} failed")
+        print(f"Issues found: {len(self.issues)}")
+        print(f"Report: {self.report_path}")
+        print(f"Screenshots: {self.screenshots_dir}")
+        print(f"{'='*60}")
+        return failed == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Story-specific test sequence (Shadows of Thornwood)
+#  Override or replace this section for a different story
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def run_tests(tester: PlayerFlowTester) -> bool:
+    """Run the full player flow test suite. Story-specific for Shadows of Thornwood."""
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -146,8 +201,10 @@ def run_tests():
         js_errors: list[str] = []
         page.on("pageerror", lambda err: js_errors.append(str(err)))
 
+        html_url = f"file://{tester.html_path.resolve()}"
+
         print("\n=== TEST 1: Starting a New Story ===")
-        page.goto(f"file://{HTML_PATH.resolve()}")
+        page.goto(html_url)
         page.wait_for_load_state("networkidle", timeout=15000)
         time.sleep(1)
 
@@ -637,7 +694,7 @@ def run_tests():
         context.clear_cookies()
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
 
-        page.goto(f"file://{HTML_PATH.resolve()}")
+        page.goto(html_url)
         page.wait_for_load_state("domcontentloaded")
         time.sleep(1)
 
@@ -679,7 +736,7 @@ def run_tests():
 
         # Test 1: Try to use healing potion at full HP
         # Go back to town, get a potion, try to use at full HP
-        page.goto(f"file://{HTML_PATH.resolve()}")
+        page.goto(html_url)
         page.wait_for_load_state("domcontentloaded")
         time.sleep(1)
 
@@ -729,7 +786,7 @@ def run_tests():
 
         # Test 2: Insufficient gold
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
-        page.goto(f"file://{HTML_PATH.resolve()}")
+        page.goto(html_url)
         page.wait_for_load_state("domcontentloaded")
         time.sleep(1)
 
@@ -758,7 +815,7 @@ def run_tests():
 
         # Test 3: Access forest path without lantern
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
-        page.goto(f"file://{HTML_PATH.resolve()}")
+        page.goto(html_url)
         page.wait_for_load_state("domcontentloaded")
         time.sleep(1)
 
@@ -819,34 +876,37 @@ def run_tests():
 
         browser.close()
 
-    # Build summary
-    passed = sum(1 for r in tester.results if r.passed)
-    failed = sum(1 for r in tester.results if not r.passed)
-    total = len(tester.results)
+    return tester.write_report(js_errors)
 
-    report = {
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "html_path": str(HTML_PATH),
-        "html_size": HTML_PATH.stat().st_size if HTML_PATH.exists() else 0,
-        "total_tests": total,
-        "passed": passed,
-        "failed": failed,
-        "results": [r.to_dict() for r in tester.results],
-        "issues": tester.issues,
-        "js_errors": js_errors,
-    }
 
-    REPORT_PATH.write_text(json.dumps(report, indent=2))
-    print(f"\n{'='*60}")
-    print(f"PLAYER FLOW TEST RESULTS: {passed}/{total} passed, {failed} failed")
-    print(f"Issues found: {len(tester.issues)}")
-    print(f"Report: {REPORT_PATH}")
-    print(f"Screenshots: {tester.screenshots_dir}")
-    print(f"{'='*60}")
+def main():
+    parser = argparse.ArgumentParser(
+        prog="test_player_flow",
+        description="Comprehensive E2E player flow test for compiled SugarCube HTML games.",
+    )
+    parser.add_argument(
+        "project_path",
+        nargs="?",
+        default=str(DEFAULT_PROJECT),
+        help=f"Path to the story project root (default: {DEFAULT_PROJECT})",
+    )
+    args = parser.parse_args()
 
-    return failed == 0
+    project = Path(args.project_path).resolve()
+    if not project.exists():
+        print(f"Error: project path does not exist: {project}")
+        sys.exit(1)
+
+    html = project / "build" / "story.html"
+    if not html.exists():
+        print(f"Error: compiled HTML not found at {html}")
+        print("Run Tweego first: tweego -o build/story.html <project>/arcs/")
+        sys.exit(1)
+
+    tester = PlayerFlowTester(project)
+    success = run_tests(tester)
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)
+    main()

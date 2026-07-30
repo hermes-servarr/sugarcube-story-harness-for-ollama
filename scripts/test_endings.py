@@ -1,19 +1,37 @@
-"""Test all three endings of Shadows of Thornwood.
+"""Test all three endings of a SugarCube story game.
 
-This script navigates through the complete quest chain to reach the Final
-Confrontation, then tests each of the three ending paths:
+Originally written for "Shadows of Thornwood" which has three ending paths:
 1. Seal the breach (Ending Seal)
 2. Claim the power (Ending Power)
 3. Ritual of Binding (Ending Ritual - requires INT >= 13)
+
+The play_to_final_confrontation function and ending link texts are specific
+to Shadows of Thornwood. For a different story, override the navigation
+sequence and ending parameters.
+
+Usage:
+    uv run python scripts/test_endings.py [PROJECT_PATH] [--html HTML_PATH]
+
+    PROJECT_PATH defaults to test_stories/rpg-sandbox (relative to repo root)
 """
-import os, time, json
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import time
+from pathlib import Path
+
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/data/.playwright")
 from playwright.sync_api import sync_playwright
 
-HTML_PATH = "/opt/data/rpg-sandbox/build/story.html"
+# Resolve repo root (scripts/ is one level down)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_PROJECT = REPO_ROOT / "test_stories" / "rpg-sandbox"
 
 
 def click_link(page, text):
+    """Click a link by visible text, searching .passage first then full page."""
     link = page.query_selector(f'.passage a:has-text("{text}")')
     if not link:
         link = page.query_selector(f'a:has-text("{text}")')
@@ -25,16 +43,22 @@ def click_link(page, text):
 
 
 def get_state(page):
+    """Extract SugarCube State.variables from the page."""
     return page.evaluate("() => window.SugarCube ? JSON.parse(JSON.stringify(window.SugarCube.State.variables)) : null")
 
 
 def get_passage(page):
+    """Get the current passage name."""
     return page.evaluate("() => window.SugarCube ? window.SugarCube.State.passage : ''")
 
 
-def play_to_final_confrontation(page, class_choice="Mage"):
-    """Play through all 3 quests to reach the Final Confrontation."""
-    page.goto(f"file://{HTML_PATH}")
+def play_to_final_confrontation(page, html_path: str, class_choice="Mage"):
+    """Play through all 3 quests to reach the Final Confrontation.
+
+    Story-specific navigation for Shadows of Thornwood.
+    Override this function for a different story.
+    """
+    page.goto(f"file://{html_path}")
     page.wait_for_load_state("domcontentloaded")
     time.sleep(1)
 
@@ -69,7 +93,8 @@ def play_to_final_confrontation(page, class_choice="Mage"):
         time.sleep(0.3)
 
     state = get_state(page)
-    assert state and state.get("quest_wolf_kills", 0) >= 5, f"Failed to kill 5 wolves: {state.get('quest_wolf_kills') if state else 'no state'}"
+    assert state and state.get("quest_wolf_kills", 0) >= 5, \
+        f"Failed to kill 5 wolves: {state.get('quest_wolf_kills') if state else 'no state'}"
 
     # Return to Mara - complete wolf quest, get new quests
     click_link(page, "Return to the entrance")
@@ -86,7 +111,8 @@ def play_to_final_confrontation(page, class_choice="Mage"):
         click_link(page, "I'll find Tomas")
     time.sleep(0.3)
     state = get_state(page)
-    print(f"  After Mara: quest_lost_traveler={state.get('quest_lost_traveler') if state else 'none'}, quest_artifact={state.get('quest_artifact') if state else 'none'}")
+    print(f"  After Mara: quest_lost_traveler={state.get('quest_lost_traveler') if state else 'none'}, "
+          f"quest_artifact={state.get('quest_artifact') if state else 'none'}")
 
     # Go to forest, find Tomas at river
     click_link(page, "Go South to the Forest")
@@ -111,7 +137,8 @@ def play_to_final_confrontation(page, class_choice="Mage"):
         time.sleep(0.5)
 
     state = get_state(page)
-    assert state and state.get("quest_lost_traveler") == "completed", f"Lost traveler quest not completed: {state.get('quest_lost_traveler') if state else 'no state'}"
+    assert state and state.get("quest_lost_traveler") == "completed", \
+        f"Lost traveler quest not completed: {state.get('quest_lost_traveler') if state else 'no state'}"
 
     # Return to square, go to forest, take hidden trail to shrine
     click_link(page, "Return to the square")
@@ -180,7 +207,8 @@ def test_ending(page, ending_name, ending_link_text, expected_passage):
         return False
 
 
-def run_ending_tests():
+def run_ending_tests(project_path: Path, html_path: str):
+    """Run all three ending tests. Returns True if all pass."""
     results = []
 
     with sync_playwright() as p:
@@ -194,7 +222,7 @@ def run_ending_tests():
         print("\n=== ENDING TEST: Seal the Breach ===")
         context.clear_cookies()
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
-        play_to_final_confrontation(page, class_choice="Warrior")
+        play_to_final_confrontation(page, html_path, class_choice="Warrior")
         results.append(("Seal the Breach", test_ending(page, "Seal", "Seal the breach", "Ending Seal")))
 
         print("\n=== ENDING TEST: Claim the Power ===")
@@ -202,14 +230,14 @@ def run_ending_tests():
         page.close()
         page = context.new_page()
         page.on("pageerror", lambda err: js_errors.append(str(err)))
-        play_to_final_confrontation(page, class_choice="Warrior")
+        play_to_final_confrontation(page, html_path, class_choice="Warrior")
         results.append(("Claim the Power", test_ending(page, "Power", "Claim the power", "Ending Power")))
 
         print("\n=== ENDING TEST: Ritual of Binding (requires INT >= 13) ===")
         page.close()
         page = context.new_page()
         page.on("pageerror", lambda err: js_errors.append(str(err)))
-        play_to_final_confrontation(page, class_choice="Mage")  # Mage has INT 15
+        play_to_final_confrontation(page, html_path, class_choice="Mage")  # Mage has INT 15
         # Check if the ritual link appears (requires INT >= 13)
         ritual_link = page.query_selector('.passage a:has-text("Attempt the ritual")')
         if ritual_link:
@@ -237,6 +265,38 @@ def run_ending_tests():
     return passed == total
 
 
+def main():
+    parser = argparse.ArgumentParser(
+        prog="test_endings",
+        description="Test all three endings of a compiled SugarCube HTML game.",
+    )
+    parser.add_argument(
+        "project_path",
+        nargs="?",
+        default=str(DEFAULT_PROJECT),
+        help=f"Path to the story project root (default: {DEFAULT_PROJECT})",
+    )
+    parser.add_argument(
+        "--html",
+        default="",
+        help="Explicit path to story.html (default: <project>/build/story.html)",
+    )
+    args = parser.parse_args()
+
+    project = Path(args.project_path).resolve()
+    if not project.exists():
+        print(f"Error: project path does not exist: {project}")
+        sys.exit(1)
+
+    html_path = args.html if args.html else str(project / "build" / "story.html")
+    if not Path(html_path).exists():
+        print(f"Error: compiled HTML not found at {html_path}")
+        print("Run Tweego first: tweego -o build/story.html <project>/arcs/")
+        sys.exit(1)
+
+    success = run_ending_tests(project, html_path)
+    sys.exit(0 if success else 1)
+
+
 if __name__ == "__main__":
-    success = run_ending_tests()
-    exit(0 if success else 1)
+    main()
