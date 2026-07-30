@@ -1,0 +1,21 @@
+{
+  "repo_path": "C:/benchmark/sugarcube-story-harness-for-ollama",
+  "python_executable": "C:/benchmark/sugarcube-story-harness-for-ollama/.venv/Scripts/python.exe",
+  "git_executable": "C:/Program Files/Git/cmd/git.exe",
+  "models": [
+    "replace-with-an-installed-model-tag"
+  ],
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "publish_path": "benchmark_anon/results_anonymized.json",
+  "git_remote": "origin",
+  "git_branch": "main",
+  "require_signed_commit": false,
+  "commit_message": "Publish anonymized benchmark results",
+  "state_dir": "C:/ProgramData/HermesBenchmark/state",
+  "variants": ["compact", "full", "json"],
+  "directions": ["A", "B", "C"],
+  "runs": 1,
+  "timeout": 120,
+  "num_predict": 640,
+  "temperature": 0.2
+}

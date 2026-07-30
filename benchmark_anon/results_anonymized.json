@@ -1,7 +1,7 @@
 [
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:compact:A:1",
+    "test_id": "Model_J:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -201,7 +201,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:compact:B:1",
+    "test_id": "Model_J:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -437,7 +437,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:compact:C:1",
+    "test_id": "Model_J:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -656,7 +656,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:full:A:1",
+    "test_id": "Model_J:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -853,7 +853,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:full:B:1",
+    "test_id": "Model_J:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1122,7 +1122,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:full:C:1",
+    "test_id": "Model_J:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1318,7 +1318,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:json:A:1",
+    "test_id": "Model_J:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1466,7 +1466,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:json:B:1",
+    "test_id": "Model_J:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1614,7 +1614,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "q3.6:latest:json:C:1",
+    "test_id": "Model_J:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1762,7 +1762,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:compact:A:1",
+    "test_id": "Model_C:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -1969,7 +1969,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:compact:B:1",
+    "test_id": "Model_C:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -2175,7 +2175,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:compact:C:1",
+    "test_id": "Model_C:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -2381,7 +2381,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:full:A:1",
+    "test_id": "Model_C:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -2531,7 +2531,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:full:B:1",
+    "test_id": "Model_C:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -2729,7 +2729,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:full:C:1",
+    "test_id": "Model_C:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -2958,7 +2958,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:json:A:1",
+    "test_id": "Model_C:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -3109,7 +3109,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:json:B:1",
+    "test_id": "Model_C:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -3257,7 +3257,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "l32q3:latest:json:C:1",
+    "test_id": "Model_C:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -3405,7 +3405,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:compact:A:1",
+    "test_id": "Model_11:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -3602,7 +3602,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:compact:B:1",
+    "test_id": "Model_11:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -3837,7 +3837,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:compact:C:1",
+    "test_id": "Model_11:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4020,7 +4020,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:full:A:1",
+    "test_id": "Model_11:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4250,7 +4250,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:full:B:1",
+    "test_id": "Model_11:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4498,7 +4498,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:full:C:1",
+    "test_id": "Model_11:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4652,7 +4652,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:json:A:1",
+    "test_id": "Model_11:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4790,7 +4790,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:json:B:1",
+    "test_id": "Model_11:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -4928,7 +4928,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "qwen3.6:latest:json:C:1",
+    "test_id": "Model_11:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -5065,7 +5065,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:compact:A:1",
+    "test_id": "Model_I:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -5250,7 +5250,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:compact:B:1",
+    "test_id": "Model_I:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -5453,7 +5453,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:compact:C:1",
+    "test_id": "Model_I:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -5603,7 +5603,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:full:A:1",
+    "test_id": "Model_I:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -6303,7 +6303,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:full:B:1",
+    "test_id": "Model_I:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -7023,7 +7023,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:full:C:1",
+    "test_id": "Model_I:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -7737,7 +7737,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:json:A:1",
+    "test_id": "Model_I:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -7885,7 +7885,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:json:B:1",
+    "test_id": "Model_I:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -8033,7 +8033,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax:latest:json:C:1",
+    "test_id": "Model_I:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -8181,7 +8181,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:compact:A:1",
+    "test_id": "Model_G:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -8331,7 +8331,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:compact:B:1",
+    "test_id": "Model_G:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -8481,7 +8481,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:compact:C:1",
+    "test_id": "Model_G:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -8631,7 +8631,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:full:A:1",
+    "test_id": "Model_G:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -9283,7 +9283,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:full:B:1",
+    "test_id": "Model_G:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -9927,7 +9927,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:full:C:1",
+    "test_id": "Model_G:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -10641,7 +10641,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:json:A:1",
+    "test_id": "Model_G:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -10789,7 +10789,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:json:B:1",
+    "test_id": "Model_G:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -10967,7 +10967,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_M:latest:json:C:1",
+    "test_id": "Model_G:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -11139,7 +11139,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:compact:A:1",
+    "test_id": "Model_H:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -11289,7 +11289,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:compact:B:1",
+    "test_id": "Model_H:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -11439,7 +11439,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:compact:C:1",
+    "test_id": "Model_H:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -11589,7 +11589,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:full:A:1",
+    "test_id": "Model_H:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -11735,7 +11735,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:full:B:1",
+    "test_id": "Model_H:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -12433,7 +12433,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:full:C:1",
+    "test_id": "Model_H:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13131,7 +13131,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:json:A:1",
+    "test_id": "Model_H:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13279,7 +13279,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:json:B:1",
+    "test_id": "Model_H:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13427,7 +13427,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mythomax-l2-13b.Q5_K_S:latest:json:C:1",
+    "test_id": "Model_H:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13575,7 +13575,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:compact:A:1",
+    "test_id": "Model_D:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13755,7 +13755,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:compact:B:1",
+    "test_id": "Model_D:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -13935,7 +13935,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:compact:C:1",
+    "test_id": "Model_D:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14133,7 +14133,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:full:A:1",
+    "test_id": "Model_D:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14359,7 +14359,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:full:B:1",
+    "test_id": "Model_D:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14509,7 +14509,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:full:C:1",
+    "test_id": "Model_D:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14659,7 +14659,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:json:A:1",
+    "test_id": "Model_D:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14807,7 +14807,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:json:B:1",
+    "test_id": "Model_D:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -14955,7 +14955,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3.2:latest:json:C:1",
+    "test_id": "Model_D:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -15103,7 +15103,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:compact:A:1",
+    "test_id": "Model_12:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -15301,7 +15301,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:compact:B:1",
+    "test_id": "Model_12:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -15481,7 +15481,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:compact:C:1",
+    "test_id": "Model_12:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -15661,7 +15661,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:full:A:1",
+    "test_id": "Model_12:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -15811,7 +15811,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:full:B:1",
+    "test_id": "Model_12:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16059,7 +16059,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:full:C:1",
+    "test_id": "Model_12:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16244,7 +16244,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:json:A:1",
+    "test_id": "Model_12:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16392,7 +16392,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:json:B:1",
+    "test_id": "Model_12:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16540,7 +16540,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "ramonsanchezpartner/Victor-IA:latest:json:C:1",
+    "test_id": "Model_12:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16688,7 +16688,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:compact:A:1",
+    "test_id": "Model_A:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -16903,7 +16903,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:compact:B:1",
+    "test_id": "Model_A:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -17057,7 +17057,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:compact:C:1",
+    "test_id": "Model_A:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -17323,7 +17323,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:full:A:1",
+    "test_id": "Model_A:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -17641,7 +17641,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:full:B:1",
+    "test_id": "Model_A:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -17841,7 +17841,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:full:C:1",
+    "test_id": "Model_A:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18051,7 +18051,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:json:A:1",
+    "test_id": "Model_A:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18207,7 +18207,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:json:B:1",
+    "test_id": "Model_A:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18362,7 +18362,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "UncensoredAi/diddy:latest:json:C:1",
+    "test_id": "Model_A:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18517,7 +18517,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:compact:A:1",
+    "test_id": "Model_B:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18667,7 +18667,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:compact:B:1",
+    "test_id": "Model_B:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18824,7 +18824,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:compact:C:1",
+    "test_id": "Model_B:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -18974,7 +18974,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:full:A:1",
+    "test_id": "Model_B:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -19362,7 +19362,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:full:B:1",
+    "test_id": "Model_B:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -19606,7 +19606,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:full:C:1",
+    "test_id": "Model_B:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -19969,7 +19969,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:json:A:1",
+    "test_id": "Model_B:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -20117,7 +20117,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:json:B:1",
+    "test_id": "Model_B:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -20265,7 +20265,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "dolphin-llama3:8b-256k:json:C:1",
+    "test_id": "Model_B:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -20416,7 +20416,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:compact:A:1",
+    "test_id": "Model_E:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -20632,7 +20632,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:compact:B:1",
+    "test_id": "Model_E:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -20848,7 +20848,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:compact:C:1",
+    "test_id": "Model_E:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21026,7 +21026,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:full:A:1",
+    "test_id": "Model_E:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21179,7 +21179,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:full:B:1",
+    "test_id": "Model_E:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21332,7 +21332,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:full:C:1",
+    "test_id": "Model_E:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21485,7 +21485,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:json:A:1",
+    "test_id": "Model_E:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21633,7 +21633,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:json:B:1",
+    "test_id": "Model_E:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21781,7 +21781,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "llama3:latest:json:C:1",
+    "test_id": "Model_E:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -21931,7 +21931,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:compact:A:1",
+    "test_id": "Model_F:compact:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -22183,7 +22183,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:compact:B:1",
+    "test_id": "Model_F:compact:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -22427,7 +22427,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:compact:C:1",
+    "test_id": "Model_F:compact:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -22679,7 +22679,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:full:A:1",
+    "test_id": "Model_F:full:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -23085,7 +23085,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:full:B:1",
+    "test_id": "Model_F:full:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -23455,7 +23455,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:full:C:1",
+    "test_id": "Model_F:full:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -23789,7 +23789,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:json:A:1",
+    "test_id": "Model_F:json:A:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -23937,7 +23937,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:json:B:1",
+    "test_id": "Model_F:json:B:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
@@ -24085,7 +24085,7 @@
   },
   {
     "schema_version": "1.0.0",
-    "test_id": "mistral:latest:json:C:1",
+    "test_id": "Model_F:json:C:1",
     "test_version": "v7",
     "capability": "sugarcube_direction_following",
     "category": "markup_compliance",
