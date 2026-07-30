@@ -1,0 +1,44 @@
+:: Character Sheet
+
+# Character Sheet
+
+''Name:'' $player_name
+''Class:'' $player_class
+''Level:'' $level
+''XP:'' $xp
+
+### Attributes
+- ''Strength:'' $strength
+- ''Agility:'' $agility
+- ''Intelligence:'' $intelligence
+- ''Vitality:'' $vitality
+
+### Health
+- ''HP:'' $hp / $max_hp
+
+### Wealth
+- ''Gold:'' $gold
+
+### Equipment
+- Inventory: <<print $inventory.join(", ")>>
+- Key Items:
+  - Iron Sword: <<if $has_iron_sword>>Yes<<else>>No<</if>>
+  - Lantern: <<if $has_lantern>>Yes<<else>>No<</if>>
+  - Healing Potion: <<if $has_healing_potion>>Yes<<else>>No<</if>>
+  - Amulet of Thornwood: <<if $has_amulet>>Yes<<else>>No<</if>>
+  - Map: <<if $has_map>>Yes<<else>>No<</if>>
+
+### Exploration
+- Locations Visited: <<print $visited_locations.join(", ")>>
+- Forest Cleared: <<if $forest_cleared>>Yes<<else>>No<</if>>
+- Castle Explored: <<if $castle_explored>>Yes<<else>>No<</if>>
+- Amulet Recovered: <<if $amulet_recovered>>Yes<<else>>No<</if>>
+
+### Relationships
+- Mara Trust: $mara_trust
+- Garrett Trust: $garrett_trust
+- Elara Trust: $elara_trust
+- Mara's Secret Known: <<if $maras_secret_known>>Yes<<else>>No<</if>>
+- Garrett's Suspicion: <<if $garrett_betrayed>>Yes<<else>>No<</if>>
+
+[[Back|Town Square]]

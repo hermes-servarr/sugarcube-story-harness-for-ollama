@@ -1,0 +1,29 @@
+:: Quick Start
+<<set $player_name to "Elara the Brave">>
+<<set $player_class to "Warrior">>
+<<set $strength to 15>>
+<<set $agility to 12>>
+<<set $intelligence to 11>>
+<<set $vitality to 14>>
+<<set $max_hp to 65>>
+<<set $hp to 65>>
+<<set $inventory to ["Iron Sword", "Wooden Shield", "Healing Potion", "Traveler's Clothes"]>>
+<<set $has_iron_sword to true>>
+<<set $has_healing_potion to true>>
+
+# Quick Start: Elara the Brave
+
+You skip the formalities. You are Elara the Brave, a warrior of some renown, arriving in Thornwood at dusk. Your sword is sharp, your shield sturdy, and you carry a healing potion for emergencies.
+
+''Starting Stats:''
+- Strength: $strength
+- Agility: $agility
+- Intelligence: $intelligence
+- Vitality: $vitality
+- HP: $hp / $max_hp
+- Gold: $gold
+- Inventory: <<print $inventory.join(", ")>>
+
+The village gates are half-open. Time to investigate.
+
+[[Enter Thornwood|Town Square]]

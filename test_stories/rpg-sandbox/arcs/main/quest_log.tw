@@ -1,0 +1,51 @@
+:: Quest Log
+
+# Quest Log
+
+## Main Quests
+
+### The Wolf Problem
+''Status:'' <<print $quest_wolf_problem>>
+<<if $quest_wolf_problem == "active">>
+Progress: $quest_wolf_kills of 5 wolves killed
+<</if>>
+
+### The Lost Traveler
+''Status:'' <<print $quest_lost_traveler>>
+<<if $quest_lost_traveler == "active">>
+Find Tomas near the river path in the forest.
+<</if>>
+
+### The Ancient Amulet
+''Status:'' <<print $quest_artifact>>
+<<if $quest_artifact == "active">>
+Find the amulet at the shrine in the forest clearing.
+<</if>>
+
+---
+
+## Completed Quests
+<<if $quest_wolf_problem == "completed">>
+- Wolf Problem: Completed (+50 gold, +100 XP, Lantern)
+<</if>>
+<<if $quest_lost_traveler == "completed">>
+- Lost Traveler: Completed (+20 gold, +150 XP, Healing Herbs)
+<</if>>
+<<if $quest_artifact == "completed">>
+- Ancient Amulet: Completed (+200 XP, Amulet of Thornwood)
+<</if>>
+
+---
+
+## Key Decisions
+<<if $maras_secret_known>>
+- Discovered Mara's secret: She was present during the Keep catastrophe.
+<</if>>
+<<if $garrett_betrayed>>
+- Garrett shared his suspicion about Mara.
+<</if>>
+<<if $amulet_recovered>>
+- Recovered the Amulet of Thornwood from the shrine.
+<</if>>
+
+[[Back|Town Square]]

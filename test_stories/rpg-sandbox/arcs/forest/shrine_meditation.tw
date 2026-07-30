@@ -1,0 +1,10 @@
+:: Shrine Meditation
+<<set $hp to $max_hp>>
+
+You sit in the center of the clearing and meditate. The ancient magic of the shrine flows through you, healing your wounds and clearing your mind.
+
+''HP fully restored to $max_hp.''
+
+You feel refreshed and ready to continue.
+
+[[Return to the forest entrance|Forest Entrance]]

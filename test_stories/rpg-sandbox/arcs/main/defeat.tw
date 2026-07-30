@@ -1,0 +1,20 @@
+:: Defeat
+
+# Defeat
+
+The darkness takes you. Your adventure ends here, in the depths of the Thornwood Forest.
+
+But this is not the end. SugarCube allows you to reload from a previous save.
+
+Use the ''Save/Load menu'' in the sidebar to try again.
+
+---
+
+_Your final stats:_
+- Name: $player_name
+- Class: $player_class
+- HP: 0 / $max_hp
+- Gold: $gold
+- XP: $xp
+
+[[Try Again|Start]]

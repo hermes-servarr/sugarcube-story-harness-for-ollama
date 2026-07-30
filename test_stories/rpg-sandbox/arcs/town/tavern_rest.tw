@@ -1,0 +1,15 @@
+:: Tavern Rest
+<<if $gold >= 5>>
+<<set $hp to $max_hp>>
+<<set $gold -= 5>>
+
+You spend 5 gold for a room and meal. The bed is rough but warm. By morning, your wounds are healed.
+
+''HP restored to $max_hp.'' Gold remaining: $gold.
+
+[[Leave the tavern|Town Square]]
+<<else>>
+You don't have enough gold for a room. Berta shakes her head. "No credit, friend."
+
+[[Back|Tavern]]
+<</if>>

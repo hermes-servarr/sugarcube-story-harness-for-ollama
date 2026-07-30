@@ -1,0 +1,27 @@
+:: Castle Ruins [castle hub]
+<<if not $visited_locations.includes("Castle Ruins")>><<set $visited_locations.push("Castle Ruins")>><</if>>
+<<set $castle_explored to true>>
+
+<!-- media:slot_castle -->
+
+# Thornwood Keep - Ruins
+
+The ruins of Thornwood Keep rise from the mist like broken teeth. Once a proud fortress, it was destroyed fifty years ago in a magical catastrophe. Now only crumbling walls and a partially collapsed tower remain.
+
+The image shows the ancient castle ruins, shrouded in an eerie mist. The air here is cold, regardless of the season.
+
+The green light you've seen in the distance emanates from somewhere beneath the ruins -- from the old crypts below.
+
+### Exits
+
+[[Enter the crumbling tower|Castle Tower]]
+[[Descend into the crypts|Castle Crypt]]
+<<if $has_amulet and $amulet_recovered and $quest_wolf_problem == "completed">>
+[[Face the source of the curse|Final Confrontation]]
+<</if>>
+[[Return to Thornwood|Town Square]]
+
+### Status
+
+[[View Character Sheet|Character Sheet]]
+[[View Quest Log|Quest Log]]

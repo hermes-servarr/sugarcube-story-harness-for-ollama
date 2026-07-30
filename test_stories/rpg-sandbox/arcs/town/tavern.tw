@@ -1,0 +1,40 @@
+:: Tavern
+
+# The Howling Wolf Tavern
+
+The tavern is warm and smoky. A few villagers hunch over their drinks, casting nervous glances at the door. The innkeeper, a stout woman named Berta, nods at you.
+
+"Sit anywhere. Ale is 2 copper, stew is 5. We don't get newcomers these days."
+
+### Seating Area
+
+You find a quiet corner and take in the room. A notice board by the door carries a tattered poster:
+
+_Beware the forest after dark. The wolves are not natural. Do not travel alone. -- Elder Mara_
+
+The warmth of the fire and the weight of the day hit you. You could rest here.
+
+### Services
+
+<<if $hp < $max_hp>>
+[[Rest and recover HP (5 gold)|Tavern Rest]]
+<<else>>
+You are fully rested. No need to stay.
+<</if>>
+
+[[Order a drink and listen for rumors (2 gold)|Tavern Rumors]]
+
+<<if not $has_lantern>>
+[[Ask about a lantern (10 gold)|Tavern Lantern]]
+<</if>>
+
+### People
+
+<<if not $met_elara>>
+[[Talk to the woman in the corner|Elara]]
+<</if>>
+<<if $met_elara>>
+[[Talk to Elara|Elara]]
+<</if>>
+
+[[Return to the square|Town Square]]

@@ -1,0 +1,17 @@
+:: Buy Shield
+<<if $gold >= 30>>
+<<set $gold -= 30>>
+<<set $inventory.push("Iron Shield")>>
+<<set $vitality += 2>>
+<<set $max_hp += 10>>
+<<set $hp += 10>>
+
+Garrett hefts a solid iron shield from the rack. "This'll stop a wolf's bite. Maybe even worse."
+
+''Received: Iron Shield.'' Vitality +2, Max HP +10. Gold remaining: $gold.
+
+[[Back|Garrett]]
+<<else>>
+"Thirty gold. No haggling."
+[[Back|Garrett]]
+<</if>>

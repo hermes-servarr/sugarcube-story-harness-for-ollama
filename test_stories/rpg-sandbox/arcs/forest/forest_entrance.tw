@@ -1,0 +1,26 @@
+:: Forest Entrance [forest hub]
+<<if not $visited_locations.includes("Forest Entrance")>><<set $visited_locations.push("Forest Entrance")>><</if>>
+
+<!-- media:slot_forest -->
+
+# The Thornwood Forest - Entrance
+
+The forest looms before you, a wall of ancient trees. The path leads south into the shadows between the trunks. Despite the fading daylight, the forest seems to exist in its own twilight.
+
+The image shows the forest path -- deceptively peaceful, but you can feel the wrongness in the air.
+
+<<if not $has_lantern>>
+The path ahead is dark. You'll have a hard time navigating without a light source.
+<</if>>
+
+### Exits
+
+[[Follow the main path deeper|Forest Path]]
+<<if $quest_lost_traveler == "active" or $quest_lost_traveler == "completed">>[[Follow the river path|Forest River]]<</if>>
+<<if $quest_artifact == "active">>[[Take the hidden trail to the shrine|Forest Clearing]]<</if>>
+[[Return to Thornwood|Town Square]]
+
+### Status
+
+[[View Character Sheet|Character Sheet]]
+[[View Quest Log|Quest Log]]

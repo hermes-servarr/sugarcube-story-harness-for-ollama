@@ -1,0 +1,16 @@
+:: Wolf Sneak
+<<if $agility >= 13>>
+You move silently through the underbrush, avoiding the wolves' attention. Your agility serves you well -- you slip past without incident.
+
+''Sneak successful!'' No damage taken.
+
+[[Continue deeper|Forest River]]
+[[Return to the entrance|Forest Entrance]]
+<<else>>
+You try to sneak past, but a branch snaps under your foot. The wolves turn toward you with glowing eyes.
+
+''Sneak failed!'' You must fight.
+
+[[Fight the wolves|Wolf Fight]]
+[[Run back to the entrance|Forest Entrance]]
+<</if>>

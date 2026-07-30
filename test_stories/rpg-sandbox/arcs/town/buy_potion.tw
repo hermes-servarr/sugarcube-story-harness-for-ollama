@@ -1,0 +1,15 @@
+:: Buy Potion
+<<if $gold >= 15>>
+<<set $gold -= 15>>
+<<set $has_healing_potion to true>>
+<<set $inventory.push("Healing Potion")>>
+
+Garrett hands you a small vial of red liquid. "Don't drink it all at once."
+
+''Received: Healing Potion.'' Gold remaining: $gold.
+
+[[Back|Garrett]]
+<<else>>
+"You can't afford that. Come back with more coin."
+[[Back|Garrett]]
+<</if>>

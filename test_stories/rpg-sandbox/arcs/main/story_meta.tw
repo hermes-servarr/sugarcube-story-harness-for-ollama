@@ -1,0 +1,45 @@
+:: StoryData
+{
+  "ifid": "FA86D8CA-636C-4D54-9F42-0D565A99E903",
+  "format": "SugarCube2",
+  "format-version": "2.37.3",
+  "start": "Start"
+}
+
+:: StoryTitle
+Shadows of Thornwood
+
+:: StoryInit
+<<set $agility to 10>>
+<<set $amulet_recovered to false>>
+<<set $castle_explored to false>>
+<<set $elara_trust to 0>>
+<<set $forest_cleared to false>>
+<<set $garrett_betrayed to false>>
+<<set $garrett_trust to 0>>
+<<set $gold to 25>>
+<<set $has_amulet to false>>
+<<set $has_healing_potion to false>>
+<<set $has_iron_sword to true>>
+<<set $has_lantern to false>>
+<<set $has_map to false>>
+<<set $hp to 50>>
+<<set $intelligence to 10>>
+<<set $inventory to []>>
+<<set $level to 1>>
+<<set $mara_trust to 0>>
+<<set $maras_secret_known to false>>
+<<set $max_hp to 50>>
+<<set $met_elara to false>>
+<<set $met_garrett to false>>
+<<set $met_mara to false>>
+<<set $player_class to "Warrior">>
+<<set $player_name to "Hero">>
+<<set $quest_artifact to "not_started">>
+<<set $quest_lost_traveler to "not_started">>
+<<set $quest_wolf_kills to 0>>
+<<set $quest_wolf_problem to "not_started">>
+<<set $strength to 10>>
+<<set $visited_locations to []>>
+<<set $vitality to 10>>
+<<set $xp to 0>>

@@ -1,0 +1,61 @@
+:: Wolf Fight
+<<set _damage to 8>>
+<<if $player_class == "Warrior">>
+<<set _damage to 5>>
+<<elseif $player_class == "Rogue">>
+<<set _damage to 7>>
+<<elseif $player_class == "Mage">>
+<<set _damage to 8>>
+<</if>>
+<<if $vitality >= 13>>
+<<set _damage to Math.round(_damage * 0.8)>>
+<</if>>
+<<if $has_healing_potion and $hp <= _damage * 2>>
+<<set _damage to Math.round(_damage * 0.5)>>
+You instinctively reach for your healing potion, but the wolves are too fast. You take the hit but manage to brace yourself, reducing the damage.
+<</if>>
+<<set $hp -= _damage>>
+<<set $quest_wolf_kills += 1>>
+
+# Wolf Fight
+
+You draw your weapon and face the corrupted wolves. They're larger than normal wolves, their eyes glowing with an unnatural green light. The fight is fierce -- you take some hits but bring down one of the beasts.
+
+<<if $player_class == "Warrior">>
+Your warrior training holds. You block with your shield, reducing the damage. ''Took <<print _damage>> damage.''
+<<elseif $player_class == "Rogue">>
+You dodge and weave, but one wolf clips you. ''Took <<print _damage>> damage.''
+<<elseif $player_class == "Mage">>
+Your staff keeps the wolves at bay, but you're not built for prolonged combat. ''Took <<print _damage>> damage.''
+<</if>>
+
+''One wolf killed.'' HP: $hp / $max_hp.
+Wolves killed so far: $quest_wolf_kills of 5.
+
+<<if $hp <= 0>>
+You've taken too much damage. The world goes dark...
+
+[[...|Defeat]]
+<<else>>
+<<if $quest_wolf_kills >= 5>>
+That was the last one! The forest seems to breathe a sigh of relief. The unnatural green glow in the wolves' eyes fades as they fall.
+
+''5 wolves killed!'' The wolf problem is dealt with.
+
+<<set $forest_cleared to true>>
+
+You should return to Mara and report your success.
+
+[[Return to the entrance|Forest Entrance]]
+[[Continue exploring|Forest Path]]
+<<else>>
+<<if $quest_wolf_kills >= 3>>
+You're making good progress. $quest_wolf_kills of 5 wolves killed. But the forest still feels dangerous.
+<<else>>
+$quest_wolf_kills down, $quest_wolf_kills - 5 to go. The wolves keep coming.
+<</if>>
+
+[[Continue fighting|Wolf Fight]]
+[[Retreat to the entrance|Forest Entrance]]
+<</if>>
+<</if>>

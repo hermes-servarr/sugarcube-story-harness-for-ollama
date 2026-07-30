@@ -1,0 +1,27 @@
+:: Rogue Setup
+<<set $player_class to "Rogue">>
+<<set $strength to 10>>
+<<set $agility to 15>>
+<<set $intelligence to 13>>
+<<set $vitality to 10>>
+<<set $max_hp to 45>>
+<<set $hp to 45>>
+<<set $inventory to ["Dagger", "Lockpick", "Leather Armor", "Traveler's Clothes"]>>
+<<set $has_iron_sword to false>>
+
+# The Rogue's Path
+
+You are $player_name, a shadow among shadows. Quick fingers, quicker feet. You've made your living where the law doesn't reach -- and Thornwood seems far from any law.
+
+''Starting Stats:''
+- Strength: $strength
+- Agility: $agility
+- Intelligence: $intelligence
+- Vitality: $vitality
+- HP: $hp / $max_hp
+- Gold: $gold
+- Inventory: <<print $inventory.join(", ")>>
+
+You feel ready to face whatever Thornwood has in store.
+
+[[Enter Thornwood|Town Square]]

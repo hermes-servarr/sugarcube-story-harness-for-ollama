@@ -1,0 +1,102 @@
+{
+  "slot_village": {
+    "passage": "town_square",
+    "keywords": [
+      "village",
+      "town",
+      "thornwood"
+    ],
+    "type": "image",
+    "status": "resolved",
+    "resolved_path": "/opt/data/rpg-sandbox/media/image_2.jpg",
+    "description": "Thornwood village at night",
+    "alt": "The village of Thornwood under a starry sky",
+    "caption": "Thornwood Village at Dusk",
+    "lazy": true,
+    "loop": false,
+    "autoplay": false,
+    "muted": false,
+    "controls": true,
+    "poster": ""
+  },
+  "slot_forest": {
+    "passage": "forest_entrance",
+    "keywords": [
+      "forest",
+      "trees",
+      "path"
+    ],
+    "type": "image",
+    "status": "resolved",
+    "resolved_path": "/opt/data/rpg-sandbox/media/image_3.jpg",
+    "description": "The Thornwood Forest path",
+    "alt": "A dark forest path winding through ancient trees",
+    "caption": "The Thornwood Forest",
+    "lazy": true,
+    "loop": false,
+    "autoplay": false,
+    "muted": false,
+    "controls": true,
+    "poster": ""
+  },
+  "slot_castle": {
+    "passage": "castle_ruins",
+    "keywords": [
+      "castle",
+      "ruins",
+      "keep"
+    ],
+    "type": "image",
+    "status": "resolved",
+    "resolved_path": "/opt/data/rpg-sandbox/media/image_5.jpg",
+    "description": "The ruins of Thornwood Keep",
+    "alt": "Ancient castle ruins shrouded in mist",
+    "caption": "Thornwood Keep - The Ruined Fortress",
+    "lazy": true,
+    "loop": false,
+    "autoplay": false,
+    "muted": false,
+    "controls": true,
+    "poster": ""
+  },
+  "slot_landscape": {
+    "passage": "forest_clearing",
+    "keywords": [
+      "landscape",
+      "mountains",
+      "vista"
+    ],
+    "type": "image",
+    "status": "resolved",
+    "resolved_path": "/opt/data/rpg-sandbox/media/image_1.jpg",
+    "description": "Mountain landscape near Thornwood",
+    "alt": "A mountain landscape visible from the forest clearing",
+    "caption": "The Mountains Beyond Thornwood",
+    "lazy": true,
+    "loop": false,
+    "autoplay": false,
+    "muted": false,
+    "controls": true,
+    "poster": ""
+  },
+  "slot_beach": {
+    "passage": "forest_river",
+    "keywords": [
+      "water",
+      "river",
+      "beach"
+    ],
+    "type": "image",
+    "status": "resolved",
+    "resolved_path": "/opt/data/rpg-sandbox/media/image_4.jpg",
+    "description": "The river through the forest",
+    "alt": "A river flowing through the forest near Thornwood",
+    "caption": "The Thornwood River",
+    "lazy": true,
+    "loop": false,
+    "autoplay": false,
+    "muted": false,
+    "controls": true,
+    "poster": ""
+  }
+}

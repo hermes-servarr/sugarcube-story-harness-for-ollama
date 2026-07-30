@@ -1,0 +1,31 @@
+:: Final Confrontation
+
+# The Final Choice
+
+You stand before the breach -- the tear in reality that has been poisoning Thornwood for fifty years. The Amulet of Thornwood glows in your hand, resonating with the rift's energy.
+
+<<if $maras_secret_known>>
+Mara's voice echoes in your memory: "The amulet is the key to ending this."
+<</if>>
+
+<<if $garrett_betrayed>>
+Garrett's warning surfaces: "Mara's hiding something. Watch your back."
+<</if>>
+
+You know the truth now. The amulet can seal the breach forever -- or it can be used to widen it, granting tremendous power to whoever holds it. Roderick died trying to seal it. Mara has lived with the guilt for fifty years.
+
+### Choose Your Fate
+
+''Seal the breach'' -- Use the amulet to close the rift forever. Thornwood will be safe, but the amulet will be consumed. You'll be remembered as a hero.
+
+[[Seal the breach|Ending Seal]]
+
+''Claim the power'' -- Use the amulet to widen the breach and absorb its energy. You'll gain immense power, but Thornwood will be consumed by the curse.
+
+[[Claim the power|Ending Power]]
+
+<<if $intelligence >= 13>>
+''Find a third path'' -- Your intelligence suggests there might be a way to seal the breach without destroying the amulet. A ritual that requires both the amulet and the willing sacrifice of one connected to the original catastrophe.
+
+[[Attempt the ritual|Ending Ritual]]
+<</if>>

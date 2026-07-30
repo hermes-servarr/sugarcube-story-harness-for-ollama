@@ -1,0 +1,82 @@
+:: Mara
+<<if not $met_mara>><<set $met_mara to true>><</if>>
+
+# Elder Mara
+
+Mara is an old woman with sharp eyes that miss nothing. She sits on her porch, wrapped in a wool shawl despite the mild evening.
+
+<<if $mara_trust < 1>>
+"So. You're the one who answered my call." She studies you. "I sent word to three guilds. Only you came."
+
+She gestures for you to sit. "Things have gone from bad to worse. The wolves in the forest -- they're not natural. Too big, too cunning. They've taken six sheep this month. And then there are the lights. Green lights, deep in the forest, where no one goes anymore."
+
+She leans closer. "I need you to deal with the wolves. Kill five of them and I'll know you're serious. Then we can talk about the bigger problems."
+
+<<set $quest_wolf_problem to "active">>
+<<set $mara_trust to 1>>
+
+''Quest Started: The Wolf Problem''
+Kill 5 wolves in the Thornwood Forest. Return to Mara when done.
+
+[[I'll handle the wolves|Town Square]]
+[[Tell me more about the lights|Maras Secret]]
+[[Return to the square|Town Square]]
+<<else>>
+<<if $quest_wolf_problem == "active" and $quest_wolf_kills >= 5>>
+"You've done it! The wolves won't trouble us anymore." Mara's face softens with relief. "Here -- 50 gold for your trouble. And take this." She hands you a ''lantern''. "You'll need it for the forest at night."
+
+<<set $quest_wolf_problem to "completed">>
+<<set $gold += 50>>
+<<set $xp += 100>>
+<<set $has_lantern to true>>
+<<set $mara_trust to 3>>
+<<set $inventory.push("Lantern")>>
+
+''Quest Completed: The Wolf Problem''
+Rewards: 50 Gold, 100 XP, Lantern
+
+"Now, about those lights in the forest... There's a clearing deep in the woods. An old shrine. I think the source of the trouble is there. And there's a traveler -- went missing three days ago. Name's Tomas. If you find him..."
+
+<<set $quest_artifact to "active">>
+
+''Quest Started: The Ancient Amulet''
+Explore the old shrine in the forest clearing. Recover the amulet of Thornwood.
+
+''New Lead: Elara in the tavern''
+Garrett mentioned Elara is looking for her brother Tomas. Talk to her in the tavern.
+
+[[I'll find Tomas and the shrine|Town Square]]
+[[Return to the square|Town Square]]
+<<elseif $quest_wolf_problem == "completed">>
+<<if $amulet_recovered>>
+<<if not $maras_secret_known>>
+"You found the amulet. I... I need to tell you something." Mara looks away. "Fifty years ago, I was a young woman. I was there when the Keep fell. The amulet was mine -- I used it to seal the catastrophe, but I lost it in the chaos. I thought it was gone forever."
+
+<<set $maras_secret_known to true>>
+<<set $mara_trust to 5>>
+
+"If Garrett tells you I'm hiding something... he's right. But I was trying to protect everyone. The amulet is the key to ending this. And now you have it."
+<<else>>
+"The amulet is safe with you. When you're ready, head to the old Keep. The source of the curse lies there."
+<</if>>
+<<else>>
+"Have you dealt with the wolves yet? I need proof I can trust you before I share more."
+<</if>>
+
+[[Return to Mara|Mara]]
+[[Return to the square|Town Square]]
+<<else>>
+<<if $quest_wolf_problem == "active">>
+"You're back. Have you dealt with the wolves? I need 5 killed before I can trust you with the bigger tasks."
+<<if $quest_wolf_kills > 0>>
+"Progress: $quest_wolf_kills of 5 wolves killed."
+<<else>>
+"No progress yet. The forest is south of the square."
+<</if>>
+[[Return to the square|Town Square]]
+<<else>>
+"Welcome back. How can I help?"
+[[Return to the square|Town Square]]
+<</if>>
+<</if>>
+<</if>>

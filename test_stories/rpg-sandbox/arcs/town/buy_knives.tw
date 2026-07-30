@@ -1,0 +1,14 @@
+:: Buy Knives
+<<if $gold >= 20>>
+<<set $gold -= 20>>
+<<set $inventory.push("Throwing Knives")>>
+Garrett hands you a set of balanced throwing knives. "These are well-made. Don't waste them."
+
+''Received: Throwing Knives.'' Gold remaining: $gold.
+
+[[Back|Garrett]]
+<<else>>
+"You don't have enough gold for those. Come back when you do."
+
+[[Back|Garrett]]
+<</if>>

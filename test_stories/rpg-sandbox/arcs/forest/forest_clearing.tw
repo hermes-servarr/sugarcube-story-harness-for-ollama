@@ -1,0 +1,27 @@
+:: Forest Clearing
+<!-- media:slot_landscape -->
+
+# The Sacred Shrine Clearing
+
+You find a hidden clearing deep in the forest. Ancient stone pillars form a circle around a moss-covered altar. The air here feels different -- charged with old magic.
+
+The image shows the mountain landscape visible through a break in the canopy above -- a reminder that there is a world beyond this dark forest.
+
+<<if $quest_artifact == "active" and not $amulet_recovered>>
+### The Altar
+
+At the center of the clearing sits a stone altar. Upon it rests a small, ancient amulet -- a disc of tarnished silver with a glowing green stone at its center. It pulses with a faint light, matching the eerie lights reported in the forest.
+
+This is the ''Amulet of Thornwood'' -- the artifact Mara's husband died seeking.
+
+[[Take the amulet|Take Amulet]]
+[[Examine the altar more closely|Examine Altar]]
+[[Leave it for now|Forest Entrance]]
+<<else>>
+The clearing is peaceful now. The amulet is gone -- in your possession or returned to Mara, the shrine's magic has calmed.
+
+The clearing offers a moment of respite.
+
+[[Meditate and recover HP|Shrine Meditation]]
+[[Return to the forest entrance|Forest Entrance]]
+<</if>>

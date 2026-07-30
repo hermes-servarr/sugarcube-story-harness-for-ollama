@@ -1,0 +1,47 @@
+:: Ending Seal
+<<set $has_amulet to false>>
+<<set $xp += 500>>
+<<set $level to 2>>
+
+# Ending: The Sealed Breach
+
+You hold the amulet aloft and channel your will into it. The green light flares blindingly. The breach convulses, contracts, and with a sound like tearing silk in reverse -- closes.
+
+The amulet crumbles to dust in your hand. But the curse is broken.
+
+Thornwood awakens the next morning to find the forest quiet. No more green lights. No more corrupted wolves. The villagers emerge from their homes as if seeing the sun for the first time in months.
+
+Mara weeps. "Roderick would be proud. You did what he couldn't."
+
+Garrett grunts. "Maybe I was wrong about you."
+
+Elara smiles. "Tomas is safe. The village is safe. Thank you."
+
+''You are a hero.'' The Shadow of Thornwood has been lifted.
+
+---
+
+''Final Stats:''
+- Name: $player_name
+- Class: $player_class
+- Level: $level
+- HP: $hp / $max_hp
+- Gold: $gold
+- XP: $xp
+- Strength: $strength
+- Agility: $agility
+- Intelligence: $intelligence
+- Vitality: $vitality
+- Inventory: <<print $inventory.join(", ")>>
+- Locations Visited: <<print $visited_locations.join(", ")>>
+
+''Quest Summary:''
+- Wolf Problem: <<print $quest_wolf_problem>>
+- Lost Traveler: <<print $quest_lost_traveler>>
+- Ancient Amulet: <<print $quest_artifact>>
+
+---
+
+_Thank you for playing Shadows of Thornwood. Your save file remains available to reload and try different choices._
+
+[[Return to Start|Start]]

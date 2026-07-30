@@ -1,0 +1,7 @@
+:: Tavern Lantern
+"Need a lantern, do you?" Berta rummages behind the bar. "I've got one. Ten gold."
+
+<<if $gold >= 10>>
+[[Buy the lantern (10 gold)|Buy Lantern]]
+<</if>>
+[[Decline|Tavern]]

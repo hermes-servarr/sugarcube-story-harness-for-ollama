@@ -1,0 +1,42 @@
+:: Ending Power
+<<set $has_amulet to true>>
+<<set $xp += 300>>
+<<set $intelligence += 10>>
+<<set $level to 2>>
+
+# Ending: The Power Within
+
+You reverse the amulet's polarity and plunge it into the breach. Green energy surges outward -- into you. The rift widens, then stabilizes, feeding its power into the amulet and through it into your body.
+
+The crypts shake. Stone cracks. The Keep above collapses further.
+
+When the dust settles, you stand alone. The breach is still open, but now it serves you. The green light flows from the rift, through the amulet, into you. You feel power beyond anything you've imagined.
+
+But Thornwood... Thornwood is doomed. The curse will spread. The villagers will suffer. Mara will know it was you.
+
+Garrett was right to distrust outsiders. You've proven him right.
+
+''You have claimed the power.'' Thornwood's shadow deepens.
+
+---
+
+''Final Stats:''
+- Name: $player_name
+- Class: $player_class
+- Level: $level
+- HP: $hp / $max_hp
+- Gold: $gold
+- XP: $xp
+- Intelligence: $intelligence (boosted!)
+- Inventory: <<print $inventory.join(", ")>>
+
+''Quest Summary:''
+- Wolf Problem: <<print $quest_wolf_problem>>
+- Lost Traveler: <<print $quest_lost_traveler>>
+- Ancient Amulet: <<print $quest_artifact>>
+
+---
+
+_Thank you for playing Shadows of Thornwood. The dark path is a valid one._
+
+[[Return to Start|Start]]

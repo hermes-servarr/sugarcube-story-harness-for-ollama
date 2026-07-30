@@ -1,0 +1,3 @@
+.harness/cache/
+.venv/
+__pycache__/

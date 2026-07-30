@@ -1,0 +1,27 @@
+:: Mage Setup
+<<set $player_class to "Mage">>
+<<set $strength to 8>>
+<<set $agility to 13>>
+<<set $intelligence to 15>>
+<<set $vitality to 10>>
+<<set $max_hp to 50>>
+<<set $hp to 50>>
+<<set $inventory to ["Staff", "Spellbook", "Robes", "Traveler's Clothes"]>>
+<<set $has_iron_sword to false>>
+
+# The Mage's Path
+
+You are $player_name, a scholar of the arcane. Your power lies not in the sword-arm but in the mind. Years of study have given you knowledge -- and a few tricks.
+
+''Starting Stats:''
+- Strength: $strength
+- Agility: $agility
+- Intelligence: $intelligence
+- Vitality: $vitality
+- HP: $hp / $max_hp
+- Gold: $gold
+- Inventory: <<print $inventory.join(", ")>>
+
+You feel ready to face whatever Thornwood has in store.
+
+[[Enter Thornwood|Town Square]]

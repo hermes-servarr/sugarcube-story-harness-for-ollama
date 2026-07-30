@@ -1,0 +1,54 @@
+:: Forest Path
+
+# The Thornwood Forest - Deep Woods
+
+The path winds deeper into the forest. The canopy thickens overhead, blocking out what little light remains. The air is cool and damp, carrying the scent of moss and something else -- something metallic.
+
+<<if not $has_lantern>>
+It's dark here. You can barely see, but you can hear movement in the underbrush. The wolves won't wait for you to find a light.
+
+### Encounter
+
+<<if $quest_wolf_problem == "active" and $quest_wolf_kills < 5>>
+You hear growling. Wolves -- the corrupted beasts Mara warned you about. You'll have to fight them in the dim light.
+
+//Warning:// Fighting in the dark is dangerous. Without a lantern, each wolf takes 10 HP (vs 8 HP with a lantern). Choose your battles carefully.
+
+[[Fight the wolves|Wolf Fight]]
+<<if $agility >= 13>>[[Try to sneak past|Wolf Sneak]]<</if>>
+[[Return to the entrance|Forest Entrance]]
+<<else>>
+<<if $forest_cleared>>
+The forest is dark, but the wolves are gone. The path is quiet now. You can explore deeper, though you still lack a lantern.
+
+[[Continue to the river path|Forest River]]
+<<if $quest_artifact == "active">>[[Take the hidden trail to the shrine|Forest Clearing]]<</if>>
+<<else>>
+The forest is dark and dangerous without a lantern. You should get one from the tavern or from Mara.
+<</if>>
+
+[[Return to the entrance|Forest Entrance]]
+<</if>>
+
+<<else>>
+Your lantern casts a warm circle of light around you, pushing back the shadows. You can see clearly now.
+
+### Encounter
+
+<<if $quest_wolf_problem == "active" and $quest_wolf_kills < 5>>
+You hear growling. Wolves -- the corrupted beasts Mara warned you about.
+
+[[Fight the wolves|Wolf Fight]]
+[[Try to sneak past|Wolf Sneak]]
+<<else>>
+<<if $forest_cleared>>
+The forest is quiet here now. The corrupted wolves have been dealt with. You can explore safely.
+<</if>>
+
+The path continues deeper into the forest.
+
+[[Continue to the river path|Forest River]]
+<<if $quest_artifact == "active">>[[Take the hidden trail to the shrine|Forest Clearing]]<</if>>
+[[Return to the entrance|Forest Entrance]]
+<</if>>
+<</if>>

@@ -1,0 +1,381 @@
+{
+  "timestamp": "2026-07-29T03:20:13Z",
+  "html_path": "/opt/data/rpg-sandbox/build/story.html",
+  "html_size": 531988,
+  "total_tests": 60,
+  "passed": 57,
+  "failed": 3,
+  "results": [
+    {
+      "name": "sugarcube-loaded",
+      "passed": true,
+      "detail": "SugarCube State object present",
+      "error": ""
+    },
+    {
+      "name": "start-passage",
+      "passed": true,
+      "detail": "Current passage: Start",
+      "error": ""
+    },
+    {
+      "name": "title-renders",
+      "passed": true,
+      "detail": "Title visible on start page",
+      "error": ""
+    },
+    {
+      "name": "start-links",
+      "passed": true,
+      "detail": "Character creation link: True, Quick start: True",
+      "error": ""
+    },
+    {
+      "name": "char-creation-passage",
+      "passed": true,
+      "detail": "Passage: Character Creation",
+      "error": ""
+    },
+    {
+      "name": "class-options",
+      "passed": true,
+      "detail": "Warrior: True, Rogue: True, Mage: True",
+      "error": ""
+    },
+    {
+      "name": "warrior-setup",
+      "passed": true,
+      "detail": "Passage: Warrior Setup",
+      "error": ""
+    },
+    {
+      "name": "warrior-stats",
+      "passed": true,
+      "detail": "Strength: 15 (expected 15)",
+      "error": ""
+    },
+    {
+      "name": "enter-town",
+      "passed": true,
+      "detail": "Passage: Town Square",
+      "error": ""
+    },
+    {
+      "name": "mara-met-flag",
+      "passed": true,
+      "detail": "met_mara: True",
+      "error": ""
+    },
+    {
+      "name": "location-tracked",
+      "passed": true,
+      "detail": "Visited: ['Town Square']",
+      "error": ""
+    },
+    {
+      "name": "enter-tavern",
+      "passed": true,
+      "detail": "Passage: Tavern",
+      "error": ""
+    },
+    {
+      "name": "return-to-square",
+      "passed": true,
+      "detail": "Back at: Town Square",
+      "error": ""
+    },
+    {
+      "name": "enter-forest",
+      "passed": true,
+      "detail": "Passage: Forest Entrance",
+      "error": ""
+    },
+    {
+      "name": "forest-tracked",
+      "passed": true,
+      "detail": "Visited: ['Town Square', 'Forest Entrance']",
+      "error": ""
+    },
+    {
+      "name": "return-to-town-from-forest",
+      "passed": true,
+      "detail": "Back at: Town Square",
+      "error": ""
+    },
+    {
+      "name": "mara-passage",
+      "passed": true,
+      "detail": "Passage: Mara",
+      "error": ""
+    },
+    {
+      "name": "wolf-quest-started",
+      "passed": true,
+      "detail": "Quest status: active",
+      "error": ""
+    },
+    {
+      "name": "quest-text-shown",
+      "passed": true,
+      "detail": "Quest start text visible",
+      "error": ""
+    },
+    {
+      "name": "forest-path-no-lantern",
+      "passed": true,
+      "detail": "Forest path accessible without lantern (passage: Forest Path)",
+      "error": ""
+    },
+    {
+      "name": "wolf-kill-1",
+      "passed": true,
+      "detail": "Kill count: 1",
+      "error": ""
+    },
+    {
+      "name": "wolf-kill-2",
+      "passed": true,
+      "detail": "Kill count: 2",
+      "error": ""
+    },
+    {
+      "name": "wolf-kill-3",
+      "passed": true,
+      "detail": "Kill count: 3",
+      "error": ""
+    },
+    {
+      "name": "wolf-kill-4",
+      "passed": true,
+      "detail": "Kill count: 4",
+      "error": ""
+    },
+    {
+      "name": "wolf-kill-5",
+      "passed": true,
+      "detail": "Kill count: 5",
+      "error": ""
+    },
+    {
+      "name": "wolves-completed",
+      "passed": true,
+      "detail": "Kills: 5, Forest cleared: True",
+      "error": ""
+    },
+    {
+      "name": "wolf-quest-completed",
+      "passed": true,
+      "detail": "Quest status: completed",
+      "error": ""
+    },
+    {
+      "name": "wolf-quest-rewards",
+      "passed": true,
+      "detail": "Gold: 75, Lantern: True",
+      "error": ""
+    },
+    {
+      "name": "new-quests-started",
+      "passed": true,
+      "detail": "Lost traveler: active, Artifact: active",
+      "error": ""
+    },
+    {
+      "name": "river-passage",
+      "passed": true,
+      "detail": "Passage: Forest River",
+      "error": ""
+    },
+    {
+      "name": "tomas-found",
+      "passed": true,
+      "detail": "Tomas found at river",
+      "error": ""
+    },
+    {
+      "name": "traveler-quest-updated",
+      "passed": true,
+      "detail": "Quest status: found_tomas",
+      "error": ""
+    },
+    {
+      "name": "return-with-tomas",
+      "passed": true,
+      "detail": "Passage: Town Square",
+      "error": ""
+    },
+    {
+      "name": "elara-passage",
+      "passed": false,
+      "detail": "",
+      "error": "Elara link not found in Town Square"
+    },
+    {
+      "name": "traveler-quest-completed",
+      "passed": false,
+      "detail": "",
+      "error": "Could not reach Elara"
+    },
+    {
+      "name": "shrine-passage",
+      "passed": true,
+      "detail": "Passage: Forest Clearing",
+      "error": ""
+    },
+    {
+      "name": "shrine-image",
+      "passed": true,
+      "detail": "Landscape image displayed at shrine",
+      "error": ""
+    },
+    {
+      "name": "amulet-taken",
+      "passed": true,
+      "detail": "Has amulet: True, Recovered: True",
+      "error": ""
+    },
+    {
+      "name": "artifact-quest-completed",
+      "passed": true,
+      "detail": "Quest status: completed",
+      "error": ""
+    },
+    {
+      "name": "char-sheet-passage",
+      "passed": true,
+      "detail": "Passage: Character Sheet",
+      "error": ""
+    },
+    {
+      "name": "state-variables",
+      "passed": true,
+      "detail": "All 13 vars present",
+      "error": ""
+    },
+    {
+      "name": "hp-reduced",
+      "passed": true,
+      "detail": "HP: 10/60 (should be < max after combat)",
+      "error": ""
+    },
+    {
+      "name": "inventory-populated",
+      "passed": true,
+      "detail": "Inventory: ['Iron Sword', 'Wooden Shield', \"Traveler's Clothes\", 'Lantern', 'Amulet of Thornwood']",
+      "error": ""
+    },
+    {
+      "name": "quest-log-passage",
+      "passed": true,
+      "detail": "Passage: Quest Log",
+      "error": ""
+    },
+    {
+      "name": "quest-log-shows-completed",
+      "passed": true,
+      "detail": "Completed quests visible in log",
+      "error": ""
+    },
+    {
+      "name": "inventory-passage",
+      "passed": true,
+      "detail": "Passage: Inventory View",
+      "error": ""
+    },
+    {
+      "name": "mara-trust-increased",
+      "passed": true,
+      "detail": "Mara trust: 5",
+      "error": ""
+    },
+    {
+      "name": "mara-remembers-amulet",
+      "passed": true,
+      "detail": "Mara acknowledges amulet recovery",
+      "error": ""
+    },
+    {
+      "name": "garrett-trust",
+      "passed": true,
+      "detail": "Garrett trust: 1",
+      "error": ""
+    },
+    {
+      "name": "save-game",
+      "passed": true,
+      "detail": "Save result: {'success': True, 'method': 'Save API present (autoSave: false, slots: true)'}",
+      "error": ""
+    },
+    {
+      "name": "state-preserved-after-reload",
+      "passed": true,
+      "detail": "Name before: Hero, after: Hero",
+      "error": ""
+    },
+    {
+      "name": "village-image",
+      "passed": true,
+      "detail": "Image src: file:///opt/data/rpg-sandbox/build/media/image_2.jpg",
+      "error": ""
+    },
+    {
+      "name": "forest-image",
+      "passed": true,
+      "detail": "Image src: file:///opt/data/rpg-sandbox/build/media/image_3.jpg",
+      "error": ""
+    },
+    {
+      "name": "forest-image-loads",
+      "passed": true,
+      "detail": "Image fully loaded (not broken)",
+      "error": ""
+    },
+    {
+      "name": "potion-purchased",
+      "passed": true,
+      "detail": "Has potion: True",
+      "error": ""
+    },
+    {
+      "name": "potion-at-full-hp",
+      "passed": true,
+      "detail": "Potion use blocked at full HP",
+      "error": ""
+    },
+    {
+      "name": "insufficient-gold-blocked",
+      "passed": true,
+      "detail": "Rest blocked with 0 gold",
+      "error": ""
+    },
+    {
+      "name": "dark-forest-warning",
+      "passed": true,
+      "detail": "Dim light warning shown without lantern",
+      "error": ""
+    },
+    {
+      "name": "defeat-scenario",
+      "passed": false,
+      "detail": "",
+      "error": "Could not reach wolf fight for defeat test"
+    },
+    {
+      "name": "no-js-errors",
+      "passed": true,
+      "detail": "No JS errors",
+      "error": ""
+    }
+  ],
+  "issues": [
+    {
+      "severity": "HIGH",
+      "component": "Town Square",
+      "description": "Elara link not always available after returning with Tomas",
+      "repro": "Complete wolf quest, find Tomas, return to town",
+      "expected": "Elara should be accessible in Town Square",
+      "actual": "Elara link may not appear due to conditional met_elara flag"
+    }
+  ],
+  "js_errors": []
+}

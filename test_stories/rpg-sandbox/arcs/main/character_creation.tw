@@ -1,0 +1,32 @@
+:: Character Creation
+<<set $player_name to "">>
+<<set $player_class to "">>
+<<set $strength to 10>>
+<<set $agility to 10>>
+<<set $intelligence to 10>>
+<<set $vitality to 10>>
+
+# Create Your Character
+
+Every hero needs a name and a calling. Choose wisely -- your class determines your starting attributes and equipment.
+
+''Enter your name:''
+<<textbox "$player_name" "Hero" autofocus>>
+
+---
+
+### Choose Your Class
+
+''Warrior'' -- Strong and resilient. High HP, good with melee weapons.
+Starting: +5 Strength, +3 Vitality, Iron Sword
+[[Choose Warrior|Warrior Setup]]
+
+''Rogue'' -- Quick and cunning. High agility, stealthy.
+Starting: +5 Agility, +3 Intelligence, Dagger, Lockpick
+[[Choose Rogue|Rogue Setup]]
+
+''Mage'' -- Knowledgeable in the arcane. High intelligence, magical potential.
+Starting: +5 Intelligence, +3 Agility, Staff, Spellbook
+[[Choose Mage|Mage Setup]]
+
+[[Back to Start|Start]]

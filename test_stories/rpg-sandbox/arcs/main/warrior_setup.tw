@@ -1,0 +1,27 @@
+:: Warrior Setup
+<<set $player_class to "Warrior">>
+<<set $strength to 15>>
+<<set $agility to 10>>
+<<set $intelligence to 10>>
+<<set $vitality to 13>>
+<<set $max_hp to 60>>
+<<set $hp to 60>>
+<<set $inventory to ["Iron Sword", "Wooden Shield", "Traveler's Clothes"]>>
+<<set $has_iron_sword to true>>
+
+# The Warrior's Path
+
+You are $player_name, a seasoned warrior. Your muscles are hard-earned from years on the road. You carry a trusty iron sword and a wooden shield -- nothing fancy, but they've kept you alive.
+
+''Starting Stats:''
+- Strength: $strength
+- Agility: $agility
+- Intelligence: $intelligence
+- Vitality: $vitality
+- HP: $hp / $max_hp
+- Gold: $gold
+- Inventory: <<print $inventory.join(", ")>>
+
+You feel ready to face whatever Thornwood has in store.
+
+[[Enter Thornwood|Town Square]]

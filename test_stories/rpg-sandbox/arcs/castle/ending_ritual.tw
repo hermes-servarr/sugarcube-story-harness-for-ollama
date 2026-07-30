@@ -1,0 +1,47 @@
+:: Ending Ritual
+<<set $xp += 700>>
+<<set $level to 2>>
+<<set $mara_trust to 10>>
+
+# Ending: The Ritual of Binding
+
+You understand the truth. The breach was created by the catastrophe fifty years ago -- and the amulet was meant to seal it. But the seal requires a willing sacrifice: someone connected to the original event. Mara.
+
+You return to Thornwood and tell Mara the truth. She doesn't flinch.
+
+"I knew this day would come," she says quietly. "Roderick tried to seal it alone and died. I've been waiting fifty years for someone strong enough to complete the ritual. To use the amulet properly."
+
+She takes your hand. "I'll go with you. Let me end what I started."
+
+Together, you return to the crypts. Mara stands before the breach, places her hands on the amulet, and begins the ritual. Green light fills the chamber. The rift convulses, contracts -- and seals.
+
+Mara is gone. The amulet remains, its power spent but intact. A monument to sacrifice.
+
+Thornwood is free. The forest heals. The wolves return to normal. And in the square, a statue of Mara is erected -- not of a coward who hid, but of a woman who spent fifty years waiting for the right moment to make things right.
+
+''You have found the true ending.'' The Shadow of Thornwood is lifted, and the amulet preserved.
+
+---
+
+''Final Stats:''
+- Name: $player_name
+- Class: $player_class
+- Level: $level
+- HP: $hp / $max_hp
+- Gold: $gold
+- XP: $xp
+- Intelligence: $intelligence
+- Inventory: <<print $inventory.join(", ")>>
+- Locations Visited: <<print $visited_locations.join(", ")>>
+
+''Quest Summary:''
+- Wolf Problem: <<print $quest_wolf_problem>>
+- Lost Traveler: <<print $quest_lost_traveler>>
+- Ancient Amulet: <<print $quest_artifact>>
+- Mara's Trust: $mara_trust (maximum)
+
+---
+
+_Thank you for playing Shadows of Thornwood. The true ending rewards understanding and sacrifice._
+
+[[Return to Start|Start]]

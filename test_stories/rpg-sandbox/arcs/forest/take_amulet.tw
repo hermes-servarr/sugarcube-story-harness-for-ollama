@@ -1,0 +1,30 @@
+:: Take Amulet
+<<set $has_amulet to true>>
+<<set $amulet_recovered to true>>
+<<set $inventory.push("Amulet of Thornwood")>>
+<<set $xp += 200>>
+
+# The Amulet of Thornwood
+
+You reach out and take the amulet. The green glow flares, then dims. The air in the clearing shifts -- the oppressive feeling lifts, replaced by a quiet calm. The eerie lights in the forest should stop now.
+
+''Received: Amulet of Thornwood.'' 200 XP earned.
+
+The amulet is warm in your hand. You feel a faint connection to the land -- as if the forest itself acknowledges you.
+
+You should return to Mara. She'll want to see this.
+
+<<set $quest_artifact to "completed">>
+
+''Quest Completed: The Ancient Amulet''
+Rewards: 200 XP, Amulet of Thornwood
+
+<<if $quest_wolf_problem == "completed" and $quest_lost_traveler == "completed">>
+All three main quests are complete. Return to Mara to discuss the final step.
+
+[[Return to Mara|Mara]]
+[[Return to the forest entrance|Forest Entrance]]
+<<else>>
+[[Return to the forest entrance|Forest Entrance]]
+[[Return to Mara|Mara]]
+<</if>>

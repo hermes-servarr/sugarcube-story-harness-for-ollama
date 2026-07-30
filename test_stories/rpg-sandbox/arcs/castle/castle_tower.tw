@@ -1,0 +1,20 @@
+:: Castle Tower
+
+# The Crumbling Tower
+
+You climb the winding stairs of the old tower. Half the staircase has collapsed, but you manage to pick your way up. At the top, you find what was once a study -- a broken desk, scattered papers, and a view over the entire forest.
+
+Among the papers, you find a journal entry:
+
+_"The breach is widening. I cannot hold the seal alone. If Mara and I work together, we might close it. But she refuses -- she says the amulet is too dangerous, that it should be destroyed. She doesn't understand. The amulet is the only thing that can seal the breach. Without it, the curse will consume everything."_
+
+-- Roderick, three days before the catastrophe.
+
+So Mara's husband was trying to seal the breach. And Mara opposed him. The amulet was the key then -- and it's the key now.
+
+<<if not $inventory.includes("Roderick's Journal")>>
+<<set $inventory.push("Roderick's Journal")>>
+''Received: Roderick's Journal''
+<</if>>
+
+[[Return to the ruins|Castle Ruins]]

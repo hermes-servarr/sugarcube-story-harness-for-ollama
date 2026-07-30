@@ -1,0 +1,58 @@
+:: Garrett
+<<if not $met_garrett>><<set $met_garrett to true>><</if>>
+
+# Garrett the Blacksmith
+
+Garrett is a broad-shouldered man with soot-stained hands and a guarded expression. He works a bellows at his forge just off the square.
+
+<<if $garrett_trust < 1>>
+"Another outsider." He barely looks up. "We've had enough of those. Mara trusts too easily."
+
+He hammers a glowing piece of iron. "I don't trust you. But if you're going to be useful, prove it. There's a woman in the tavern -- Elara. She's been looking for someone to help her find her brother. He went into the forest two weeks ago."
+
+He glances at you. "Help her, and maybe I'll talk to you."
+
+<<set $garrett_trust to 1>>
+
+''New Lead: Elara in the tavern''
+Garrett suggests you talk to Elara the Herbalist in the tavern.
+
+[[Return to the square|Town Square]]
+<<else>>
+<<if $quest_lost_traveler == "completed">>
+"So you found Tomas. Elara told me." Garrett sets down his hammer. "Maybe you're not just another wandering fool after all."
+
+<<if $garrett_trust < 3>>
+"Listen. I don't trust Mara. She knows more than she's saying. That amulet you're looking for? It's connected to the Keep, and to her. She was there fifty years ago. She won't admit it, but I've seen old records."
+
+<<set $garrett_trust to 3>>
+<<set $garrett_betrayed to true>>
+
+"I'm telling you this because someone needs to. Watch your back with Mara."
+
+[[Thank him for the warning|Town Square]]
+<<else>>
+"Mara's hiding something. Keep an eye on her."
+[[Return to the square|Town Square]]
+<</if>>
+<<else>>
+"If you want my trust, help Elara find her brother."
+[[Return to the square|Town Square]]
+<</if>>
+<</if>>
+
+### Shop
+
+<<if $garrett_trust >= 1>>
+''Garrett's Wares:''
+- Healing Potion -- 15 gold
+- Iron Shield -- 30 gold
+- Throwing Knives -- 20 gold
+
+[[Buy Healing Potion|Buy Potion]]
+<<if not $inventory.includes("Iron Shield")>>[[Buy Iron Shield|Buy Shield]]<</if>>
+<<if not $inventory.includes("Throwing Knives")>>[[Buy Throwing Knives|Buy Knives]]<</if>>
+[[Return to the square|Town Square]]
+<<else>>
+[[Return to the square|Town Square]]
+<</if>>

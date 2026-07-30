@@ -1,0 +1,10 @@
+:: Buy Lantern
+<<set $gold -= 10>>
+<<set $has_lantern to true>>
+<<set $inventory.push("Lantern")>>
+
+You hand over 10 gold and receive an old but functional lantern. It should help you see in the dark forest.
+
+''Received: Lantern.'' Gold remaining: $gold.
+
+[[Back|Tavern]]

@@ -1,0 +1,23 @@
+ollama_model: mistralai/Mistral-Medium-3.5-128B
+ollama_base_url: http://localhost:11434
+tweego_path: tweego
+sugarcube_path: ''
+story_title: Shadows of Thornwood
+story_format: SugarCube2
+story_ifid: FA86D8CA-636C-4D54-9F42-0D565A99E903
+format_version: '2.37.3'
+model_mode: compact
+output_format: delimited
+temperature: 0.7
+repeat_penalty: 1.15
+num_predict: 1024
+num_ctx: 4096
+embed_model: nomic-embed-text
+rag_enabled: true
+rag_top_k: 3
+rag_min_score: 0.3
+tweego_log_stats: false
+tweego_test_mode: false
+tweego_head_file: ''
+tweego_module_dirs: []
+template_id: ''

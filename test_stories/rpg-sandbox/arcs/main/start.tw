@@ -1,0 +1,47 @@
+:: Start [start]
+<<set $player_name to "Hero">>
+<<set $player_class to "Warrior">>
+<<set $strength to 10>>
+<<set $agility to 10>>
+<<set $intelligence to 10>>
+<<set $vitality to 10>>
+<<set $max_hp to 50>>
+<<set $hp to 50>>
+<<set $xp to 0>>
+<<set $level to 1>>
+<<set $gold to 25>>
+<<set $inventory to ["Iron Sword", "Traveler's Clothes"]>>
+<<set $visited_locations to []>>
+<<set $quest_wolf_problem to "not_started">>
+<<set $quest_wolf_kills to 0>>
+<<set $quest_lost_traveler to "not_started">>
+<<set $quest_artifact to "not_started">>
+<<set $met_mara to false>>
+<<set $met_garrett to false>>
+<<set $met_elara to false>>
+<<set $mara_trust to 0>>
+<<set $garrett_trust to 0>>
+<<set $elara_trust to 0>>
+<<set $has_map to false>>
+<<set $has_lantern to false>>
+<<set $has_amulet to false>>
+<<set $has_iron_sword to true>>
+<<set $has_healing_potion to false>>
+<<set $forest_cleared to false>>
+<<set $castle_explored to false>>
+<<set $amulet_recovered to false>>
+<<set $maras_secret_known to false>>
+<<set $garrett_betrayed to false>>
+
+# Shadows of Thornwood
+
+The road to Thornwood has been long and weary. As the sun dips below the treeline, you see the village ahead -- a cluster of modest buildings surrounded by a wooden palisade. Smoke rises from chimneys, and the warm glow of hearth-fires flickers through shuttered windows.
+
+But something is wrong. The gates stand half-open. No guards patrol the walls. The evening air carries an uneasy silence.
+
+You've come because Elder Mara sent word requesting aid. Strange things plague this village -- disappearing livestock, travelers vanishing on the forest road, eerie lights deep in the woods at night.
+
+Before you enter, you should establish who you are.
+
+[[Choose Your Character|Character Creation]]
+[[Skip to a predefined character|Quick Start]]

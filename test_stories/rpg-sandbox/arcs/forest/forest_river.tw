@@ -1,0 +1,28 @@
+:: Forest River
+<!-- media:slot_beach -->
+
+# The Thornwood River
+
+The river winds through the heart of the forest, its waters clear and cold. Moonlight sparkles on the surface. The sound of flowing water is almost peaceful -- a stark contrast to the dark woods around you.
+
+The image shows the river -- a quiet, beautiful spot that feels out of place in the corrupted forest.
+
+<<if $quest_lost_traveler == "active" or ($quest_lost_traveler == "not_started" and $met_elara)>>
+### Discovery
+
+You spot a figure slumped against a tree by the riverbank. As you approach, you see it's a young man in a green cloak -- Tomas!
+
+He's alive but weak. "You... you came for me," he manages. "I was gathering herbs and the wolves chased me. I've been hiding here for days. Please, help me back to town."
+
+<<set $quest_lost_traveler to "found_tomas">>
+
+''Quest Updated: The Lost Traveler''
+You found Tomas alive! Help him return to town and tell Elara.
+
+[[Help Tomas back to town|Town Square]]
+<<else>>
+The river flows peacefully. Nothing new to find here.
+
+[[Return to the forest entrance|Forest Entrance]]
+<<if $quest_artifact == "active">>[[Take the hidden trail to the shrine|Forest Clearing]]<</if>>
+<</if>>

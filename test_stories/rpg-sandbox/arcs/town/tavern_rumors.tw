@@ -1,0 +1,18 @@
+:: Tavern Rumors
+<<if $gold >= 2>>
+<<set $gold -= 2>>
+
+You buy an ale and settle in. The villagers speak in hushed tones. Over the next hour, you piece together several rumors:
+
+- "The wolves started appearing a month ago. Right after those green lights showed up in the deep forest."
+- "Old Garrett says he saw someone -- or something -- moving near the Keep ruins at midnight."
+- "Mara's been acting strange. She won't go near the forest anymore. Not since her husband died there thirty years ago."
+- "Some say the shrine in the clearing is cursed. Others say it's blessed. Depends who you ask."
+
+You've spent 2 gold. Gold remaining: $gold.
+
+[[Leave the tavern|Town Square]]
+<<else>>
+You're too broke for a drink. Come back when you have 2 gold.
+[[Back|Tavern]]
+<</if>>

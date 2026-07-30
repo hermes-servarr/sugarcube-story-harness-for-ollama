@@ -1,0 +1,19 @@
+:: Use Potion
+<<if $has_healing_potion and $hp < $max_hp>>
+<<set $hp += 25>>
+<<if $hp > $max_hp>><<set $hp to $max_hp>><</if>>
+<<set $has_healing_potion to false>>
+<<set $inventory = $inventory.filter(function(item) { return item !== "Healing Potion" })>>
+
+You drink the healing potion. A warm glow spreads through your body, mending your wounds.
+
+''HP restored by 25. Current HP: $hp / $max_hp.''
+
+[[Back|Inventory View]]
+<<elseif $has_healing_potion>>
+You're already at full health. No need to waste a potion.
+[[Back|Inventory View]]
+<<else>>
+You don't have a healing potion.
+[[Back|Inventory View]]
+<</if>>

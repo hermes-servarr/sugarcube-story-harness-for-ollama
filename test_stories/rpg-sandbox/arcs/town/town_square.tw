@@ -1,0 +1,49 @@
+:: Town Square [hub town]
+<<set $met_mara to true>>
+<<if not $visited_locations.includes("Town Square")>><<set $visited_locations.push("Town Square")>><</if>>
+
+<!-- media:slot_village -->
+
+# Thornwood Village Square
+
+You stand in the center of Thornwood. The village square is modest -- a stone well at its heart, a tavern to the east, Elder Mara's house to the north, and the south road leading to the forest.
+
+The image before you shows the village at dusk, buildings huddled together as if for warmth against the encroaching dark.
+
+<<if visited() <= 2>>
+It's quiet. Too quiet for a village that should be preparing for evening. A few villagers eye you warily before retreating indoors.
+<<else>>
+The square is familiar now. Villagers nod at you as they pass -- you've proven yourself here.
+<</if>>
+
+---
+
+### People
+
+<<if not $met_garrett>>
+[[Talk to the man by the well|Garrett]]
+<<else>>
+[[Talk to Garrett the Blacksmith|Garrett]]
+<</if>>
+
+[[Visit Elder Mara|Mara]]
+<<if $met_elara>>[[Visit Elara the Herbalist|Elara]]<</if>>
+### Places
+
+[[Enter the Tavern|Tavern]]
+<<if $has_lantern>>[[Go South to the Forest|Forest Entrance]]<<else>>[[Go South to the Forest|Forest Entrance]]<</if>>
+<<if $forest_cleared or $quest_artifact == "active">>[[Go North to the Old Keep|Castle Ruins]]<</if>>
+
+### Status
+
+[[View Character Sheet|Character Sheet]]
+[[View Quest Log|Quest Log]]
+[[View Inventory|Inventory View]]
+
+<<if $quest_wolf_problem == "completed" and $quest_lost_traveler == "completed" and $quest_artifact == "completed">>
+[[Face the Final Choice|Final Confrontation]]
+<</if>>
+
+---
+
+_Use the links above to navigate. SugarCube saves your progress automatically -- use the menu to save/load._

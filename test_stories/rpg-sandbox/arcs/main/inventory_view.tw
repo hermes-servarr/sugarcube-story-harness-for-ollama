@@ -1,0 +1,29 @@
+:: Inventory View
+
+# Inventory
+
+''Gold:'' $gold
+
+### Items
+<<if $inventory.length > 0>>
+<<for _i, _item range $inventory>>
+- _item
+<</for>>
+<<else>>
+Your inventory is empty.
+<</if>>
+
+### Key Items
+<<if $has_iron_sword>>- Iron Sword (equipped)<</if>>
+<<if $has_lantern>>- Lantern (can explore dark areas)<</if>>
+<<if $has_healing_potion>>- Healing Potion (restores HP)<</if>>
+<<if $has_amulet>>- Amulet of Thornwood (quest item)<</if>>
+<<if $has_map>>- Map of Thornwood<</if>>
+
+### Consumables
+
+<<if $has_healing_potion>>
+[[Use Healing Potion|Use Potion]]
+<</if>>
+
+[[Back|Town Square]]

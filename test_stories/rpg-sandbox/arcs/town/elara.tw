@@ -1,0 +1,60 @@
+:: Elara
+<<if not $met_elara>><<set $met_elara to true>><</if>>
+
+# Elara the Herbalist
+
+Elara is a woman in her thirties with tired eyes and dirt under her fingernails. She's seated at a table, nursing an untouched cup of tea.
+
+<<if $quest_lost_traveler == "not_started" and $quest_wolf_problem == "completed">>
+"You're the one Mara sent for." She looks up. "My brother, Tomas. He went into the forest to gather herbs two weeks ago. He never came back. The forest is... wrong now. I can't go in there myself."
+
+She grips her cup. "If you find him -- alive or dead -- I need to know. I can't... I can't just not know."
+
+<<set $quest_lost_traveler to "active">>
+
+''Quest Started: The Lost Traveler''
+Find Tomas in the Thornwood Forest.
+
+"I can also make you a healing potion. Here, take this one for free. You'll need it."
+
+<<set $has_healing_potion to true>>
+<<set $inventory.push("Healing Potion")>>
+<<set $elara_trust to 2>>
+
+''Received: Healing Potion''
+
+[[Return to the square|Town Square]]
+<<elseif $quest_lost_traveler == "not_started" and not $met_garrett>>
+"I'm Elara. I'm the village herbalist." She manages a tired smile. "You look like you've been through a lot. If you need healing supplies, I'm your woman. But if Mara hasn't talked to you yet, you should see her first."
+
+[[Return to the square|Town Square]]
+<<elseif $quest_lost_traveler == "active">>
+"Please, find Tomas. He was last seen heading toward the river path in the forest. He wears a green cloak."
+[[Return to the square|Town Square]]
+<<elseif $quest_lost_traveler == "found_tomas">>
+"You found him? Is he...?" She searches your face.
+
+"He's alive? Oh, thank the old gods!" Tears spring to her eyes. "Here, take these herbs. They'll help you in the forest."
+
+<<set $quest_lost_traveler to "completed">>
+<<set $elara_trust to 5>>
+<<set $inventory.push("Healing Herbs")>>
+<<set $xp += 150>>
+<<set $gold += 20>>
+
+''Quest Completed: The Lost Traveler''
+Rewards: 20 Gold, 150 XP, Healing Herbs
+
+"If you're going deeper into the forest, be careful. The shrine clearing is sacred ground. And the Keep... don't go there alone."
+
+[[Return to the square|Town Square]]
+<<elseif $quest_lost_traveler == "completed">>
+"Thank you again for finding Tomas. He's recovering at home." She smiles.
+<<if $quest_artifact == "active" and not $amulet_recovered>>
+"The shrine is deep in the forest. Follow the river path. The amulet should be there."
+<</if>>
+[[Return to the square|Town Square]]
+<<else>>
+"Hello. If you need herbs or potions, I'm your woman."
+[[Return to the square|Town Square]]
+<</if>>

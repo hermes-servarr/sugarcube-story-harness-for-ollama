@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "start_passage": "Start",
+  "passages": {},
+  "state_variables": {
+    "$player_name": {
+      "type": "str",
+      "default": "Hero",
+      "declared_in": "Start"
+    },
+    "$player_class": {
+      "type": "str",
+      "default": "Warrior",
+      "declared_in": "Start"
+    },
+    "$strength": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$agility": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$intelligence": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$vitality": {
+      "type": "int",
+      "default": 10,
+      "declared_in": "Start"
+    },
+    "$max_hp": {
+      "type": "int",
+      "default": 50,
+      "declared_in": "Start"
+    },
+    "$hp": {
+      "type": "int",
+      "default": 50,
+      "declared_in": "Start"
+    },
+    "$xp": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$level": {
+      "type": "int",
+      "default": 1,
+      "declared_in": "Start"
+    },
+    "$gold": {
+      "type": "int",
+      "default": 25,
+      "declared_in": "Start"
+    },
+    "$inventory": {
+      "type": "str",
+      "default": [],
+      "declared_in": "Start"
+    },
+    "$visited_locations": {
+      "type": "str",
+      "default": [],
+      "declared_in": "Start"
+    },
+    "$quest_wolf_problem": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$quest_wolf_kills": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$quest_lost_traveler": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$quest_artifact": {
+      "type": "str",
+      "default": "not_started",
+      "declared_in": "Start"
+    },
+    "$met_mara": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$met_garrett": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$met_elara": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$mara_trust": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$garrett_trust": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$elara_trust": {
+      "type": "int",
+      "default": 0,
+      "declared_in": "Start"
+    },
+    "$has_map": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_lantern": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_amulet": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$has_iron_sword": {
+      "type": "bool",
+      "default": true,
+      "declared_in": "Start"
+    },
+    "$has_healing_potion": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$forest_cleared": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$castle_explored": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$amulet_recovered": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$maras_secret_known": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    },
+    "$garrett_betrayed": {
+      "type": "bool",
+      "default": false,
+      "declared_in": "Start"
+    }
+  },
+  "branches": {},
+  "plan": {
+    "acts": [
+      "Arrival",
+      "Investigation",
+      "Resolution"
+    ],
+    "beats": [
+      {
+        "id": "b1",
+        "text": "Arrive in Thornwood and meet Elder Mara",
+        "act": "Arrival",
+        "status": "open"
+      },
+      {
+        "id": "b2",
+        "text": "Investigate the wolf attacks in the forest",
+        "act": "Investigation",
+        "status": "open"
+      },
+      {
+        "id": "b3",
+        "text": "Find the lost traveler",
+        "act": "Investigation",
+        "status": "open"
+      },
+      {
+        "id": "b4",
+        "text": "Explore Thornwood Keep and recover the amulet",
+        "act": "Resolution",
+        "status": "open"
+      },
+      {
+        "id": "b5",
+        "text": "Confront the truth behind the curse",
+        "act": "Resolution",
+        "status": "open"
+      }
+    ],
+    "open_questions": [
+      "Who is behind the curse?",
+      "What happened at Thornwood Keep?"
+    ]
+  },
+  "arcs": {},
+  "text_templates": []
+}

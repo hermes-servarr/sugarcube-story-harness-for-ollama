@@ -1,0 +1,18 @@
+:: Castle Crypt
+
+# The Old Crypts
+
+You descend into the crypts beneath the Keep. The air grows colder with each step. Green light pulses from below, casting eerie shadows on the stone walls.
+
+At the bottom, you find a large underground chamber. In the center is a rift -- a tear in reality itself, pulsing with green energy. This is the breach that Roderick wrote about. The source of the curse.
+
+<<if $has_amulet>>
+The amulet in your possession resonates with the breach. You can feel it pulling toward the rift -- it wants to be used. To seal the breach. Or to widen it.
+
+[[Use the amulet to seal the breach|Final Confrontation]]
+[[Retreat for now|Castle Ruins]]
+<<else>>
+Without the amulet, there's nothing you can do here. The breach pulses, indifferent to your presence. You need the Amulet of Thornwood -- it's somewhere in the forest shrine.
+
+[[Retreat to the ruins|Castle Ruins]]
+<</if>>
