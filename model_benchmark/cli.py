@@ -108,11 +108,7 @@ def _legacy_main(argv: list[str]) -> int:
 
     if cfg.dry_run:
         # Dry-run: produce the iteration plan without calling Ollama.
-        plan = runner.dry_run()
-        if not cfg.quiet:
-            sys.stderr.write(
-                f"[dry-run] {plan.total_cases} case(s) planned\n"
-            )
+        runner.dry_run()
         # In dry-run mode, execute to get fixture-scored records.
         results = runner.execute()
     else:
@@ -1022,9 +1018,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     if cfg.dry_run:
         # Fixture dry-run: produces scored records without calling Ollama.
-        plan = runner.dry_run()
-        if not quiet:
-            sys.stderr.write(f"[dry-run] {plan.total_cases} case(s) planned\n")
+        runner.dry_run()
         results = runner.execute()
     else:
         results = runner.execute()

@@ -29,16 +29,35 @@ uv run python -m model_benchmark.cli --models llama3.1:8b qwen2.5:7b
 uv run python -m model_benchmark.cli --models llama3.1:8b --output report.txt
 ```
 
-### Rich Terminal Progress Bar
+### Progress bar
 
-When running in a real terminal (TTY), the benchmark displays an animated
-progress bar with ANSI colors. No flags needed -- it activates automatically.
+When running in a real terminal (TTY), an animated progress bar with ANSI colors
+appears automatically on stderr:
 
 ```
+[generation] benchmark run starting
+[generation]   models: 2
+[generation]     - llama3.1:8b
+[generation]     - qwen2.5:7b
+[generation]   variants: compact, full, json
+[generation]   directions: A, B, C
+[generation]   repetitions: 1
+[generation]   total cases: 18
+[generation]   mode: full run
+[generation]   resumed: 0  new: 18
+[generation]   ollama: http://localhost:11434
+[generation]   timeout: 120s  num_predict: 640  temperature: 0.2
+[generation] starting...
 [=====>    ] 45.0% 9/20 3:42 pass=7 fail=1 err=0 skip=0 llama3.2 v=full dir=A rep=1
 ```
 
-The bar shows:
+Before the run starts, a pre-run summary banner shows what was discovered:
+models (one per line), variants, directions, repetitions, total case count,
+Ollama URL, timeout/token/temperature settings, and resumed vs new case counts
+(for checkpoint resume). In dry-run mode, the banner labels itself `[dry-run]`
+and skips the resumed/new breakdown.
+
+During the run, the progress bar shows:
 - Progress bar with `>` head
 - Percentage and completed/total count
 - ETA (MM:SS or H:MM:SS)

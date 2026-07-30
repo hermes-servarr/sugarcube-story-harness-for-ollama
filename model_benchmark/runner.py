@@ -738,11 +738,7 @@ class BenchmarkRunner:
             repetitions=max(1, self.config.runs),
         )
         if not self.quiet:
-            sys.stderr.write(
-                f"[dry-run] planned {plan.total_cases} case(s): "
-                f"{len(plan.models)} model(s) × {len(plan.variants)} variant(s) "
-                f"× {len(plan.directions)} direction(s) × {plan.repetitions} rep(s)\n"
-            )
+            self._print_run_summary(plan, models, dry_run=True)
         return plan
 
     def execute(self, resume: bool = False) -> list[ResultRecord]:
@@ -795,9 +791,9 @@ class BenchmarkRunner:
 
         try:
             if not self.quiet:
-                sys.stderr.write(
-                    f"[generation] {total} case(s); "
-                    f"resumed={len(completed_ids)} new={total - len(completed_ids)}\n"
+                self._print_run_summary(
+                    plan, models, dry_run=False,
+                    resumed=len(completed_ids), new=total - len(completed_ids),
                 )
 
             results: list[ResultRecord] = []
@@ -858,6 +854,51 @@ class BenchmarkRunner:
         return self.execute(resume=True)
 
     # ── Internal helpers ────────────────────────────────────────────────
+
+    def _print_run_summary(
+        self,
+        plan: IterationPlan,
+        models: list[str],
+        *,
+        dry_run: bool,
+        resumed: int = 0,
+        new: int = 0,
+    ) -> None:
+        """Print a pre-run summary banner to stderr.
+
+        Shows what was discovered/configured before the benchmark starts:
+        models, variants, directions, repetitions, total cases, Ollama URL,
+        timeout, and token/temperature settings.  In dry-run mode, labels the
+        banner accordingly; in execute mode, shows resumed vs new case counts.
+        """
+        w = sys.stderr.write
+        label = "dry-run" if dry_run else "generation"
+        w(f"[{label}] benchmark run starting\n")
+        w(f"[{label}]   models: {len(models)}\n")
+        for m in models:
+            w(f"[{label}]     - {m}\n")
+        w(
+            f"[{label}]   variants: {', '.join(plan.variants)}\n"
+            f"[{label}]   directions: {', '.join(plan.directions)}\n"
+            f"[{label}]   repetitions: {plan.repetitions}\n"
+            f"[{label}]   total cases: {plan.total_cases}\n"
+        )
+        if dry_run:
+            w(f"[{label}]   mode: dry-run (no model calls)\n")
+        else:
+            w(
+                f"[{label}]   mode: full run\n"
+                f"[{label}]   resumed: {resumed}  new: {new}\n"
+            )
+        w(
+            f"[{label}]   ollama: {self.config.base_url}\n"
+            f"[{label}]   timeout: {self.config.timeout}s  "
+            f"num_predict: {self.config.num_predict}  "
+            f"temperature: {self.config.temperature}\n"
+        )
+        if self.force_rerun:
+            w(f"[{label}]   force_rerun: ignoring any checkpoint\n")
+        w(f"[{label}] starting...\n")
 
     def _resolve_models(self) -> list[str]:
         """Determine the model list: explicit config models, else discover."""

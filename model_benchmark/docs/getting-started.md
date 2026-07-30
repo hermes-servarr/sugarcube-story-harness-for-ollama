@@ -193,16 +193,31 @@ See `config-reference.md` for all `run` flags.
 
 ### Progress bar
 
-When running in a real terminal (TTY), an animated progress bar appears
-automatically on stderr:
+When running in a real terminal (TTY), a pre-run summary banner and an
+animated progress bar appear automatically on stderr:
 
 ```
-[=====>    ] 45.0% 9/20 3:42 pass=7 fail=1 err=0 skip=0 llama3.2 v=full dir=A rep=1
+[dry-run] benchmark run starting
+[dry-run]   models: 1
+[dry-run]     - (dry-run)
+[dry-run]   variants: compact, full, json
+[dry-run]   directions: A, B, C
+[dry-run]   repetitions: 1
+[dry-run]   total cases: 9
+[dry-run]   mode: dry-run (no model calls)
+[dry-run]   ollama: http://localhost:11434
+[dry-run]   timeout: 120s  num_predict: 640  temperature: 0.2
+[dry-run] starting...
 ```
 
-Add `--verbose` to show model/variant/direction/repetition in the bar.
-Use `--quiet` to suppress it. In non-TTY environments (pipes, CI), the bar
-falls back to one line per update without colors.
+In full-run mode, the banner shows `[generation]` and includes resumed vs new
+case counts. The banner lists every discovered model (one per line), so you
+can verify Ollama is reachable and the right models are loaded before the
+benchmark starts.
+
+Add `--verbose` to show model/variant/direction/repetition in the progress
+bar. Use `--quiet` to suppress all progress output. In non-TTY environments
+(pipes, CI), the bar falls back to one line per update without colors.
 
 ## 6. Interpret results
 
