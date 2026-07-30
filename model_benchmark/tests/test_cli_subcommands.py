@@ -580,14 +580,14 @@ class TestHelp:
 class TestSubcommandParser:
     """Test the _build_subcommand_parser structure."""
 
-    def test_parser_has_five_subcommands(self):
+    def test_parser_has_six_subcommands(self):
         parser = _build_subcommand_parser()
         # Find the subparsers action.
         sub_action = next(
             a for a in parser._actions
             if hasattr(a, "choices") and isinstance(a.choices, dict)
         )
-        assert set(sub_action.choices.keys()) == {"init", "new", "validate", "list", "run"}
+        assert set(sub_action.choices.keys()) == {"init", "new", "validate", "list", "run", "models"}
 
     def test_global_debug_flag_present(self):
         parser = _build_subcommand_parser()

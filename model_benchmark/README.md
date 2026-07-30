@@ -125,6 +125,16 @@ output-format control:
 uv run python -m model_benchmark.cli run --dry-run --config-dir model_benchmark/docs/examples/
 ```
 
+### List discovered models (no run)
+
+The `models` subcommand queries Ollama and prints installed models without
+running any benchmark:
+
+```bash
+uv run python -m model_benchmark.cli models
+uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:11434
+```
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |

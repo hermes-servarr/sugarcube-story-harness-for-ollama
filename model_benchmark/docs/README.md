@@ -49,6 +49,9 @@ Ollama. See `getting-started.md` for the exact commands.
 ## Quick start
 
 ```bash
+# List models discovered from Ollama (no benchmark run)
+uv run python -m model_benchmark.cli models
+
 # Validate all example configs
 uv run python -m model_benchmark.cli validate model_benchmark/docs/examples/
 

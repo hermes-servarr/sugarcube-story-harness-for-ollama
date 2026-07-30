@@ -44,7 +44,7 @@ from model_benchmark.config import BenchmarkConfig, parse_cli_args
 logger = logging.getLogger("model_benchmark.cli")
 
 # ── Subcommand names (recognized as the first positional argument) ──────────
-_SUBCOMMANDS = {"init", "new", "validate", "list", "run"}
+_SUBCOMMANDS = {"init", "new", "validate", "list", "run", "models"}
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -507,6 +507,22 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help="Emit detailed per-case progress to stderr.",
     )
 
+    # ── models ────────────────────────────────────────────────────────────
+    p_models = sub.add_parser(
+        "models",
+        help="List models discovered from Ollama (no benchmark run).",
+        description=(
+            "Query the Ollama server at --base-url for installed models "
+            "and print them one per line.  No benchmark is executed.  "
+            "Useful to verify Ollama is reachable and see what would be tested."
+        ),
+    )
+    p_models.add_argument(
+        "--base-url",
+        default="http://localhost:11434",
+        help="Ollama server URL (default: http://localhost:11434).",
+    )
+
     return parser
 
 
@@ -537,6 +553,7 @@ def cli_main(argv: list[str]) -> int:
         "validate": _cmd_validate,
         "list": _cmd_list,
         "run": _cmd_run,
+        "models": _cmd_models,
     }
     handler = handlers.get(command)
     if handler is None:
@@ -1180,6 +1197,25 @@ def _debug_model_io(results: list) -> None:
         if err:
             print(f"  error: {err}")
     print("=" * 72)
+
+
+# ── models ──────────────────────────────────────────────────────────────────
+
+def _cmd_models(args: argparse.Namespace) -> int:
+    """List models discovered from the Ollama server.  No benchmark run."""
+    from model_benchmark.benchmark import discover_models
+
+    base_url = getattr(args, "base_url", "http://localhost:11434")
+    models = discover_models(base_url)
+
+    if not models:
+        print(f"No models found at {base_url}.  Is Ollama running?", file=sys.stderr)
+        return 1
+
+    print(f"Discovered {len(models)} model(s) from {base_url}:")
+    for m in models:
+        print(f"  {m}")
+    return 0
 
 
 # ── `python -m model_benchmark.cli` entry ──────────────────────────────────
