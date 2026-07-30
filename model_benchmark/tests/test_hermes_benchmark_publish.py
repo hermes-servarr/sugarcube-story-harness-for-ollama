@@ -72,7 +72,11 @@ def test_update_checkout_pulls_configured_branch(monkeypatch, tmp_path):
     )
 
     publisher._update_checkout(
-        {"git_remote": "upstream", "git_branch": "release"},
+        {
+            "git_remote": "upstream",
+            "git_branch": "release",
+            "require_signed_commit": False,
+        },
         repo=tmp_path,
         git="git",
         log_handle=io.StringIO(),
@@ -93,6 +97,56 @@ def test_update_checkout_rejects_dirty_tree(monkeypatch, tmp_path):
     with pytest.raises(publisher.PublishError, match="not clean"):
         publisher._update_checkout(
             {},
+            repo=tmp_path,
+            git="git",
+            log_handle=io.StringIO(),
+        )
+
+
+def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):
+    captured = iter(("", "main", "AA BB CC"))
+    logged_commands = []
+    monkeypatch.setattr(
+        publisher,
+        "_run_captured",
+        lambda command, cwd: next(captured),
+    )
+    monkeypatch.setattr(
+        publisher,
+        "_run_logged",
+        lambda command, **kwargs: logged_commands.append(command),
+    )
+
+    publisher._update_checkout(
+        {
+            "git_branch": "main",
+            "require_signed_commit": True,
+            "trusted_commit_signers": ["aabbcc"],
+        },
+        repo=tmp_path,
+        git="git",
+        log_handle=io.StringIO(),
+    )
+
+    assert ["git", "verify-commit", "HEAD"] in logged_commands
+
+
+def test_update_checkout_rejects_untrusted_signer(monkeypatch, tmp_path):
+    captured = iter(("", "main", "BADFINGERPRINT"))
+    monkeypatch.setattr(
+        publisher,
+        "_run_captured",
+        lambda command, cwd: next(captured),
+    )
+    monkeypatch.setattr(publisher, "_run_logged", lambda command, **kwargs: None)
+
+    with pytest.raises(publisher.PublishError, match="not trusted"):
+        publisher._update_checkout(
+            {
+                "git_branch": "main",
+                "require_signed_commit": True,
+                "trusted_commit_signers": ["TRUSTEDFINGERPRINT"],
+            },
             repo=tmp_path,
             git="git",
             log_handle=io.StringIO(),

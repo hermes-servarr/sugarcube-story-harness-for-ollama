@@ -9,7 +9,10 @@
   "publish_path": "benchmark_anon/results_anonymized.json",
   "git_remote": "origin",
   "git_branch": "main",
-  "require_signed_commit": false,
+  "require_signed_commit": true,
+  "trusted_commit_signers": [
+    "REPLACE_WITH_TRUSTED_SIGNING_KEY_FINGERPRINT"
+  ],
   "commit_message": "Publish anonymized benchmark results",
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
   "variants": ["compact", "full", "json"],

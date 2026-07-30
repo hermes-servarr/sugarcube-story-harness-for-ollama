@@ -248,13 +248,26 @@ def _update_checkout(
         log_handle=log_handle,
         env=_git_environment(),
     )
-    if bool(config.get("require_signed_commit", False)):
+    if bool(config.get("require_signed_commit", True)):
+        trusted_signers = config.get("trusted_commit_signers", [])
+        if not isinstance(trusted_signers, list) or not trusted_signers:
+            raise PublishError("no trusted commit signers are configured")
         _run_logged(
             [git, "verify-commit", "HEAD"],
             cwd=repo,
             log_handle=log_handle,
             env=_git_environment(),
         )
+        signer = _run_captured(
+            [git, "log", "-1", "--format=%GF"],
+            cwd=repo,
+        )
+        allowed = {
+            str(fingerprint).replace(" ", "").casefold()
+            for fingerprint in trusted_signers
+        }
+        if not signer or signer.replace(" ", "").casefold() not in allowed:
+            raise PublishError("commit signer is not trusted")
 
 
 def _git_environment() -> dict[str, str]:

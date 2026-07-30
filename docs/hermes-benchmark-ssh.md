@@ -39,10 +39,16 @@ account/model must therefore have no write permission to that branch. Use a
 private repository with a protected branch, mandatory review, and trusted
 maintainers.
 
-For repositories whose commits are signed and whose local Git trust store is
-configured, set `"require_signed_commit": true`. The publisher will run
-`git verify-commit HEAD` after pulling and fail before contacting Ollama if
-verification fails.
+Signed commits and an explicit signer allowlist are enabled by default. Set
+`trusted_commit_signers` to the accepted signing-key fingerprint(s) and
+configure the PC's local Git trust store. The publisher runs
+`git verify-commit HEAD`, reads Git's `%GF` signer fingerprint, and requires an
+exact allowlist match before contacting Ollama. Keep every trusted signing
+private key off the Hermes server.
+
+Disabling `require_signed_commit` is unsafe when Hermes can push to the
+configured branch: it could change the pulled Python benchmark and bypass the
+anonymization layer.
 
 ## Install on a Windows benchmark PC
 
@@ -194,3 +200,30 @@ The repository previously contained model tags in the Git history of
 this change, but normal commits cannot erase old objects. If the Hermes server
 can browse this repository's history, publish results to a fresh private
 repository or deliberately purge the old history before granting it access.
+
+## Enable the skill on Hermes
+
+This repository includes `skills/run-sugarcube-benchmark/SKILL.md`. On the
+Hermes server, add the checkout's `skills` directory to
+`~/.hermes/config.yaml`:
+
+```yaml
+skills:
+  external_dirs:
+    - /absolute/path/to/sugarcube-story-harness-for-ollama/skills
+  write_approval: true
+```
+
+Hermes scans external skill directories and exposes each skill as a slash
+command. After reloading Hermes, verify that `run-sugarcube-benchmark` appears
+in `hermes skills list`, then invoke:
+
+```text
+/run-sugarcube-benchmark
+```
+
+Keep the checkout and skill files read-only to the Hermes process if practical.
+If Hermes needs repository write access for other work, retain
+`write_approval: true` and review skill edits before committing them. The
+PC-side forced SSH command and signed-commit allowlist remain the enforcement
+boundaries even if the model ignores or edits skill instructions.
