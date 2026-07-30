@@ -60,12 +60,30 @@ Allowed checks:
 {"check": "plain_text"}
 {"check": "max_words", "count": 35}
 {"check": "min_words", "count": 5}
+{"check": "conversation_layout"}
+{"check": "min_dialogue_turns", "count": 4}
+{"check": "mc_inner_monologue"}
 ```
 
 Use 3-12 checks. At least one must be `macro`, `variable`,
 `context_needle`, `min_choices`, `balanced_macro`, `max_words`, or
-`min_words`. All checks must pass; the probe cannot set an arbitrary token
-limit, threshold, or verdict.
+`min_words`, or `min_dialogue_turns`. All checks must pass; the probe cannot
+set an arbitrary token limit, threshold, or verdict.
+
+The signed conversation convention is:
+
+```text
+DIALOGUE:
+Speaker: "Spoken words."
+MC: "Spoken reply."
+INNER MONOLOGUE:
+MC: //Private thoughts.//
+```
+
+`conversation_layout` requires the two labeled blocks in that order inside
+PROSE. `min_dialogue_turns` counts standardized quoted speaker lines before
+the inner-monologue block. `mc_inner_monologue` requires the italicized MC
+line after it.
 
 Keep `task` under 1,500 characters. It may describe SugarCube output but must
 not contain URLs, model identities, private data, commands for the operator,

@@ -26,8 +26,8 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 
 - Status: proposed
 - Proposed in iteration: iteration-NN
-- Capability: syntax | state | branching | loops | forms | retrieval |
-  distractor-resistance | consistency | harness-scale | thinking
+- Capability: syntax | state | branching | loops | forms | conversation-layout
+  | retrieval | distractor-resistance | consistency | harness-scale | thinking
 - Context size: S | M | L | XL
 - Task complexity: K1 | K2 | K3 | K4
 - Distractor density: D0 | D1

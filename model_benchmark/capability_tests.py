@@ -59,6 +59,9 @@ _ALLOWED_CHECKS = {
     "plain_text",
     "max_words",
     "min_words",
+    "conversation_layout",
+    "min_dialogue_turns",
+    "mc_inner_monologue",
 }
 _NEEDLES = {
     "archive_code": "7319",
@@ -167,6 +170,9 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             "plain_text": {"check"},
             "max_words": {"check", "count"},
             "min_words": {"check", "count"},
+            "conversation_layout": {"check"},
+            "min_dialogue_turns": {"check", "count"},
+            "mc_inner_monologue": {"check"},
         }[kind]
         if set(raw_check) - permitted:
             raise CapabilityCaseError("check contains unknown fields")
@@ -189,9 +195,15 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             if check.get("name") not in _NEEDLES:
                 raise CapabilityCaseError("unknown context needle")
             nontrivial = True
-        elif kind in {"min_choices", "max_words", "min_words"}:
+        elif kind in {
+            "min_choices", "max_words", "min_words", "min_dialogue_turns"
+        }:
             count = check.get("count")
-            upper = 6 if kind == "min_choices" else 500
+            upper = (
+                6 if kind == "min_choices"
+                else 12 if kind == "min_dialogue_turns"
+                else 500
+            )
             if not isinstance(count, int) or not 1 <= count <= upper:
                 raise CapabilityCaseError(f"{kind} count must be 1 to {upper}")
             nontrivial = True
@@ -362,14 +374,41 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
             ok = len(re.findall(r"\b[\w'-]+\b", text)) <= check["count"]
         elif kind == "min_words":
             ok = len(re.findall(r"\b[\w'-]+\b", text)) >= check["count"]
+        elif kind == "conversation_layout":
+            prose = getattr(parsed, "prose", "") or ""
+            dialogue_at = prose.find("DIALOGUE:")
+            inner_at = prose.find("INNER MONOLOGUE:")
+            ok = 0 <= dialogue_at < inner_at
+        elif kind == "min_dialogue_turns":
+            prose = getattr(parsed, "prose", "") or ""
+            dialogue = prose.partition("DIALOGUE:")[2].partition(
+                "INNER MONOLOGUE:"
+            )[0]
+            turns = re.findall(
+                r'(?m)^\s*[A-Za-z][A-Za-z0-9 _-]*:\s*["“][^"”\n]+["”]\s*$',
+                dialogue,
+            )
+            ok = len(turns) >= check["count"]
+        elif kind == "mc_inner_monologue":
+            prose = getattr(parsed, "prose", "") or ""
+            inner = prose.partition("INNER MONOLOGUE:")[2]
+            ok = re.search(r"(?m)^\s*MC:\s*//[^/\n]+//\s*$", inner) is not None
         passed += int(ok)
         evidence.append(f"{kind}={'pass' if ok else 'fail'}")
     score = passed / len(case.checks)
+    failed = [
+        item.split("=", 1)[0]
+        for item in evidence
+        if item.endswith("=fail")
+    ]
     return CategoryResult(
         name="capability_observables",
         passed=passed == len(case.checks),
         score=score,
-        details=f"checks={passed}/{len(case.checks)}",
+        details=(
+            f"checks={passed}/{len(case.checks)}; "
+            f"failed={','.join(failed) if failed else 'none'}"
+        ),
         evidence=tuple(evidence),
     )
 

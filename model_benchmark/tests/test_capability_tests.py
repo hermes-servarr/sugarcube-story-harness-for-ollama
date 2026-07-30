@@ -5,11 +5,13 @@ import pytest
 from model_benchmark.capability_tests import (
     CapabilityCaseError,
     _build_prompt,
+    _score_checks,
     execute_capability_cases,
     load_cases,
     validate_case,
 )
 from model_benchmark.config import BenchmarkConfig
+from harness.parsers import parse_model_output
 
 
 def _candidate(**overrides):
@@ -36,7 +38,7 @@ def _candidate(**overrides):
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     cases = load_cases(candidate_dir=None)
-    assert len(cases) == 22
+    assert len(cases) == 29
     retrieval = {
         case.context_size
         for case in cases
@@ -63,6 +65,20 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     }
     assert plain_tiny == {"S", "XL"}
     assert any(case.id == "T9-PLAIN-FALLBACK-XL" for case in cases)
+    conversation_variants = {
+        case.variant for case in cases if "CONVERSATION" in case.id
+    }
+    assert conversation_variants == {"compact", "full", "json", "thinking"}
+    thinking_conversation_profiles = {
+        (case.context_size, case.task_complexity)
+        for case in cases
+        if "CONVERSATION-THINKING" in case.id
+    }
+    assert thinking_conversation_profiles == {
+        ("S", "K2"),
+        ("M", "K3"),
+        ("XL", "K4"),
+    }
 
 
 def test_candidate_schema_rejects_code_fields_and_weak_checks():
@@ -188,3 +204,38 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
     assert record.status == "PASS"
     assert record.subcategory == "plain_text"
     assert len(record.scored_result.category_results) == 1
+
+
+def test_conversation_layout_requires_dialogue_before_mc_inner_monologue():
+    case = next(
+        case
+        for case in load_cases(candidate_dir=None)
+        if case.id == "T2-CONVERSATION-COMPACT"
+    )
+    valid = """PROSE:
+DIALOGUE:
+Mentor: "You found the key."
+MC: "I did."
+INNER MONOLOGUE:
+MC: //I should be careful.//
+
+CHOICES:
+- Continue | Move onward
+- Wait | Stay here
+
+SUMMARY:
+The mentor questioned the protagonist.
+"""
+    invalid = valid.replace(
+        "DIALOGUE:\nMentor: \"You found the key.\"\nMC: \"I did.\"\n"
+        "INNER MONOLOGUE:\nMC: //I should be careful.//",
+        "INNER MONOLOGUE:\nMC: //I should be careful.//\n"
+        "DIALOGUE:\nMentor: \"You found the key.\"\nMC: \"I did.\"",
+    )
+
+    passed = _score_checks(case, valid, parse_model_output(valid))
+    failed = _score_checks(case, invalid, parse_model_output(invalid))
+
+    assert passed.passed is True
+    assert failed.passed is False
+    assert "conversation_layout" in failed.details

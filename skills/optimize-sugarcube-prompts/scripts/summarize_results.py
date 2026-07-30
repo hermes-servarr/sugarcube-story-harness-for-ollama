@@ -81,6 +81,36 @@ def _plain_text_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _conversation_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    conversation = [
+        row for row in records
+        if "CONVERSATION" in str(row.get("test_id", "")).upper()
+    ]
+    grouped = _group(conversation, "dataset")
+    aggregate = (
+        next(iter(grouped.values()))
+        if grouped else
+        {"cases": 0, "passed": 0, "pass_rate": 0.0, "mean_score": 0.0}
+    )
+    failed_checks: Counter[str] = Counter()
+    for row in conversation:
+        scored = row.get("scored_result")
+        if not isinstance(scored, dict):
+            continue
+        for category in scored.get("category_results", []):
+            if not isinstance(category, dict):
+                continue
+            for evidence in category.get("evidence", []):
+                if isinstance(evidence, str) and evidence.endswith("=fail"):
+                    failed_checks[evidence.removesuffix("=fail")] += 1
+    return {
+        **aggregate,
+        "failed_checks": dict(failed_checks.most_common()),
+        "by_variant": _group(conversation, "subcategory"),
+        "by_context_profile": _group(conversation, "split"),
+    }
+
+
 def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
@@ -142,6 +172,7 @@ def summarize(path: Path) -> dict[str, Any]:
         "by_context_profile": _group(objective_records, "split"),
         "thinking_variant": _thinking_summary(objective_records),
         "plain_text": _plain_text_summary(objective_records),
+        "conversation_layout": _conversation_summary(objective_records),
         "candidate_tests": {
             "diagnostic_only": True,
             **(

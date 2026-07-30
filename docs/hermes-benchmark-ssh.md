@@ -96,13 +96,18 @@ pull/push credentials for the dedicated account.
 The example runs all benchmark directions currently defined by the project
 (A–H) and all variants, including `thinking`; reduce those lists only if you
 intentionally want a smaller run.
-It also enables the signed 22-case capability ladder. Those additional calls
+It also enables the signed 29-case capability ladder. Those additional calls
 run sequentially for each configured model and cover T0 atomic syntax through
 T9 harness-scale context, including matched S/M/L/XL retrieval probes.
 The ladder includes direct plain-text fallbacks at tiny, short, and medium
 output budgets. Per-case caps can only reduce the configured `num_predict`;
 they measure concise-answer compliance and longer explanations without
 increasing GPU memory requirements.
+Conversation-layout cases cover compact, full, JSON, thinking, and XL-context
+generation. They require a standardized `DIALOGUE:` block of quoted speaker
+turns followed by `INNER MONOLOGUE:` and `MC: //thoughts//` inside PROSE.
+Thinking conversation cases form an S/K2, M/K3, and XL/K4 slope, increasing
+context and turn requirements gradually instead of testing only the extreme.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.

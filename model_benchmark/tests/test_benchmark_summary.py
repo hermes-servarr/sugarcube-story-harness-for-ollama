@@ -162,3 +162,46 @@ def test_plain_text_results_are_reported_by_context_profile(tmp_path):
     assert summary["plain_text"]["cases"] == 1
     assert summary["plain_text"]["pass_rate"] == 1.0
     assert summary["plain_text"]["by_context_profile"]["XL-K1-D0"]["passed"] == 1
+
+
+def test_conversation_layout_reports_failed_signed_checks(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:T8-CONVERSATION-XL:full:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_core",
+                    "subcategory": "full",
+                    "difficulty": "T8",
+                    "split": "XL-K3-D1",
+                    "normalized_score": 0.5,
+                    "status": "FAIL",
+                    "scored_result": {
+                        "category_results": [
+                            {
+                                "name": "capability_observables",
+                                "passed": False,
+                                "evidence": [
+                                    "conversation_layout=pass",
+                                    "min_dialogue_turns=fail",
+                                    "mc_inner_monologue=fail",
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)
+
+    assert summary["conversation_layout"]["cases"] == 1
+    assert summary["conversation_layout"]["failed_checks"] == {
+        "min_dialogue_turns": 1,
+        "mc_inner_monologue": 1,
+    }
+    assert summary["conversation_layout"]["by_variant"]["full"]["passed"] == 0

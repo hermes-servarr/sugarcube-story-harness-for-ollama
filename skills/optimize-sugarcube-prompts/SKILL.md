@@ -47,6 +47,8 @@ five experiments without a new explicit user instruction.
      suspected output-budget exhaustion;
    - whether plain-text failures concern retrieval, requested answer length,
      or inability to fall back from structured generation;
+   - whether conversation failures concern block ordering, dialogue-turn
+     formatting, or the MC inner-monologue line;
    - one narrow prompt hypothesis that could improve those failures.
 
 5. Create `benchmark_optimization/iteration-NN.md` containing baseline
@@ -138,6 +140,20 @@ reasoning.
 - Compare paired M/XL or S/XL cases before attributing a failure to context
   length. A word-limit failure is instruction following; a missing known
   context needle is retrieval.
+
+## Conversation Layout Rules
+
+- The signed standard inside PROSE is `DIALOGUE:`, quoted
+  `Speaker: "words"` turns, then `INNER MONOLOGUE:`, followed by
+  `MC: //thoughts//`.
+- Compare compact, full, JSON, thinking, and XL-context conversation cases
+  independently. Use the failed signed check names to distinguish missing
+  blocks, too few dialogue turns, and malformed MC inner monologue.
+- For thinking conversations, compare the S/K2, M/K3, and XL/K4 slope before
+  concluding that the problem is thinking mode itself; identify the first tier
+  where layout compliance falls away.
+- Conversation cases are signed capability tests. Do not weaken their layout,
+  turn count, ordering, or SugarCube-italic requirement in an overlay.
 
 ## Candidate Test Rules
 
