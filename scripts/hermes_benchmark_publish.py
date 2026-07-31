@@ -35,6 +35,9 @@ class PublishError(RuntimeError):
     """A safe-to-log failure that must not reveal details to the SSH caller."""
 
 
+COMMAND_TIMEOUT_SECONDS = 120
+
+
 def _load_config(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         config = json.load(handle)
@@ -193,29 +196,37 @@ def _run_logged(
     log_handle: Any,
     env: dict[str, str] | None = None,
 ) -> None:
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-        env=env,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            env=env,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise PublishError("command timed out") from exc
     if completed.returncode:
         raise PublishError(f"command failed with exit status {completed.returncode}")
 
 
 def _run_captured(command: list[str], *, cwd: Path) -> str:
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise PublishError("command timed out") from exc
     if completed.returncode:
         raise PublishError(f"command failed with exit status {completed.returncode}")
     return completed.stdout.strip()
@@ -446,6 +457,62 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
     return args
 
 
+def _write_private_progress(
+    run_dir: Path,
+    payload: dict[str, Any],
+    *,
+    log_handle: Any,
+) -> None:
+    """Atomically persist identity-free progress for PC-side inspection."""
+    phase = str(payload.get("phase", "unknown"))
+    if phase not in {"starting", "matrix", "capability", "finalizing"}:
+        phase = "unknown"
+    progress: dict[str, Any] = {
+        "schema_version": 1,
+        "phase": phase,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    for key in (
+        "completed",
+        "total",
+        "pass_count",
+        "fail_count",
+        "error_count",
+        "timeout_count",
+    ):
+        if key in payload:
+            progress[key] = max(0, int(payload[key]))
+    for key in ("percent", "elapsed_seconds", "eta_seconds"):
+        if key in payload:
+            progress[key] = float(payload[key])
+
+    target = run_dir / "progress.json"
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=".progress-",
+        suffix=".json",
+        dir=run_dir,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(progress, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, target)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+    log_handle.write(
+        "progress "
+        f"phase={progress['phase']} "
+        f"completed={progress.get('completed', 0)} "
+        f"total={progress.get('total', 0)} "
+        f"updated_at={progress['updated_at']}\n"
+    )
+    log_handle.flush()
+
+
 def _publish(config: dict[str, Any], log_handle: Any) -> bool:
     repo = Path(config["repo_path"]).resolve()
     if not (repo / ".git").exists():
@@ -469,6 +536,19 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
     os.chmod(run_dir, 0o700)
 
     try:
+        _write_private_progress(
+            run_dir,
+            {"phase": "starting", "completed": 0, "total": 0},
+            log_handle=log_handle,
+        )
+
+        def record_progress(payload: dict[str, Any]) -> None:
+            _write_private_progress(
+                run_dir,
+                payload,
+                log_handle=log_handle,
+            )
+
         # Import and invoke in this process: model tags never enter argv or the
         # environment, where another unprivileged process might inspect them.
         sys.path.insert(0, str(repo))
@@ -478,12 +558,20 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         try:
             os.chdir(repo)
             with contextlib.redirect_stdout(log_handle), contextlib.redirect_stderr(log_handle):
-                exit_code = benchmark_main(_benchmark_args(config, run_dir))
+                exit_code = benchmark_main(
+                    _benchmark_args(config, run_dir),
+                    progress_callback=record_progress,
+                )
         finally:
             os.chdir(previous_cwd)
         if exit_code:
             raise PublishError(f"benchmark failed with exit status {exit_code}")
 
+        _write_private_progress(
+            run_dir,
+            {"phase": "finalizing", "completed": 1, "total": 1},
+            log_handle=log_handle,
+        )
         source = _latest_anonymized_result(run_dir)
         with source.open("r", encoding="utf-8") as handle:
             public_data = prepare_public_results(json.load(handle), terms)
@@ -508,18 +596,11 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
                 os.unlink(temporary_name)
 
         relative_target = str(target.relative_to(repo))
-        status = subprocess.run(
+        status = _run_captured(
             [git, "status", "--porcelain", "--", relative_target],
             cwd=repo,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=log_handle,
-            text=True,
-            check=False,
         )
-        if status.returncode:
-            raise PublishError("git could not inspect the publish artifact")
-        changed = bool(status.stdout.strip())
+        changed = bool(status.strip())
         if changed:
             _run_logged(
                 [git, "add", "--force", "--", relative_target],
@@ -572,6 +653,7 @@ def main() -> int:
             with log_path.open("w", encoding="utf-8") as log_handle:
                 os.chmod(log_path, 0o600)
                 log_handle.write(f"started={datetime.now(timezone.utc).isoformat()}\n")
+                log_handle.flush()
                 try:
                     pushed = _publish(config, log_handle)
                 except Exception:

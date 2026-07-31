@@ -116,6 +116,53 @@ def test_git_environment_uses_protected_repository_ssh_config(monkeypatch):
     assert "GIT_SSH_VARIANT" not in environment
 
 
+@pytest.mark.parametrize(
+    ("runner", "kwargs"),
+    [
+        (publisher._run_logged, {"log_handle": io.StringIO()}),
+        (publisher._run_captured, {}),
+    ],
+)
+def test_git_helpers_fail_closed_on_timeout(monkeypatch, tmp_path, runner, kwargs):
+    def timeout(*args, **call_kwargs):
+        raise publisher.subprocess.TimeoutExpired(args[0], call_kwargs["timeout"])
+
+    monkeypatch.setattr(publisher.subprocess, "run", timeout)
+
+    with pytest.raises(publisher.PublishError, match="timed out"):
+        runner(["git", "status"], cwd=tmp_path, **kwargs)
+
+
+def test_private_progress_file_excludes_identity_fields(tmp_path):
+    log = io.StringIO()
+
+    publisher._write_private_progress(
+        tmp_path,
+        {
+            "phase": "matrix",
+            "completed": 7,
+            "total": 20,
+            "percent": 35.0,
+            "model_alias": "private-model",
+            "current_test": "private-model:compact:A:1",
+        },
+        log_handle=log,
+    )
+
+    progress = publisher.json.loads(
+        (tmp_path / "progress.json").read_text(encoding="utf-8")
+    )
+    rendered = publisher.json.dumps(progress)
+
+    assert progress["phase"] == "matrix"
+    assert progress["completed"] == 7
+    assert progress["total"] == 20
+    assert "model_alias" not in progress
+    assert "current_test" not in progress
+    assert "private-model" not in rendered
+    assert "private-model" not in log.getvalue()
+
+
 def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):
     captured = iter(("", "main", "AA BB CC"))
     logged_commands = []

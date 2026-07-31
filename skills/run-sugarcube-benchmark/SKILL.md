@@ -8,20 +8,38 @@ description: Safely trigger the remote SugarCube Ollama benchmark and publish it
 Trigger the PC-side publisher through its forced SSH command. The PC handles
 the Git pull, single-run lock, benchmark, anonymization, commit, and push.
 
+Use Hermes's managed background process facility because the benchmark may
+exceed the 600-second foreground terminal limit.
+
+## Exact SSH Command
+
+Never alter this command:
+
+```bash
+ssh -F /opt/data/home/.ssh/config -T -o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=15 sugarcube-benchmark run
+```
+
 ## Procedure
 
-1. Run exactly this foreground command with the terminal tool:
+1. Use the process-management tool with action `list`. Find live managed
+   processes whose command exactly matches the SSH command above.
+2. Act on the match count:
 
-   ```bash
-   ssh -F /opt/data/home/.ssh/config -T -o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=15 sugarcube-benchmark run
-   ```
+   - More than one: start nothing; report a duplicate-process safety
+     violation and require operator inspection.
+   - Exactly one: start nothing; record its process/session ID and monitor it.
+   - None: invoke the exact command once with the terminal tool using
+     `background=true` and `notify_on_complete=true`; record the returned
+     process/session ID. If startup fails or returns no reliable ID, do not
+     retry.
 
-   Keep the absolute `-F` path. Hermes tool processes may receive
-   `HOME=/opt/data` even though the agent account's persistent home and SSH
-   configuration are under `/opt/data/home`.
-2. Wait for the command to finish. Allow a long tool timeout because the
-   benchmark may take substantial time.
-3. Interpret the result:
+3. Monitor only the recorded process with process action `wait` or `poll`.
+   Repeated monitoring calls on the same ID are allowed. A monitoring timeout
+   is not permission to run terminal again. Never kill the process because a
+   monitoring call timed out. If the process is lost or ambiguous, report
+   unknown status and require PC-side verification.
+4. After the managed process exits, read only its captured log/status and
+   interpret it:
 
    - `Benchmark completed and anonymized results were pushed.` — report
      success.
@@ -31,7 +49,7 @@ the Git pull, single-run lock, benchmark, anonymization, commit, and push.
      existing run owns the GPU; do not start or schedule another.
    - `Benchmark request failed; ...` or any other nonzero exit — report that
      the PC administrator must inspect the private local log.
-   - Tool timeout, SSH disconnect, or ambiguous result — report that status is
+   - SSH disconnect, lost process, or ambiguous result — report that status is
      unknown and manual PC-side verification is required.
 
 ## Safety Rules
@@ -39,7 +57,12 @@ the Git pull, single-run lock, benchmark, anonymization, commit, and push.
 - Invoke the command at most once per user request.
 - Never retry automatically, including after a timeout or disconnect. A run
   may still be using the GPU.
-- Never background, detach, schedule, parallelize, or delegate this command.
+- Never start the SSH command while a matching managed process exists.
+- Permit only one Hermes-managed background process for this exact command.
+  Never use shell `&`, `nohup`, `tmux`, `screen`, `timeout`, scheduling,
+  delegation, parallel execution, or another SSH process.
+- Never call terminal again to restart the command after receiving a managed
+  process ID, and never kill it merely because monitoring timed out.
 - Never alter the SSH hostname, remote command, or security options.
 - Never request an interactive shell or use SSH/SFTP/SCP for any other action
   on the benchmark PC.

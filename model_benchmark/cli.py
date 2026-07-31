@@ -37,7 +37,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from model_benchmark.config import BenchmarkConfig, parse_cli_args
 
@@ -59,7 +59,11 @@ def _build_parser() -> argparse.ArgumentParser:
 # ════════════════════════════════════════════════════════════════════════════
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> int:
     """Parse CLI args, run the benchmark, write reports, optionally compare baseline; return process exit code.
 
     Dispatch logic:
@@ -74,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     raw = list(argv) if argv is not None else sys.argv[1:]
     if raw and raw[0] in _SUBCOMMANDS:
-        return cli_main(raw)
+        return cli_main(raw, progress_callback=progress_callback)
     if raw and raw[0] in ("-h", "--help") and not any(a in _SUBCOMMANDS for a in raw):
         # Top-level --help with no subcommand → show the subcommand CLI help.
         try:
@@ -580,7 +584,11 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cli_main(argv: list[str]) -> int:
+def cli_main(
+    argv: list[str],
+    *,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> int:
     """Dispatch to a subcommand handler.  ``argv[0]`` must be a subcommand name."""
     if not argv or argv[0] not in _SUBCOMMANDS:
         # Should not happen — main() guards this — but be defensive.
@@ -613,6 +621,8 @@ def cli_main(argv: list[str]) -> int:
     if handler is None:
         print(f"error: unknown command {command}", file=sys.stderr)
         return 2
+    if command == "run":
+        return _cmd_run(args, progress_callback=progress_callback)
     return handler(args)
 
 
@@ -1043,7 +1053,11 @@ def _cmd_list(args: argparse.Namespace) -> int:
 # ── run ────────────────────────────────────────────────────────────────────
 
 
-def _cmd_run(args: argparse.Namespace) -> int:
+def _cmd_run(
+    args: argparse.Namespace,
+    *,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> int:
     """Execute selected tests with dry-run, debug, and output-format flags."""
     from model_benchmark.test_selection import dry_run as ts_dry_run
 
@@ -1076,6 +1090,24 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except SystemExit as e:
         return int(e.code) if isinstance(e.code, int) else 1
 
+    def report_matrix_progress(event: Any) -> None:
+        if progress_callback is None:
+            return
+        progress_callback(
+            {
+                "phase": "matrix",
+                "completed": int(event.completed),
+                "total": int(event.total),
+                "percent": float(event.percent),
+                "elapsed_seconds": float(event.elapsed_seconds),
+                "eta_seconds": float(event.eta_seconds),
+                "pass_count": int(event.pass_count),
+                "fail_count": int(event.fail_count),
+                "error_count": int(event.error_count),
+                "timeout_count": int(event.timeout_count),
+            }
+        )
+
     from model_benchmark.runner import BenchmarkRunner
     runner = BenchmarkRunner(
         cfg,
@@ -1085,6 +1117,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         verbose=verbose,
         quiet=quiet,
         force_rerun=cfg.force_rerun,
+        progress_callback=report_matrix_progress,
     )
 
     if cfg.dry_run:
@@ -1099,10 +1132,33 @@ def _cmd_run(args: argparse.Namespace) -> int:
             execute_capability_cases,
             load_cases,
         )
-        cases = load_cases(
+        cases = tuple(load_cases(
             candidate_dir=Path(getattr(args, "candidate_test_dir"))
+        ))
+
+        def report_capability_progress(completed: int, total: int) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "phase": "capability",
+                    "completed": int(completed),
+                    "total": int(total),
+                    "percent": (
+                        float(completed / total * 100.0)
+                        if total
+                        else 100.0
+                    ),
+                }
+            )
+
+        results.extend(
+            execute_capability_cases(
+                cfg,
+                cases,
+                progress_callback=report_capability_progress,
+            )
         )
-        results.extend(execute_capability_cases(cfg, cases))
 
     if debug:
         _debug_model_io(results)

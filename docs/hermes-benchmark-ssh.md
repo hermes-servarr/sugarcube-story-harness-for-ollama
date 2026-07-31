@@ -225,6 +225,20 @@ Git output, tracebacks, and raw results go only to the root-readable
 `C:\ProgramData\HermesBenchmark\state\last-run.log` on Windows. Temporary
 internal results are deleted after every attempt.
 
+While a benchmark is active, its private `run-*` directory contains an
+atomically replaced `progress.json`. It reports only the phase, completed and
+total counts, timing, and aggregate status counts; model names and test IDs are
+never written to it. The same identity-free counter is flushed to
+`last-run.log` after every completed matrix or capability case. On Windows,
+an administrator can inspect the newest snapshot without reading raw results:
+
+```powershell
+$run = Get-ChildItem C:\ProgramData\HermesBenchmark\state -Directory -Filter "run-*" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+Get-Content -Raw (Join-Path $run.FullName "progress.json") | ConvertFrom-Json
+```
+
 ## Additional host hardening
 
 The model tags never appear in the publisher process command line or

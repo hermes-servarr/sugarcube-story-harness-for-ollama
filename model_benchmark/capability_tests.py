@@ -7,7 +7,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from harness.models import HarnessConfig
 from harness.ollama_client import call_ollama_sync
@@ -463,10 +463,15 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
 def execute_capability_cases(
     cfg: BenchmarkConfig,
     cases: Iterable[CapabilityCase],
+    *,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[Any]:
+    case_list = tuple(cases)
+    total = len(cfg.models) * len(case_list)
+    completed = 0
     records = []
     for model in cfg.models:
-        for case in cases:
+        for case in case_list:
             prompt = _build_prompt(case)
             configured_cap = _OUTPUT_BUDGETS[case.output_budget]
             case_num_predict = (
@@ -554,4 +559,10 @@ def execute_capability_cases(
                     reference_rubric="signed capability check vocabulary v1",
                 )
             )
+            completed += 1
+            if progress_callback is not None:
+                try:
+                    progress_callback(completed, total)
+                except Exception:
+                    pass
     return records
