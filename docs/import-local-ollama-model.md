@@ -101,3 +101,19 @@ Prompt. For example:
 ```cmd
 ollama create orinth -f "C:\models\orinth\Modelfile"
 ```
+
+## External Jinja chat templates
+
+For a Safetensors model, the script recognizes `chat_template.jinja`,
+`chat_template.jinja2`, or a Jinja file referenced by an `{% include %}` in
+`tokenizer_config.json`. It embeds the template text into the
+`chat_template` property that Ollama imports. Before changing an existing
+tokenizer configuration, it preserves the original once as:
+
+```text
+tokenizer_config.json.ollama-backup
+```
+
+If several `.jinja` files exist, name the default one `chat_template.jinja`.
+External Jinja cannot be attached to a GGUF through a Modelfile; GGUF imports
+use the `tokenizer.chat_template` metadata embedded in the GGUF itself.

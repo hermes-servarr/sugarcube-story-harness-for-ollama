@@ -105,6 +105,98 @@ function Test-OllamaModel {
     }
 }
 
+function Add-ExternalChatTemplate {
+    param([Parameter(Mandatory = $true)][string] $Directory)
+
+    $tokenizerConfigPath = Join-Path $Directory 'tokenizer_config.json'
+    $configExists = Test-Path -LiteralPath $tokenizerConfigPath -PathType Leaf
+    if ($configExists) {
+        try {
+            $config = Get-Content -LiteralPath $tokenizerConfigPath -Raw | ConvertFrom-Json
+        } catch {
+            throw "Cannot read tokenizer_config.json while adding its Jinja chat template: $($_.Exception.Message)"
+        }
+    } else {
+        $config = [pscustomobject]@{}
+    }
+
+    $templateProperty = $config.PSObject.Properties['chat_template']
+    $currentTemplate = if ($templateProperty -and $templateProperty.Value -is [string]) {
+        [string] $templateProperty.Value
+    } else {
+        ''
+    }
+
+    $templateFile = $null
+    $includeMatch = [regex]::Match(
+        $currentTemplate,
+        "\{%[-+]?\s*include\s+['`"]([^'`"]+\.jinja2?)['`"]\s*[-+]?%\}",
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if ($includeMatch.Success) {
+        $includedName = $includeMatch.Groups[1].Value
+        if ([System.IO.Path]::GetFileName($includedName) -ne $includedName) {
+            throw "Jinja include '$includedName' must refer to a file in the model directory."
+        }
+        $includedPath = Join-Path $Directory $includedName
+        if (-not (Test-Path -LiteralPath $includedPath -PathType Leaf)) {
+            throw "tokenizer_config.json includes '$includedName', but that file is missing."
+        }
+        $templateFile = Get-Item -LiteralPath $includedPath
+    } elseif (-not $currentTemplate) {
+        $preferredNames = @('chat_template.jinja', 'chat_template.jinja2')
+        foreach ($preferredName in $preferredNames) {
+            $candidatePath = Join-Path $Directory $preferredName
+            if (Test-Path -LiteralPath $candidatePath -PathType Leaf) {
+                $templateFile = Get-Item -LiteralPath $candidatePath
+                break
+            }
+        }
+        if (-not $templateFile) {
+            $jinjaFiles = @(
+                Get-ChildItem -LiteralPath $Directory -File |
+                    Where-Object { $_.Name -match '(?i)\.jinja2?$' }
+            )
+            if ($jinjaFiles.Count -eq 1) {
+                $templateFile = $jinjaFiles[0]
+            } elseif ($jinjaFiles.Count -gt 1) {
+                Write-Warning "Multiple Jinja files were found in '$Directory'; name the default one chat_template.jinja."
+            }
+        }
+    }
+
+    if (-not $templateFile) {
+        return
+    }
+
+    $externalTemplate = [System.IO.File]::ReadAllText($templateFile.FullName)
+    if (-not $externalTemplate.Trim()) {
+        throw "Jinja chat template '$($templateFile.FullName)' is empty."
+    }
+    $resolvedTemplate = if ($includeMatch.Success) {
+        $currentTemplate.Remove($includeMatch.Index, $includeMatch.Length).Insert($includeMatch.Index, $externalTemplate)
+    } else {
+        $externalTemplate
+    }
+
+    if ($configExists) {
+        $backupPath = Join-Path $Directory 'tokenizer_config.json.ollama-backup'
+        if (-not (Test-Path -LiteralPath $backupPath)) {
+            Copy-Item -LiteralPath $tokenizerConfigPath -Destination $backupPath
+        }
+    }
+    if ($templateProperty) {
+        $templateProperty.Value = $resolvedTemplate
+    } else {
+        $config | Add-Member -NotePropertyName 'chat_template' -NotePropertyValue $resolvedTemplate
+    }
+
+    $json = ($config | ConvertTo-Json -Depth 100) + "`n"
+    $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($tokenizerConfigPath, $json, $utf8WithoutBom)
+    Write-Host "Embedded Jinja template '$($templateFile.Name)' into tokenizer_config.json for Ollama." -ForegroundColor Green
+}
+
 if (-not $Path) {
     $Path = Read-Host 'Paste the model file, model folder, or root models folder path'
 }
@@ -216,6 +308,13 @@ if ($Recursive) {
             $childModelfileName += '.' + (ConvertTo-OllamaName $target.Label)
         }
 
+        if (
+            -not $target.IsFile -and
+            (Test-Path -LiteralPath (Join-Path $target.Directory 'config.json') -PathType Leaf)
+        ) {
+            Add-ExternalChatTemplate -Directory $target.Directory
+        }
+
         $sourceFiles = if ($target.IsFile) {
             @(Get-Item -LiteralPath $target.Path)
         } else {
@@ -224,7 +323,9 @@ if ($Recursive) {
                     Where-Object {
                         $_.Extension -ieq '.safetensors' -or
                         $_.Name -ieq 'config.json' -or
-                        $_.Name -ieq 'adapter_config.json'
+                        $_.Name -ieq 'adapter_config.json' -or
+                        $_.Name -ieq 'tokenizer_config.json' -or
+                        $_.Name -match '(?i)\.jinja2?$'
                     }
             )
         }
@@ -394,12 +495,20 @@ if ($kind -eq 'Safetensors adapter') {
     $lines.Add('FROM ' + (Format-ModelfileValue $Base))
     $lines.Add('ADAPTER .')
 } elseif ($kind -eq 'Safetensors model') {
+    Add-ExternalChatTemplate -Directory $modelDirectory.FullName
     $lines.Add('FROM .')
 } else {
     $relativeModelPath = './' + $modelFile.Name
     $lines.Add('FROM ' + (Format-ModelfileValue $relativeModelPath))
     if ($modelFile.Length -eq 0) {
         Write-Warning "The GGUF file is empty (0 bytes). The Modelfile will be written, but Ollama cannot import it until the download is complete."
+    }
+    $externalJinja = @(
+        Get-ChildItem -LiteralPath $modelDirectory.FullName -File |
+            Where-Object { $_.Name -match '(?i)\.jinja2?$' }
+    )
+    if ($externalJinja.Count -gt 0) {
+        Write-Warning 'External Jinja files cannot be applied to GGUF through a Modelfile. Ollama will use the chat template embedded in the GGUF metadata.'
     }
 }
 
