@@ -21,8 +21,17 @@ ssh -F /opt/data/home/.ssh/config -T -o BatchMode=yes -o ClearAllForwardings=yes
 
 ## Procedure
 
-1. Use the process-management tool with action `list`. Find live managed
-   processes whose command exactly matches the SSH command above.
+1. Use the process-management tool with action `list`. Find managed processes
+   whose command exactly matches the SSH command above, then classify their
+   lifecycle state:
+
+   - Count only explicitly active records (for example `running`, `pending`,
+     or an equivalent non-terminal state) as live matches.
+   - Ignore terminal history records (`completed`, `exited`, `failed`,
+     `stopped`, or equivalent) when deciding whether a new process may start.
+     Never monitor or reuse a terminal record for a new user request.
+   - If a matching record's lifecycle state is absent or ambiguous, start
+     nothing and require operator inspection.
 2. Act on the match count:
 
    - More than one: start nothing; report a duplicate-process safety
@@ -57,7 +66,9 @@ ssh -F /opt/data/home/.ssh/config -T -o BatchMode=yes -o ClearAllForwardings=yes
 - Invoke the command at most once per user request.
 - Never retry automatically, including after a timeout or disconnect. A run
   may still be using the GPU.
-- Never start the SSH command while a matching managed process exists.
+- Never start the SSH command while an active matching managed process exists.
+  Completed or otherwise terminal process-history records do not block a new
+  user-requested run and must not be reused as its process ID.
 - Permit only one Hermes-managed background process for this exact command.
   Never use shell `&`, `nohup`, `tmux`, `screen`, `timeout`, scheduling,
   delegation, parallel execution, or another SSH process.
