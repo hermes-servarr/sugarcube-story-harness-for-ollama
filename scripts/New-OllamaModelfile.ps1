@@ -291,10 +291,14 @@ if ($Recursive) {
     }
 
     $rootPath = $rootItem.FullName.TrimEnd('\', '/')
+    $totalCount = $targets.Count
+    $currentCount = 0
     $processedCount = 0
     $skippedCount = 0
     $failureCount = 0
     foreach ($target in @($targets | Sort-Object Directory, Label)) {
+        $currentCount++
+        $progressLabel = "[$currentCount/$totalCount]"
         $relativeDirectory = $target.Directory.Substring($rootPath.Length).TrimStart('\', '/')
         $nameSource = if ($relativeDirectory) { $relativeDirectory } else { $rootItem.Name }
         $multipleInDirectory = $directoryCounts[$target.Directory.ToLowerInvariant()] -gt 1
@@ -355,10 +359,12 @@ if ($Recursive) {
             )
         )
         if ($alreadyPassed) {
-            Write-Host "Skipping $childName; previous $($previous.outcome) result is still current." -ForegroundColor DarkGray
             $skippedCount++
+            Write-Host "$progressLabel Skipping $childName; previous $($previous.outcome) result is still current (skipped: $skippedCount)." -ForegroundColor DarkGray
             continue
         }
+
+        Write-Host "$progressLabel Processing $childName..." -ForegroundColor Cyan
 
         $childArguments = @{
             Path = $target.Path
@@ -406,7 +412,7 @@ if ($Recursive) {
     }
 
     Write-Host ''
-    Write-Host "Processed: $processedCount; skipped previous successes: $skippedCount; failed: $failureCount" -ForegroundColor Green
+    Write-Host "Total discovered: $totalCount; processed: $processedCount; skipped previous successes: $skippedCount; failed: $failureCount" -ForegroundColor Green
     Write-Host "Status log: $logPath"
     if ($failureCount -gt 0) {
         throw "$failureCount model(s) failed. Review the warnings above."
