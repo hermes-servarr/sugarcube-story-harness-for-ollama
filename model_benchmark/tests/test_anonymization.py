@@ -372,6 +372,25 @@ class TestAliasScheme:
         assert "Model_A" in aliases
         assert "Model_B" in aliases
 
+    def test_model_aliases_remain_lettered_beyond_ten_models(self):
+        assert [
+            anonymization._model_alias(index)
+            for index in (0, 9, 10, 25, 26, 27, 701, 702)
+        ] == [
+            "Model_A",
+            "Model_J",
+            "Model_K",
+            "Model_Z",
+            "Model_AA",
+            "Model_AB",
+            "Model_ZZ",
+            "Model_AAA",
+        ]
+
+    def test_model_alias_rejects_negative_index(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            anonymization._model_alias(-1)
+
     def test_provider_aliases_are_lettered(self):
         mapping = anonymization.build_anonymization_mapping(
             _sample_results(),

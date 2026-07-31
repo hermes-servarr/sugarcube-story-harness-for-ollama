@@ -98,16 +98,22 @@ _PATH_RE = re.compile(r"/(?:opt|home|tmp|var|usr|etc|root|mnt|srv|data)[/\w.+-]*
 # ── Alias generation helpers ─────────────────────────────────────────
 
 
-# TODO(anonymization): _model_alias - generate model alias - Model_A..Model_J (letter), fallback Model_NN for index 10+ (P3 4)
+# TODO(anonymization): _model_alias - generate model alias - Model_A..Model_Z, Model_AA... (P3 4)
 def _model_alias(index: int) -> str:
     """Generate a model alias for the given 0-based index.
 
-    Indices 0–9 use the letter scheme (Model_A … Model_J).  Index 10+
-    falls back to zero-padded numeric (Model_11, Model_12, …) per spec §2.1.
+    Uses spreadsheet-style letters for every index: Model_A … Model_Z,
+    Model_AA … Model_AZ, Model_BA, and so on.
     """
-    if index < 10:
-        return f"Model_{chr(ord('A') + index)}"
-    return f"Model_{index + 1:02d}"
+    if index < 0:
+        raise ValueError("model alias index must be non-negative")
+
+    value = index + 1
+    letters = ""
+    while value:
+        value, remainder = divmod(value - 1, 26)
+        letters = chr(ord("A") + remainder) + letters
+    return f"Model_{letters}"
 
 
 # TODO(anonymization): _provider_alias - generate provider alias - Provider_A, Provider_B (P3 4)

@@ -366,19 +366,11 @@ class RunManifest:
 # §3.9  Alias type aliases  (anonymization.py home, defined here) — NEW
 # ═══════════════════════════════════════════════════════════════════════════
 
-ModelAlias = Literal[
-    "Model_A", "Model_B", "Model_C", "Model_D", "Model_E",
-    "Model_F", "Model_G", "Model_H", "Model_I", "Model_J",
-]
+ModelAlias = str
 """Anonymized model alias (§6).
 
-Rationale: the benchmark tests at most a handful of models (small Ollama
-deployments).  A ``Literal`` of 10 aliases covers realistic use and gives
-the reviewer a concrete, bounded set.  If more than 10 models are ever
-tested, P7 will fall back to ``f"Model_{n+1:02d}"`` — but the Literal
-documents the expected range.  Using ``Literal`` (not bare ``str``) makes
-the alias domain explicit and machine-checkable for the anonymization leak
-tests (§17)."""
+Aliases use an unbounded spreadsheet-style letter sequence: ``Model_A``
+through ``Model_Z``, followed by ``Model_AA``, ``Model_AB``, and so on."""
 
 ProviderAlias = Literal["Provider_A", "Provider_B"]
 """Anonymized provider alias (§6).
