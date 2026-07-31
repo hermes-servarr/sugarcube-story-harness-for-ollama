@@ -65,6 +65,10 @@ _ALLOWED_CHECKS = {
     "exact_dialogue_turns",
     "alternating_dialogue",
     "conversation_endpoints",
+    "dialogue_slang",
+    "slang_confined_to_dialogue",
+    "banned_register",
+    "max_sentence_words",
 }
 _NEEDLES = {
     "archive_code": "7319",
@@ -73,6 +77,30 @@ _NEEDLES = {
     "conversation_opening": "We need to discuss the Accord of Glass.",
     "conversation_closing": "Then we have an agreement.",
 }
+# Signed writing-style guides (P1 §3.3 style probes).  ``terms`` are the
+# register markers a speaker must use inside quoted dialogue; ``banned`` are
+# out-of-register words that must never appear in the answer.  Both lists are
+# injected into the prompt by signed code, exactly like the conversation
+# needles, so a case never has to spell them out in its task text.
+_STYLE_GUIDES: dict[str, dict[str, Any]] = {
+    "street_cant": {
+        "label": "street cant",
+        "terms": ("chrome-cold", "wired-in", "no-static", "streetwise"),
+        "banned": ("okay", "yeah", "guys", "awesome", "basically"),
+    },
+    "court_formal": {
+        "label": "court formal register",
+        "terms": ("your grace", "with respect", "by the accord"),
+        "banned": ("okay", "yeah", "gonna", "kinda", "stuff"),
+    },
+}
+_STYLE_GUIDE_CHECKS = {
+    "dialogue_slang",
+    "slang_confined_to_dialogue",
+    "banned_register",
+}
+_SECTION_LABELS = {"PROSE", "CHOICES", "SUMMARY", "DIALOGUE", "INNER MONOLOGUE"}
+_QUOTED_RE = re.compile(r'["“]([^"”\n]+)["”]')
 
 
 @dataclass(frozen=True)
@@ -181,6 +209,10 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             "exact_dialogue_turns": {"check", "count"},
             "alternating_dialogue": {"check"},
             "conversation_endpoints": {"check"},
+            "dialogue_slang": {"check", "name", "count"},
+            "slang_confined_to_dialogue": {"check", "name"},
+            "banned_register": {"check", "name"},
+            "max_sentence_words": {"check", "count"},
         }[kind]
         if set(raw_check) - permitted:
             raise CapabilityCaseError("check contains unknown fields")
@@ -203,9 +235,21 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             if check.get("name") not in _NEEDLES:
                 raise CapabilityCaseError("unknown context needle")
             nontrivial = True
+        elif kind in _STYLE_GUIDE_CHECKS:
+            guide_name = check.get("name")
+            if guide_name not in _STYLE_GUIDES:
+                raise CapabilityCaseError("unknown style guide")
+            if kind == "dialogue_slang":
+                count = check.get("count")
+                terms = _STYLE_GUIDES[guide_name]["terms"]
+                if not isinstance(count, int) or not 1 <= count <= len(terms):
+                    raise CapabilityCaseError(
+                        f"dialogue_slang count must be 1 to {len(terms)}"
+                    )
+            nontrivial = True
         elif kind in {
             "min_choices", "max_words", "min_words", "min_dialogue_turns",
-            "exact_dialogue_turns",
+            "exact_dialogue_turns", "max_sentence_words",
         }:
             count = check.get("count")
             upper = (
@@ -264,10 +308,31 @@ def load_cases(
     return cases
 
 
+def _style_directive(case: CapabilityCase) -> str:
+    """Render the signed voice guides referenced by a case's style checks."""
+    names: list[str] = []
+    for check in case.checks:
+        name = check.get("name")
+        if check["check"] in _STYLE_GUIDE_CHECKS and name not in names:
+            names.append(name)
+    parts = []
+    for name in names:
+        guide = _STYLE_GUIDES[name]
+        terms = ", ".join(f'"{term}"' for term in guide["terms"])
+        banned = ", ".join(guide["banned"])
+        parts.append(
+            f"Voice guide ({guide['label']}): speakers use the phrases {terms} "
+            "inside quoted dialogue only, and narration never uses them. "
+            f"Never write these words anywhere: {banned}."
+        )
+    return " ".join(parts)
+
+
 def _sized_context(case: CapabilityCase) -> FixtureContext:
     base = FIXTURE_CONTEXTS[case.context_ref]
+    directive = _style_directive(case)
     if case.context_size == "S":
-        return dataclasses.replace(
+        ctx = dataclasses.replace(
             base,
             arc_md="## Current scene",
             snapshot="$archiveCode = 7319, $hasKey = false, $gold = 15.",
@@ -280,6 +345,7 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
             parent_prose="The protagonist pauses.",
             inspiration="",
         )
+        return _with_style_directive(ctx, directive)
     repetitions = {"M": 0, "L": 18, "XL": 70}[case.context_size]
     padding = "\n".join(
         f"Background note {index}: district {index % 7} remains unchanged; "
@@ -292,7 +358,7 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
             "\nArchived invalid examples to ignore: **markdown**, "
             "<<set $legacy = 1>>, and setup.legacy."
         )
-    return dataclasses.replace(
+    ctx = dataclasses.replace(
         base,
         arc_md=f"{base.arc_md}\n{padding}{distractor}",
         snapshot=(
@@ -304,6 +370,15 @@ def _sized_context(case: CapabilityCase) -> FixtureContext:
             'conversation opening "We need to discuss the Accord of Glass."; '
             'required closing "Then we have an agreement."'
         ),
+    )
+    return _with_style_directive(ctx, directive)
+
+
+def _with_style_directive(ctx: FixtureContext, directive: str) -> FixtureContext:
+    if not directive:
+        return ctx
+    return dataclasses.replace(
+        ctx, story_points=f"{ctx.story_points} {directive}"
     )
 
 
@@ -350,6 +425,46 @@ def _build_prompt(case: CapabilityCase) -> str:
     return apply_prompt_overlay(
         prompt, variant=case.variant, direction=case.direction_key
     )
+
+
+def _prose_text(parsed: Any, text: str) -> str:
+    """Prefer parsed prose, falling back to the whole answer (plain-text mode)."""
+    return (getattr(parsed, "prose", "") or "").strip() or text
+
+
+def _quoted_speech(prose: str) -> str:
+    return "\n".join(_QUOTED_RE.findall(prose))
+
+
+def _narration_text(prose: str) -> str:
+    """Prose with quoted speech, inner monologue, macros and labels removed."""
+    stripped = _QUOTED_RE.sub(" ", prose)
+    stripped = re.sub(r"//[^/\n]*//", " ", stripped)
+    stripped = re.sub(r"<<[^>]*>>", " ", stripped)
+    lines = []
+    for raw_line in stripped.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("-"):
+            continue
+        if line.rstrip(":").strip().upper() in _SECTION_LABELS:
+            continue
+        line = re.sub(r"^[A-Za-z][A-Za-z0-9 _-]{0,30}:\s*", "", line).strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _term_hits(terms: Iterable[str], haystack: str) -> set[str]:
+    """Terms present in ``haystack``, tolerant of hyphen/space variation."""
+    folded = haystack.casefold()
+    hits = set()
+    for term in terms:
+        pattern = r"[\s-]+".join(
+            re.escape(part) for part in re.split(r"[\s-]+", term.casefold())
+        )
+        if re.search(rf"(?<![\w-]){pattern}(?![\w-])", folded):
+            hits.add(term)
+    return hits
 
 
 def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult:
@@ -440,6 +555,28 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
                     and turns[0][1].strip() == _NEEDLES["conversation_opening"]
                     and turns[-1][1].strip() == _NEEDLES["conversation_closing"]
                 )
+        elif kind == "dialogue_slang":
+            terms = _STYLE_GUIDES[check["name"]]["terms"]
+            spoken = _quoted_speech(_prose_text(parsed, text))
+            ok = len(_term_hits(terms, spoken)) >= check["count"]
+        elif kind == "slang_confined_to_dialogue":
+            terms = _STYLE_GUIDES[check["name"]]["terms"]
+            narration = _narration_text(_prose_text(parsed, text))
+            ok = not _term_hits(terms, narration)
+        elif kind == "banned_register":
+            banned = _STYLE_GUIDES[check["name"]]["banned"]
+            ok = not _term_hits(banned, text)
+        elif kind == "max_sentence_words":
+            narration = _narration_text(_prose_text(parsed, text))
+            sentences = [
+                sentence
+                for sentence in re.split(r"(?<=[.!?])\s+|\n+", narration)
+                if re.search(r"\w", sentence)
+            ]
+            ok = bool(sentences) and all(
+                len(re.findall(r"\b[\w'-]+\b", sentence)) <= check["count"]
+                for sentence in sentences
+            )
         passed += int(ok)
         evidence.append(f"{kind}={'pass' if ok else 'fail'}")
     score = passed / len(case.checks)

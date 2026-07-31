@@ -3,6 +3,7 @@ import json
 import pytest
 
 from model_benchmark.capability_tests import (
+    _STYLE_GUIDES,
     CapabilityCaseError,
     _build_prompt,
     _score_checks,
@@ -38,7 +39,7 @@ def _candidate(**overrides):
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     cases = load_cases(candidate_dir=None)
-    assert len(cases) == 33
+    assert len(cases) == 38
     retrieval = {
         case.context_size
         for case in cases
@@ -305,3 +306,170 @@ Mira Vale and the protagonist reached an agreement.
     assert passed.passed is True
     assert failed.passed is False
     assert "conversation_endpoints" in failed.details
+
+
+def _case(case_id):
+    return next(
+        case
+        for case in load_cases(candidate_dir=None)
+        if case.id == case_id
+    )
+
+
+_STYLE_PASSAGE = """PROSE:
+The netrunner watched the vault pulse.
+Fixer: "Stay chrome-cold and keep the run quiet."
+MC: "I am wired-in already."
+
+CHOICES:
+- Breach the vault | Take the data
+- Report the flaw | Claim the bounty
+
+SUMMARY:
+The netrunner weighed a quiet breach against a bounty.
+"""
+
+
+def test_style_cases_span_variants_and_take_the_voice_guide_from_context():
+    cases = [
+        case for case in load_cases(candidate_dir=None) if "STYLE" in case.id
+    ]
+
+    assert {case.variant for case in cases} == {
+        "compact", "full", "json", "thinking"
+    }
+    assert {case.context_size for case in cases} == {"S", "M", "L", "XL"}
+
+    for case in cases:
+        guides = {
+            check["name"]
+            for check in case.checks
+            if check["check"] in {
+                "dialogue_slang",
+                "slang_confined_to_dialogue",
+                "banned_register",
+            }
+        }
+        assert guides, f"{case.id} has no style guide check"
+        prompt = _build_prompt(case)
+        for guide in guides:
+            for term in _STYLE_GUIDES[guide]["terms"]:
+                # The lexicon is trusted context, never leaked through the task.
+                assert term not in case.task
+                assert term in prompt
+            for word in _STYLE_GUIDES[guide]["banned"]:
+                assert word in prompt
+
+
+def test_dialogue_slang_must_appear_in_speech_and_stay_out_of_narration():
+    case = _case("T2-STYLE-CANT-COMPACT")
+    narration_leak = _STYLE_PASSAGE.replace(
+        "The netrunner watched the vault pulse.",
+        "The netrunner watched the chrome-cold vault pulse.",
+    )
+    plain_speech = _STYLE_PASSAGE.replace(
+        'Fixer: "Stay chrome-cold and keep the run quiet."',
+        'Fixer: "Stay calm and keep the run quiet."',
+    )
+
+    passed = _score_checks(case, _STYLE_PASSAGE, parse_model_output(_STYLE_PASSAGE))
+    leaked = _score_checks(
+        case, narration_leak, parse_model_output(narration_leak)
+    )
+    plain = _score_checks(case, plain_speech, parse_model_output(plain_speech))
+
+    assert passed.passed is True
+    assert leaked.passed is False
+    assert "slang_confined_to_dialogue" in leaked.details
+    assert plain.passed is False
+    assert "dialogue_slang" in plain.details
+
+
+def test_banned_register_words_fail_anywhere_in_the_answer():
+    case = _case("T2-STYLE-CANT-COMPACT")
+    in_dialogue = _STYLE_PASSAGE.replace(
+        'MC: "I am wired-in already."',
+        'MC: "Yeah, I am wired-in already."',
+    )
+    in_summary = _STYLE_PASSAGE.replace(
+        "The netrunner weighed a quiet breach against a bounty.",
+        "The netrunner basically weighed a quiet breach against a bounty.",
+    )
+
+    spoken = _score_checks(case, in_dialogue, parse_model_output(in_dialogue))
+    summarized = _score_checks(case, in_summary, parse_model_output(in_summary))
+
+    assert spoken.passed is False
+    assert "banned_register" in spoken.details
+    assert summarized.passed is False
+    assert "banned_register" in summarized.details
+
+
+def test_max_sentence_words_measures_narration_not_quoted_speech():
+    case = _case("T3-STYLE-TERSE-M")
+    terse = """PROSE:
+The detective leaned in. The lights buzzed.
+Suspect: "I stayed streetwise about the whole thing, detective."
+MC: "Then say it plainly."
+
+CHOICES:
+- Press harder | Push for a confession
+- Let them walk | Follow them home
+
+SUMMARY:
+The detective pressed a nervous suspect.
+"""
+    long_speech = terse.replace(
+        '"I stayed streetwise about the whole thing, detective."',
+        '"I stayed streetwise about the whole thing, detective, and I never '
+        'once looked at the file you keep waving around."',
+    )
+    long_narration = terse.replace(
+        "The detective leaned in. The lights buzzed.",
+        "The detective leaned in across the scarred metal table while the "
+        "fluorescent lights buzzed and the recorder kept turning.",
+    )
+
+    assert _score_checks(case, terse, parse_model_output(terse)).passed is True
+    assert _score_checks(
+        case, long_speech, parse_model_output(long_speech)
+    ).passed is True
+
+    failed = _score_checks(
+        case, long_narration, parse_model_output(long_narration)
+    )
+
+    assert failed.passed is False
+    assert "max_sentence_words" in failed.details
+
+
+def test_style_schema_rejects_unknown_guide_and_oversized_lexicon_count():
+    with pytest.raises(CapabilityCaseError, match="unknown style guide"):
+        validate_case(
+            _candidate(
+                checks=[
+                    {"check": "sections"},
+                    {"check": "dialogue_slang", "name": "pirate", "count": 1},
+                    {"check": "min_choices", "count": 2},
+                ]
+            ),
+            candidate=True,
+            source="candidate",
+        )
+
+    with pytest.raises(CapabilityCaseError, match="dialogue_slang count"):
+        validate_case(
+            _candidate(
+                checks=[
+                    {"check": "sections"},
+                    {
+                        "check": "dialogue_slang",
+                        "name": "street_cant",
+                        "count": len(_STYLE_GUIDES["street_cant"]["terms"]) + 1,
+                    },
+                    {"check": "min_choices", "count": 2},
+                ]
+            ),
+            candidate=True,
+            source="candidate",
+        )
