@@ -84,6 +84,8 @@ paths as needed:
 ```powershell
 New-Item -ItemType Directory -Force C:\ProgramData\HermesBenchmark | Out-Null
 Copy-Item scripts\hermes_benchmark_publish.py C:\ProgramData\HermesBenchmark\
+Copy-Item scripts\hermes_benchmark_task.py C:\ProgramData\HermesBenchmark\
+Copy-Item scripts\hermes_benchmark_trigger.py C:\ProgramData\HermesBenchmark\
 Copy-Item scripts\hermes_benchmark_config.example.json C:\ProgramData\HermesBenchmark\config.json
 notepad C:\ProgramData\HermesBenchmark\config.json
 
@@ -117,11 +119,48 @@ and layout failures in a long back-and-forth exchange.
 
 Create the account and its authorized-key file. Use Windows account-management
 policy appropriate for your machine; the account must not be an administrator.
+
+Windows OpenSSH forced sessions may prevent Git for Windows' nested SSH
+transport from completing even when the same command works in a normal logon.
+The restricted trigger therefore starts an on-demand Scheduled Task. The task
+runs under a fresh `hermes-benchmark` password logon, while the trigger waits
+for an identity-free status file and relays only one of the publisher's four
+allowlisted messages. Task Scheduler's `IgnoreNew` policy, the trigger lock,
+and the publisher's run lock all independently prevent overlapping runs.
+
+Create the task from elevated PowerShell. Task Scheduler stores the account
+credential as an LSA-protected secret; rotate the task credential whenever the
+account password changes.
+
+```powershell
+$taskName = "HermesBenchmarkPublisher"
+$taskUser = "$env:COMPUTERNAME\hermes-benchmark"
+$python = "C:\benchmark\sugarcube-story-harness-for-ollama\.venv\Scripts\python.exe"
+$runner = "C:\ProgramData\HermesBenchmark\hermes_benchmark_task.py"
+$credential = Get-Credential -UserName $taskUser -Message "Scheduled task credential"
+
+$action = New-ScheduledTaskAction -Execute $python -Argument "`"$runner`""
+$settings = New-ScheduledTaskSettingsSet `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit ([TimeSpan]::Zero) `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries
+
+Register-ScheduledTask `
+    -TaskName $taskName `
+    -Action $action `
+    -Settings $settings `
+    -User $taskUser `
+    -Password $credential.GetNetworkCredential().Password `
+    -RunLevel Limited `
+    -Force
+```
+
 Then add this block to `C:\ProgramData\ssh\sshd_config`:
 
 ```text
 Match User hermes-benchmark
-    ForceCommand "C:\benchmark\sugarcube-story-harness-for-ollama\.venv\Scripts\python.exe" "C:\ProgramData\HermesBenchmark\hermes_benchmark_publish.py"
+    ForceCommand "C:\benchmark\sugarcube-story-harness-for-ollama\.venv\Scripts\python.exe" "C:\ProgramData\HermesBenchmark\hermes_benchmark_trigger.py"
     PermitTTY no
     AllowTcpForwarding no
     X11Forwarding no
@@ -147,10 +186,11 @@ The Hermes server triggers the run with:
 ssh -T hermes-benchmark@BENCHMARK_PC run
 ```
 
-`ForceCommand` ignores `run` (and any other requested command). Forwarding and
-PTYs are disabled, so the account cannot tunnel to Ollama or request a shell.
-Also disable password authentication for this dedicated account and install
-only the Hermes trigger key.
+The trigger requires the original SSH command to be exactly `run`; all other
+commands fail closed. Forwarding and PTYs are disabled, so the account cannot
+tunnel to Ollama or request a shell. Also disable SSH password authentication
+for this dedicated account and install only the Hermes trigger key. The local
+account password remains enabled solely for Task Scheduler's batch logon.
 
 ## Install on a Linux benchmark PC
 

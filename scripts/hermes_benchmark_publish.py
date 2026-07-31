@@ -36,8 +36,6 @@ class PublishError(RuntimeError):
 
 
 COMMAND_TIMEOUT_SECONDS = 120
-PROCESS_TREE_TERMINATION_SECONDS = 15
-WINDOWS_CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 
 
 def _load_config(path: Path) -> dict[str, Any]:
@@ -198,79 +196,40 @@ def _run_logged(
     log_handle: Any,
     env: dict[str, str] | None = None,
 ) -> None:
-    process = subprocess.Popen(
-        command,
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-        env=env,
-        creationflags=_git_creation_flags(),
-    )
     try:
-        returncode = process.wait(timeout=COMMAND_TIMEOUT_SECONDS)
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            env=env,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            check=False,
+        )
     except subprocess.TimeoutExpired as exc:
-        _terminate_process_tree(process)
         raise PublishError("command timed out") from exc
-    if returncode:
-        raise PublishError(f"command failed with exit status {returncode}")
+    if completed.returncode:
+        raise PublishError(f"command failed with exit status {completed.returncode}")
 
 
 def _run_captured(command: list[str], *, cwd: Path) -> str:
-    process = subprocess.Popen(
-        command,
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        creationflags=_git_creation_flags(),
-    )
     try:
-        stdout, _stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            check=False,
+        )
     except subprocess.TimeoutExpired as exc:
-        _terminate_process_tree(process)
-        process.communicate()
         raise PublishError("command timed out") from exc
-    if process.returncode:
-        raise PublishError(f"command failed with exit status {process.returncode}")
-    return stdout.strip()
-
-
-def _git_creation_flags() -> int:
-    """Keep Git outside the enclosing Windows OpenSSH job object."""
-    if os.name != "nt":
-        return 0
-    return getattr(
-        subprocess,
-        "CREATE_BREAKAWAY_FROM_JOB",
-        WINDOWS_CREATE_BREAKAWAY_FROM_JOB,
-    )
-
-
-def _terminate_process_tree(process: subprocess.Popen[Any]) -> None:
-    """Stop a timed-out Git command and all helpers it started."""
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        taskkill = Path(os.environ.get("WINDIR", "C:/Windows")) / "System32/taskkill.exe"
-        try:
-            subprocess.run(
-                [str(taskkill), "/PID", str(process.pid), "/T", "/F"],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=PROCESS_TREE_TERMINATION_SECONDS,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            pass
-    if process.poll() is None:
-        process.kill()
-    try:
-        process.wait(timeout=PROCESS_TREE_TERMINATION_SECONDS)
-    except (OSError, subprocess.SubprocessError):
-        pass
+    if completed.returncode:
+        raise PublishError(f"command failed with exit status {completed.returncode}")
+    return completed.stdout.strip()
 
 
 def _update_checkout(
