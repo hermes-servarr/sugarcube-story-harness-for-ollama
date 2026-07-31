@@ -74,6 +74,22 @@ a pass; a response other than exactly `OK` also produces a warning about
 instruction-following or a potentially incorrect model template. Each model is
 unloaded after its probe. `-Validate` must be combined with `-Create`.
 
+Recursive runs keep a resumable status log at:
+
+```text
+C:\models\.ollama-import-status.json
+```
+
+The log is updated after every model and records its source, Ollama name,
+generated Modelfile, fingerprint, outcome, error, and timestamp. Re-running the
+same recursive create command skips unchanged models that previously passed and
+retries failed or changed models. To ignore successful history and recreate
+everything, add `-RebuildAll`:
+
+```powershell
+.\scripts\New-OllamaModelfile.ps1 'C:\models' -Recursive -Create -Validate -RebuildAll
+```
+
 If a folder contains multiple GGUF files, pass the exact GGUF file you want.
 In recursive mode, every GGUF is included and receives a distinct file such as
 `Modelfile.model-q4_k_m`; the script does not overwrite one quantization with

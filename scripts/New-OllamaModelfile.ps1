@@ -15,6 +15,8 @@ param(
 
     [switch] $Recursive,
 
+    [switch] $RebuildAll,
+
     [string] $ModelfileName = 'Modelfile',
 
     [switch] $Force,
@@ -154,6 +156,39 @@ if ($Recursive) {
         throw "No GGUF files or complete Safetensors model/adapter folders were found below '$($rootItem.FullName)'."
     }
 
+    $logPath = Join-Path $rootItem.FullName '.ollama-import-status.json'
+    $statusBySource = @{}
+    if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+        try {
+            $savedStatus = Get-Content -LiteralPath $logPath -Raw | ConvertFrom-Json
+            foreach ($entry in @($savedStatus.models)) {
+                if ($entry.source_path) {
+                    $statusBySource[[string] $entry.source_path.ToLowerInvariant()] = $entry
+                }
+            }
+        } catch {
+            throw "Could not read existing import log '$logPath': $($_.Exception.Message)"
+        }
+    }
+
+    function Save-ImportStatus {
+        $models = @(
+            $statusBySource.Values |
+                Sort-Object source_path
+        )
+        $document = [ordered]@{
+            version = 1
+            root = $rootItem.FullName
+            updated_at = [DateTime]::UtcNow.ToString('o')
+            models = $models
+        }
+        $json = ($document | ConvertTo-Json -Depth 6) + "`n"
+        $temporaryPath = $logPath + '.tmp'
+        $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText($temporaryPath, $json, $utf8WithoutBom)
+        Move-Item -LiteralPath $temporaryPath -Destination $logPath -Force
+    }
+
     $directoryCounts = @{}
     foreach ($target in $targets) {
         $key = $target.Directory.ToLowerInvariant()
@@ -165,6 +200,7 @@ if ($Recursive) {
 
     $rootPath = $rootItem.FullName.TrimEnd('\', '/')
     $processedCount = 0
+    $skippedCount = 0
     $failureCount = 0
     foreach ($target in @($targets | Sort-Object Directory, Label)) {
         $relativeDirectory = $target.Directory.Substring($rootPath.Length).TrimStart('\', '/')
@@ -180,6 +216,49 @@ if ($Recursive) {
             $childModelfileName += '.' + (ConvertTo-OllamaName $target.Label)
         }
 
+        $sourceFiles = if ($target.IsFile) {
+            @(Get-Item -LiteralPath $target.Path)
+        } else {
+            @(
+                Get-ChildItem -LiteralPath $target.Path -File |
+                    Where-Object {
+                        $_.Extension -ieq '.safetensors' -or
+                        $_.Name -ieq 'config.json' -or
+                        $_.Name -ieq 'adapter_config.json'
+                    }
+            )
+        }
+        $sourceSignature = @(
+            $sourceFiles | Sort-Object Name | ForEach-Object {
+                $_.Name + ':' + $_.Length + ':' + $_.LastWriteTimeUtc.Ticks
+            }
+        ) -join '|'
+        $configurationSignature = @(
+            [string] $Base,
+            [string] $SystemPrompt,
+            $(if ($PSBoundParameters.ContainsKey('Temperature')) { [string] $Temperature } else { '' }),
+            $(if ($PSBoundParameters.ContainsKey('NumCtx')) { [string] $NumCtx } else { '' })
+        ) -join '|'
+        $fingerprint = $sourceSignature + '||' + $configurationSignature
+        $sourceKey = $target.Path.ToLowerInvariant()
+        $previous = $statusBySource[$sourceKey]
+        $requiredOutcome = if ($Validate) { 'validated' } elseif ($Create) { 'created' } else { $null }
+        $alreadyPassed = (
+            $requiredOutcome -and
+            -not $RebuildAll -and
+            $previous -and
+            $previous.fingerprint -eq $fingerprint -and
+            (
+                $previous.outcome -eq $requiredOutcome -or
+                ($requiredOutcome -eq 'created' -and $previous.outcome -eq 'validated')
+            )
+        )
+        if ($alreadyPassed) {
+            Write-Host "Skipping $childName; previous $($previous.outcome) result is still current." -ForegroundColor DarkGray
+            $skippedCount++
+            continue
+        }
+
         $childArguments = @{
             Path = $target.Path
             Name = $childName
@@ -190,21 +269,44 @@ if ($Recursive) {
                 $childArguments[$optionName] = $PSBoundParameters[$optionName]
             }
         }
-        if ($Force) { $childArguments.Force = $true }
+        if ($Force -or $previous) { $childArguments.Force = $true }
         if ($Create) { $childArguments.Create = $true }
         if ($Validate) { $childArguments.Validate = $true }
 
         try {
             & $PSCommandPath @childArguments
             $processedCount++
+            $outcome = if ($Validate) { 'validated' } elseif ($Create) { 'created' } else { 'modelfile_created' }
+            $statusBySource[$sourceKey] = [ordered]@{
+                source_path = $target.Path
+                model_name = $childName
+                modelfile_path = Join-Path $target.Directory $childModelfileName
+                fingerprint = $fingerprint
+                outcome = $outcome
+                error = $null
+                updated_at = [DateTime]::UtcNow.ToString('o')
+            }
         } catch {
             $failureCount++
-            Write-Warning "Failed '$($target.Path)': $($_.Exception.Message)"
+            $errorMessage = $_.Exception.Message
+            $statusBySource[$sourceKey] = [ordered]@{
+                source_path = $target.Path
+                model_name = $childName
+                modelfile_path = Join-Path $target.Directory $childModelfileName
+                fingerprint = $fingerprint
+                outcome = 'failed'
+                error = $errorMessage
+                updated_at = [DateTime]::UtcNow.ToString('o')
+            }
+            Write-Warning "Failed '$($target.Path)': $errorMessage"
+        } finally {
+            Save-ImportStatus
         }
     }
 
     Write-Host ''
-    Write-Host "Processed $processedCount model(s) below $($rootItem.FullName)" -ForegroundColor Green
+    Write-Host "Processed: $processedCount; skipped previous successes: $skippedCount; failed: $failureCount" -ForegroundColor Green
+    Write-Host "Status log: $logPath"
     if ($failureCount -gt 0) {
         throw "$failureCount model(s) failed. Review the warnings above."
     }
