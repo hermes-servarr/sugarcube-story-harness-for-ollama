@@ -100,33 +100,6 @@ def _write_status(path: Path, payload: dict[str, Any]) -> None:
             os.unlink(temporary_name)
 
 
-def _task_state(task_name: str) -> int:
-    command = (
-        "$ErrorActionPreference='Stop';"
-        f"$task=Get-ScheduledTask -TaskName '{task_name}' -ErrorAction Stop;"
-        "[Console]::Out.Write([int]$task.State)"
-    )
-    completed = subprocess.run(
-        [
-            "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            command,
-        ],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=20,
-        check=False,
-    )
-    if completed.returncode:
-        raise RuntimeError("could not query scheduled task")
-    return int(completed.stdout.strip())
-
-
 def _start_task(task_name: str) -> None:
     completed = subprocess.run(
         [
@@ -180,32 +153,44 @@ def trigger(
                 print(RUNNING_MESSAGE)
                 return 75
 
-            if _task_state(task_name) in {2, 4}:  # queued or running
-                print(RUNNING_MESSAGE)
-                return 75
-
             request_id = secrets.token_hex(16)
             _write_status(
                 status_path,
                 {"request_id": request_id, "state": "queued"},
             )
-            _start_task(task_name)
+            try:
+                _start_task(task_name)
+            except Exception:
+                _write_status(
+                    status_path,
+                    {
+                        "request_id": request_id,
+                        "state": "failed",
+                        "message": FAILURE_MESSAGE,
+                        "exit_code": 1,
+                    },
+                )
+                raise
             startup_deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
-            observed_running = False
 
             while True:
                 status = _read_status(status_path)
                 if status.get("request_id") == request_id:
                     if status.get("state") in TERMINAL_STATES:
                         return _emit_terminal(status)
-                    observed_running = observed_running or status.get("state") == "running"
+                    if status.get("state") == "running":
+                        startup_deadline = float("inf")
 
-                task_state = _task_state(task_name)
-                if task_state in {2, 4}:
-                    observed_running = True
-                elif task_state == 3 and (
-                    observed_running or time.monotonic() >= startup_deadline
-                ):
+                if time.monotonic() >= startup_deadline:
+                    _write_status(
+                        status_path,
+                        {
+                            "request_id": request_id,
+                            "state": "failed",
+                            "message": FAILURE_MESSAGE,
+                            "exit_code": 1,
+                        },
+                    )
                     print(FAILURE_MESSAGE)
                     return 1
                 time.sleep(POLL_SECONDS)

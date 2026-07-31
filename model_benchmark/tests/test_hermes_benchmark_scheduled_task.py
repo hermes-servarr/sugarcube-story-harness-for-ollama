@@ -76,7 +76,6 @@ def test_trigger_starts_once_and_relays_allowlisted_result(
     status_path = tmp_path / "status.json"
     starts = []
     monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "run")
-    monkeypatch.setattr(trigger, "_task_state", lambda task_name: 3)
 
     def start(task_name):
         starts.append(task_name)
@@ -99,6 +98,28 @@ def test_trigger_starts_once_and_relays_allowlisted_result(
     ) == 0
     assert starts == [trigger.TASK_NAME]
     assert capsys.readouterr().out.strip() == trigger.UNCHANGED_MESSAGE
+
+
+def test_trigger_records_terminal_failure_when_task_start_fails(
+    monkeypatch, tmp_path, capsys
+):
+    status_path = tmp_path / "status.json"
+    monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "run")
+
+    def fail_start(task_name):
+        raise RuntimeError("scheduler unavailable")
+
+    monkeypatch.setattr(trigger, "_start_task", fail_start)
+
+    assert trigger.trigger(
+        status_path=status_path,
+        lock_path=tmp_path / "trigger.lock",
+    ) == 1
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    assert status["state"] == "failed"
+    assert status["message"] == trigger.FAILURE_MESSAGE
+    assert "scheduler unavailable" not in status_path.read_text(encoding="utf-8")
+    assert capsys.readouterr().out.strip() == trigger.FAILURE_MESSAGE
 
 
 def test_trigger_rejects_any_other_remote_command(monkeypatch, tmp_path, capsys):
