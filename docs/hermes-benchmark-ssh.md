@@ -258,6 +258,13 @@ skills:
   write_approval: true
 ```
 
+Install the restricted `sugarcube-benchmark` host entry and its pinned
+`known_hosts` file under `/opt/data/home/.ssh`. The run skill passes
+`-F /opt/data/home/.ssh/config` explicitly: Hermes terminal tools can run with
+`HOME=/opt/data`, so relying on SSH's default `~/.ssh/config` lookup can skip
+the agent's persistent configuration and incorrectly treat the alias as a DNS
+hostname.
+
 Hermes scans external skill directories and exposes each skill as a slash
 command. After reloading Hermes, verify that `run-sugarcube-benchmark` appears
 in `hermes skills list`, then invoke:

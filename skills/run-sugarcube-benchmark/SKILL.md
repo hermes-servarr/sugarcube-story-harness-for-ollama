@@ -13,9 +13,12 @@ the Git pull, single-run lock, benchmark, anonymization, commit, and push.
 1. Run exactly this foreground command with the terminal tool:
 
    ```bash
-   ssh -T -o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=15 sugarcube-benchmark run
+   ssh -F /opt/data/home/.ssh/config -T -o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=15 sugarcube-benchmark run
    ```
 
+   Keep the absolute `-F` path. Hermes tool processes may receive
+   `HOME=/opt/data` even though the agent account's persistent home and SSH
+   configuration are under `/opt/data/home`.
 2. Wait for the command to finish. Allow a long tool timeout because the
    benchmark may take substantial time.
 3. Interpret the result:
