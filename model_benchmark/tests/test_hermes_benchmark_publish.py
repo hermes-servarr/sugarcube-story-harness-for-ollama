@@ -103,6 +103,19 @@ def test_update_checkout_rejects_dirty_tree(monkeypatch, tmp_path):
         )
 
 
+def test_git_environment_uses_protected_repository_ssh_config(monkeypatch):
+    monkeypatch.setenv("GIT_SSH", "untrusted-ssh")
+    monkeypatch.setenv("GIT_SSH_COMMAND", "ssh -o StrictHostKeyChecking=no")
+    monkeypatch.setenv("GIT_SSH_VARIANT", "plink")
+
+    environment = publisher._git_environment()
+
+    assert environment["GIT_TERMINAL_PROMPT"] == "0"
+    assert "GIT_SSH" not in environment
+    assert "GIT_SSH_COMMAND" not in environment
+    assert "GIT_SSH_VARIANT" not in environment
+
+
 def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):
     captured = iter(("", "main", "AA BB CC"))
     logged_commands = []

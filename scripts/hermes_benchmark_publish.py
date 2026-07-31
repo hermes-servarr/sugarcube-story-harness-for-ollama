@@ -381,7 +381,12 @@ def _verify_trusted_commit(
 def _git_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["GIT_TERMINAL_PROMPT"] = "0"
-    environment.setdefault("GIT_SSH_COMMAND", "ssh -oBatchMode=yes")
+    # The protected checkout owns its repository-scoped core.sshCommand,
+    # including the deploy key and pinned known_hosts file. Environment
+    # overrides take precedence over that setting, so remove them instead of
+    # replacing the configured command with a generic SSH invocation.
+    for variable in ("GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT"):
+        environment.pop(variable, None)
     return environment
 
 
