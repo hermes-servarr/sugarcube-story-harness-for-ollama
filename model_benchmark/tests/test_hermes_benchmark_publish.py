@@ -124,13 +124,61 @@ def test_git_environment_uses_protected_repository_ssh_config(monkeypatch):
     ],
 )
 def test_git_helpers_fail_closed_on_timeout(monkeypatch, tmp_path, runner, kwargs):
-    def timeout(*args, **call_kwargs):
-        raise publisher.subprocess.TimeoutExpired(args[0], call_kwargs["timeout"])
+    class TimedOutProcess:
+        pid = 123
+        returncode = None
 
-    monkeypatch.setattr(publisher.subprocess, "run", timeout)
+        def wait(self, timeout=None):
+            raise publisher.subprocess.TimeoutExpired("git", timeout)
+
+        def communicate(self, timeout=None):
+            if timeout is None:
+                return ("", "")
+            raise publisher.subprocess.TimeoutExpired("git", timeout)
+
+    terminated = []
+
+    monkeypatch.setattr(
+        publisher.subprocess,
+        "Popen",
+        lambda *args, **call_kwargs: TimedOutProcess(),
+    )
+    monkeypatch.setattr(
+        publisher,
+        "_terminate_process_tree",
+        lambda process: terminated.append(process.pid),
+    )
 
     with pytest.raises(publisher.PublishError, match="timed out"):
         runner(["git", "status"], cwd=tmp_path, **kwargs)
+
+    assert terminated == [123]
+
+
+def test_git_helpers_request_windows_job_breakaway(monkeypatch, tmp_path):
+    captured = {}
+
+    class CompletedProcess:
+        pid = 123
+        returncode = 0
+
+        def wait(self, timeout=None):
+            return 0
+
+    def popen(*args, **kwargs):
+        captured.update(kwargs)
+        return CompletedProcess()
+
+    monkeypatch.setattr(publisher.subprocess, "Popen", popen)
+    monkeypatch.setattr(publisher, "_git_creation_flags", lambda: 0x01000000)
+
+    publisher._run_logged(
+        ["git", "status"],
+        cwd=tmp_path,
+        log_handle=io.StringIO(),
+    )
+
+    assert captured["creationflags"] == 0x01000000
 
 
 def test_private_progress_file_excludes_identity_fields(tmp_path):
