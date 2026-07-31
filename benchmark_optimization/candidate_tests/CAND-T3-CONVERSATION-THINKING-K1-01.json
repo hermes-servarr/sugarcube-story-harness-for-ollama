@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "CAND-T3-CONVERSATION-THINKING-K1-01",
+  "tier": 3,
+  "context_ref": "scifi",
+  "context_size": "S",
+  "task_complexity": "K1",
+  "distractor_density": "D0",
+  "variant": "thinking",
+  "direction_key": "B",
+  "response_mode": "passage",
+  "output_budget": "standard",
+  "task": "Write a conversation scene with at least 4 dialogue turns between two characters. Follow with the MC's inner monologue. Use this layout inside PROSE: DIALOGUE: with quoted Speaker: lines, then INNER MONOLOGUE: with MC: //thoughts//. Include CHOICES with at least 2 options. Use SugarCube markup, not markdown.",
+  "checks": [
+    {"check": "conversation_layout"},
+    {"check": "min_dialogue_turns", "count": 4},
+    {"check": "mc_inner_monologue"},
+    {"check": "min_choices", "count": 2},
+    {"check": "no_markdown"}
+  ]
+}
