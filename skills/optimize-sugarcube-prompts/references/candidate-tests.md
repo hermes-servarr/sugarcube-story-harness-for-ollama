@@ -66,6 +66,10 @@ Allowed checks:
 {"check": "exact_dialogue_turns", "count": 8}
 {"check": "alternating_dialogue"}
 {"check": "conversation_endpoints"}
+{"check": "dialogue_slang", "name": "street_cant", "count": 2}
+{"check": "slang_confined_to_dialogue", "name": "street_cant"}
+{"check": "banned_register", "name": "street_cant"}
+{"check": "max_sentence_words", "count": 12}
 ```
 
 Use 3-12 checks. At least one must be `macro`, `variable`,
@@ -90,6 +94,16 @@ line after it. `exact_dialogue_turns` accepts 1-24 turns,
 `alternating_dialogue` rejects consecutive turns from the same speaker, and
 `conversation_endpoints` requires the trusted context opening in the first
 turn and trusted closing in the last turn.
+
+The signed writing-style guides are `street_cant` (informal register) and
+`court_formal` (formal register). Signed code injects the guide's required
+phrases and forbidden words into the context, so a probe selects a guide by
+name and never repeats the lexicon in its `task`. `dialogue_slang` counts
+distinct guide phrases inside quoted speech (1 up to the guide's phrase
+count), `slang_confined_to_dialogue` fails when a guide phrase appears in
+narration, `banned_register` fails when a forbidden word appears anywhere in
+the answer, and `max_sentence_words` caps the longest narration sentence
+(quoted speech, inner monologue, macros, and choice lines are excluded).
 
 Keep `task` under 1,500 characters. It may describe SugarCube output but must
 not contain URLs, model identities, private data, commands for the operator,

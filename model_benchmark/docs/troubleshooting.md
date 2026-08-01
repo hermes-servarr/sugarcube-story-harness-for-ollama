@@ -166,6 +166,58 @@ Summary: 4 test(s) → 12 instance(s)
 
 ---
 
+## Models score badly for reasons that are not the model
+
+Before attributing a low score to a model or to a prompt overlay, rule out
+these two run-level confounds. Neither raises an error, and neither is
+currently recorded in the run manifest.
+
+### Bare chat templates
+
+A model imported from a GGUF with no embedded `tokenizer.chat_template` gets
+Ollama's `{{ .Prompt }}` passthrough. The benchmark prompt then reaches it as
+raw text with no role markers, and it will tend to *continue* the prompt
+rather than follow it. The usual signature is fluent prose that ignores the
+requested output structure entirely — no section headers, no required layout
+blocks — while markup-level checks still pass.
+
+Audit the roster before a comparison run:
+
+```powershell
+(Invoke-RestMethod 'http://localhost:11434/api/tags').models |
+  ForEach-Object {
+    $body = @{ model = $_.name } | ConvertTo-Json
+    $t = (Invoke-RestMethod -Method Post -Uri 'http://localhost:11434/api/show' -Body $body -ContentType 'application/json').template
+    [pscustomobject]@{ Name = $_.name; Bare = ($t.Trim() -eq '{{ .Prompt }}') }
+  } | Sort-Object Bare, Name | Format-Table -AutoSize
+```
+
+This matters most across quantizations of one base model: if some quants were
+imported bare and others were not, the comparison conflates quantization with
+template presence. See
+[docs/import-local-ollama-model.md](../../docs/import-local-ollama-model.md).
+
+### Context-window truncation on XL cases
+
+The capability ladder's XL cases build prompts of roughly 14,300 characters
+(~3,570 tokens). With the default `--num-predict 640` a model needs about
+4,200 tokens of context. A model reporting `context_length` of 4096 will
+truncate on every XL case, and the resulting structural failures are
+indistinguishable in the scores from genuine layout failures.
+
+Check `context_length` before including a model in an XL comparison:
+
+```powershell
+(Invoke-RestMethod 'http://localhost:11434/api/tags').models |
+  Select-Object name, @{n='ctx';e={$_.details.context_length}} |
+  Sort-Object ctx
+```
+
+Approximate prompt sizes per tier: S ~1,470 tokens, M ~1,680, L ~2,180,
+XL ~3,570.
+
+---
+
 ## Common errors
 
 ### "Field required (type=missing)"

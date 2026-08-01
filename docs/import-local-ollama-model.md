@@ -3,6 +3,16 @@
 The PowerShell script `scripts/New-OllamaModelfile.ps1` creates a minimal
 `Modelfile` beside a downloaded model and prints the `ollama create` command.
 
+> **Models imported this way are bare by default.** The generated `Modelfile`
+> carries no system prompt and no chat template unless you supply one. A GGUF
+> import inherits whatever `tokenizer.chat_template` is embedded in the GGUF
+> itself; when that metadata is absent, Ollama falls back to a
+> `{{ .Prompt }}` passthrough and the model is driven as a raw completion
+> model with no instruct formatting. This materially changes how a model
+> responds to the harness prompts. See
+> [Check what a model was imported with](#check-what-a-model-was-imported-with)
+> before comparing benchmark results across models.
+
 From PowerShell, run:
 
 ```powershell
@@ -117,3 +127,54 @@ tokenizer_config.json.ollama-backup
 If several `.jinja` files exist, name the default one `chat_template.jinja`.
 External Jinja cannot be attached to a GGUF through a Modelfile; GGUF imports
 use the `tokenizer.chat_template` metadata embedded in the GGUF itself.
+
+## Check what a model was imported with
+
+Provisioning is easy to get inconsistent across a large local roster, and the
+difference is invisible in `ollama list`. Ask the server directly:
+
+```powershell
+$body = @{ model = 'replace-with-model-tag' } | ConvertTo-Json
+$info = Invoke-RestMethod -Method Post -Uri 'http://localhost:11434/api/show' -Body $body -ContentType 'application/json'
+$info.template.Length
+$info.template.Substring(0, [Math]::Min(120, $info.template.Length))
+```
+
+A `template` of exactly `{{ .Prompt }}` (13 characters) means **no chat
+template**: the harness prompt reaches the model as raw text with no
+role markers, and the model will tend to continue the text rather than follow
+the instructions in it.
+
+To audit every installed model at once:
+
+```powershell
+(Invoke-RestMethod 'http://localhost:11434/api/tags').models |
+  ForEach-Object {
+    $body = @{ model = $_.name } | ConvertTo-Json
+    $t = (Invoke-RestMethod -Method Post -Uri 'http://localhost:11434/api/show' -Body $body -ContentType 'application/json').template
+    [pscustomobject]@{ Name = $_.name; TemplateChars = $t.Length; Bare = ($t.Trim() -eq '{{ .Prompt }}') }
+  } | Sort-Object Bare, Name | Format-Table -AutoSize
+```
+
+### Why this matters for the benchmark
+
+A bare-template model and a chat-templated model are not comparable runs. In
+the 2026-08-01 capability run, the bare-template model produced ordinary
+narrative prose that ignored the required `DIALOGUE:` / `INNER MONOLOGUE:`
+layout, which is the expected shape of raw-completion behavior rather than a
+statement about the model's ability. Two failure modes look similar in the
+scores but have different causes:
+
+| Observed | Likely cause |
+|----------|--------------|
+| Well-formed prose that ignores the requested output structure | Bare `{{ .Prompt }}` template; no instruct formatting applied |
+| Prompt analysis or reasoning emitted as passage content | Chat template present; reasoning-style model leaking its analysis into the answer |
+
+Before attributing a benchmark result to a model or to a prompt overlay,
+confirm that the models being compared were imported the same way. This is
+especially important across quantizations of one base model, where a mixed
+roster silently conflates quantization with template presence.
+
+To give a bare GGUF an instruct format, either re-import from a GGUF that
+embeds `tokenizer.chat_template`, or supply a system prompt at import time
+with `-SystemPrompt` so the model receives at least some standing instruction.

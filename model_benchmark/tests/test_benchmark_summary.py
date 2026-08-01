@@ -205,3 +205,58 @@ def test_conversation_layout_reports_failed_signed_checks(tmp_path):
         "mc_inner_monologue": 1,
     }
     assert summary["conversation_layout"]["by_variant"]["full"]["passed"] == 0
+
+
+def test_writing_style_cases_are_summarized_separately(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:T2-STYLE-CANT-COMPACT:compact:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_core",
+                    "subcategory": "compact",
+                    "difficulty": "T2",
+                    "split": "S-K2-D0",
+                    "normalized_score": 0.66,
+                    "status": "FAIL",
+                    "scored_result": {
+                        "category_results": [
+                            {
+                                "name": "capability_observables",
+                                "passed": False,
+                                "evidence": [
+                                    "dialogue_slang=pass",
+                                    "slang_confined_to_dialogue=fail",
+                                    "banned_register=fail",
+                                ],
+                            }
+                        ]
+                    },
+                },
+                {
+                    "test_id": "Model_A:T8-CONVERSATION-XL:full:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_core",
+                    "subcategory": "full",
+                    "difficulty": "T8",
+                    "split": "XL-K3-D1",
+                    "normalized_score": 1.0,
+                    "status": "PASS",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)
+
+    assert summary["writing_style"]["cases"] == 1
+    assert summary["writing_style"]["pass_rate"] == 0.0
+    assert summary["writing_style"]["failed_checks"] == {
+        "slang_confined_to_dialogue": 1,
+        "banned_register": 1,
+    }
+    assert summary["writing_style"]["by_context_profile"]["S-K2-D0"]["cases"] == 1
+    assert summary["conversation_layout"]["cases"] == 1

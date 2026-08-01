@@ -81,19 +81,21 @@ def _plain_text_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _conversation_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    conversation = [
+def _signed_check_summary(
+    records: list[dict[str, Any]], marker: str
+) -> dict[str, Any]:
+    selected = [
         row for row in records
-        if "CONVERSATION" in str(row.get("test_id", "")).upper()
+        if marker in str(row.get("test_id", "")).upper()
     ]
-    grouped = _group(conversation, "dataset")
+    grouped = _group(selected, "dataset")
     aggregate = (
         next(iter(grouped.values()))
         if grouped else
         {"cases": 0, "passed": 0, "pass_rate": 0.0, "mean_score": 0.0}
     )
     failed_checks: Counter[str] = Counter()
-    for row in conversation:
+    for row in selected:
         scored = row.get("scored_result")
         if not isinstance(scored, dict):
             continue
@@ -106,9 +108,17 @@ def _conversation_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         **aggregate,
         "failed_checks": dict(failed_checks.most_common()),
-        "by_variant": _group(conversation, "subcategory"),
-        "by_context_profile": _group(conversation, "split"),
+        "by_variant": _group(selected, "subcategory"),
+        "by_context_profile": _group(selected, "split"),
     }
+
+
+def _conversation_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    return _signed_check_summary(records, "CONVERSATION")
+
+
+def _style_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    return _signed_check_summary(records, "STYLE")
 
 
 def summarize(path: Path) -> dict[str, Any]:
@@ -173,6 +183,7 @@ def summarize(path: Path) -> dict[str, Any]:
         "thinking_variant": _thinking_summary(objective_records),
         "plain_text": _plain_text_summary(objective_records),
         "conversation_layout": _conversation_summary(objective_records),
+        "writing_style": _style_summary(objective_records),
         "candidate_tests": {
             "diagnostic_only": True,
             **(
