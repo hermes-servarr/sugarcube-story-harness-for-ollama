@@ -62,6 +62,7 @@ For the autonomous optimization skill, configure:
   "trusted_code_commit": "FULL_SIGNED_COMMIT_SHA",
   "candidate_paths": [
     "model_benchmark/prompt_overrides.json",
+    "model_benchmark/ingestion_overrides.json",
     "benchmark_anon/results_anonymized.json",
     "benchmark_optimization/**"
   ]
