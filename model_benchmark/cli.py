@@ -33,9 +33,11 @@ Phase 7 — production implementation conforming to P3 (the ``main`` and
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
@@ -1139,6 +1141,7 @@ def _cmd_run(
                 "fail_count": int(event.fail_count),
                 "error_count": int(event.error_count),
                 "timeout_count": int(event.timeout_count),
+                "current_model": str(event.model_alias),
             }
         )
 
@@ -1153,6 +1156,9 @@ def _cmd_run(
         force_rerun=cfg.force_rerun,
         progress_callback=report_matrix_progress,
     )
+
+    benchmark_started_at = datetime.now(timezone.utc)
+    benchmark_started_clock = time.monotonic()
 
     if cfg.dry_run:
         # Fixture dry-run: produces scored records without calling Ollama.
@@ -1170,7 +1176,11 @@ def _cmd_run(
             candidate_dir=Path(getattr(args, "candidate_test_dir"))
         ))
 
-        def report_capability_progress(completed: int, total: int) -> None:
+        def report_capability_progress(
+            completed: int,
+            total: int,
+            current_model: str,
+        ) -> None:
             if progress_callback is None:
                 return
             progress_callback(
@@ -1183,6 +1193,7 @@ def _cmd_run(
                         if total
                         else 100.0
                     ),
+                    "current_model": current_model,
                 }
             )
 
@@ -1193,6 +1204,9 @@ def _cmd_run(
                 progress_callback=report_capability_progress,
             )
         )
+
+    benchmark_completed_at = datetime.now(timezone.utc)
+    benchmark_duration_seconds = time.monotonic() - benchmark_started_clock
 
     if debug:
         _debug_model_io(results)
@@ -1230,6 +1244,9 @@ def _cmd_run(
     manifest = collect_reproducibility_metadata(
         cfg,
         run_id=getattr(runner, "run_id", None),
+        start_timestamp=benchmark_started_at,
+        completion_timestamp=benchmark_completed_at,
+        duration_seconds=benchmark_duration_seconds,
         repeated_runs_count=cfg.runs,
         random_seed=cfg.random_seed,
         argv=sys.argv[1:],

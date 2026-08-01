@@ -145,6 +145,7 @@ def test_private_progress_file_excludes_identity_fields(tmp_path):
             "percent": 35.0,
             "model_alias": "private-model",
             "current_test": "private-model:compact:A:1",
+            "current_model_alias": "not-an-anonymous-alias",
         },
         log_handle=log,
     )
@@ -161,6 +162,36 @@ def test_private_progress_file_excludes_identity_fields(tmp_path):
     assert "current_test" not in progress
     assert "private-model" not in rendered
     assert "private-model" not in log.getvalue()
+
+
+def test_private_progress_file_includes_safe_model_alias_and_runtime(tmp_path):
+    log = io.StringIO()
+
+    publisher._write_private_progress(
+        tmp_path,
+        {
+            "phase": "finalizing",
+            "completed": 1,
+            "total": 1,
+            "percent": 100.0,
+            "elapsed_seconds": 123.5,
+            "eta_seconds": 0.0,
+            "current_model_alias": "Model_AA",
+            "current_model_number": 27,
+            "model_count": 30,
+            "total_run_seconds": 123.5,
+        },
+        log_handle=log,
+    )
+
+    progress = publisher.json.loads(
+        (tmp_path / "progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["current_model_alias"] == "Model_AA"
+    assert progress["current_model_number"] == 27
+    assert progress["model_count"] == 30
+    assert progress["total_run_seconds"] == 123.5
+    assert "model=Model_AA" in log.getvalue()
 
 
 def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):

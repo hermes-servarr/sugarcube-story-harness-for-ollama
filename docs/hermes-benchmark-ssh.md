@@ -363,10 +363,14 @@ Git output, tracebacks, and raw results go only to the root-readable
 internal results are deleted after every attempt.
 
 While a benchmark is active, its private `run-*` directory contains an
-atomically replaced `progress.json`. It reports only the phase, completed and
-total counts, timing, and aggregate status counts; model names and test IDs are
-never written to it. The same identity-free counter is flushed to
-`last-run.log` after every completed matrix or capability case. On Windows,
+atomically replaced `progress.json`. It reports the phase, completed and total
+counts, timing, aggregate status counts, and the current deterministic
+anonymous alias (`Model_A`, `Model_B`, and so on) with its ordinal. Real model
+names and test IDs are never written to it. The same identity-free counter is
+flushed to `last-run.log` after every completed matrix or capability case. At
+the end of benchmark execution the log records
+`benchmark_total_runtime_seconds`, and the finalizing progress snapshot records
+`total_run_seconds`. On Windows,
 an administrator can inspect the newest snapshot without reading raw results:
 
 ```powershell

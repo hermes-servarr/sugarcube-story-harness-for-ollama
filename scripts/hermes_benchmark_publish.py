@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 import urllib.request
 from datetime import datetime, timezone
@@ -502,6 +503,25 @@ def _write_private_progress(
     for key in ("percent", "elapsed_seconds", "eta_seconds"):
         if key in payload:
             progress[key] = float(payload[key])
+    current_model_alias = payload.get("current_model_alias")
+    if (
+        isinstance(current_model_alias, str)
+        and re.fullmatch(r"Model_[A-Z]+", current_model_alias)
+    ):
+        progress["current_model_alias"] = current_model_alias
+        progress["current_model_number"] = max(
+            1,
+            int(payload.get("current_model_number", 1)),
+        )
+        progress["model_count"] = max(
+            progress["current_model_number"],
+            int(payload.get("model_count", 1)),
+        )
+    if "total_run_seconds" in payload:
+        progress["total_run_seconds"] = max(
+            0.0,
+            float(payload["total_run_seconds"]),
+        )
 
     target = run_dir / "progress.json"
     fd, temporary_name = tempfile.mkstemp(
@@ -525,6 +545,10 @@ def _write_private_progress(
         f"phase={progress['phase']} "
         f"completed={progress.get('completed', 0)} "
         f"total={progress.get('total', 0)} "
+        f"model={progress.get('current_model_alias', '-')} "
+        f"model_number={progress.get('current_model_number', 0)}/"
+        f"{progress.get('model_count', 0)} "
+        f"elapsed_seconds={progress.get('elapsed_seconds', 0.0):.3f} "
         f"updated_at={progress['updated_at']}\n"
     )
     log_handle.flush()
@@ -566,6 +590,12 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         ):
             raise PublishError("model_profiles contains an unknown profile")
     terms = _redaction_terms(installed, selected)
+    from model_benchmark.anonymization import _model_alias
+    sorted_models = sorted(set(selected))
+    progress_aliases = {
+        model: (_model_alias(index), index + 1)
+        for index, model in enumerate(sorted_models)
+    }
 
     state_dir = Path(config.get("state_dir", DEFAULT_STATE_DIR)).resolve()
     state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -581,9 +611,17 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         )
 
         def record_progress(payload: dict[str, Any]) -> None:
+            safe_payload = dict(payload)
+            current_model = safe_payload.pop("current_model", None)
+            model_progress = progress_aliases.get(current_model)
+            if model_progress is not None:
+                alias, number = model_progress
+                safe_payload["current_model_alias"] = alias
+                safe_payload["current_model_number"] = number
+                safe_payload["model_count"] = len(sorted_models)
             _write_private_progress(
                 run_dir,
-                payload,
+                safe_payload,
                 log_handle=log_handle,
             )
 
@@ -592,6 +630,7 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         from model_benchmark.cli import main as benchmark_main
 
         previous_cwd = Path.cwd()
+        benchmark_started_clock = time.monotonic()
         try:
             os.chdir(repo)
             with contextlib.redirect_stdout(log_handle), contextlib.redirect_stderr(log_handle):
@@ -604,9 +643,23 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         if exit_code:
             raise PublishError(f"benchmark failed with exit status {exit_code}")
 
+        benchmark_total_seconds = time.monotonic() - benchmark_started_clock
+        log_handle.write(
+            f"benchmark_total_runtime_seconds={benchmark_total_seconds:.3f}\n"
+        )
+        log_handle.flush()
+
         _write_private_progress(
             run_dir,
-            {"phase": "finalizing", "completed": 1, "total": 1},
+            {
+                "phase": "finalizing",
+                "completed": 1,
+                "total": 1,
+                "percent": 100.0,
+                "elapsed_seconds": benchmark_total_seconds,
+                "eta_seconds": 0.0,
+                "total_run_seconds": benchmark_total_seconds,
+            },
             log_handle=log_handle,
         )
         source = _latest_anonymized_result(run_dir)

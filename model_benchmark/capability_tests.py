@@ -601,7 +601,7 @@ def execute_capability_cases(
     cfg: BenchmarkConfig,
     cases: Iterable[CapabilityCase],
     *,
-    progress_callback: Callable[[int, int], None] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> list[Any]:
     case_list = tuple(cases)
     total = len(cfg.models) * len(case_list)
@@ -711,7 +711,7 @@ def execute_capability_cases(
             completed += 1
             if progress_callback is not None:
                 try:
-                    progress_callback(completed, total)
+                    progress_callback(completed, total, model)
                 except Exception:
                     pass
     return records

@@ -184,13 +184,13 @@ The player used the key.
     records = execute_capability_cases(
         cfg,
         [case],
-        progress_callback=lambda completed, total: progress.append(
-            (completed, total)
+        progress_callback=lambda completed, total, model: progress.append(
+            (completed, total, model)
         ),
     )
 
     assert len(records) == 1
-    assert progress == [(1, 1)]
+    assert progress == [(1, 1, "private-model")]
     assert records[0].dataset == "capability_candidate"
     assert records[0].test_id == "private-model:CAND-T0-SET-01:compact:1"
     assert records[0].scored_result.category_results[-1].name == (
