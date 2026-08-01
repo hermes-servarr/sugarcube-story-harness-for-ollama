@@ -25,6 +25,11 @@ Complete no more than five successful benchmark experiments. An experiment count
 5. the newly published anonymized result is pulled and compared with the baseline;
 6. the iteration note records the result and conclusion.
 
+The operator must explicitly state whether this campaign uses the shared
+`optimized` envelope, the shared `story` envelope, or prompt overlays only.
+Never inspect private configuration to determine the mode. Do not perform an
+envelope experiment if modes are mixed or unspecified.
+
 An aborted run does not count as a completed experiment, but any protected-command failure is a campaign stop condition.
 
 verification:
@@ -46,7 +51,8 @@ For every experiment:
    - exact proposed overlay change;
    - expected affected categories;
    - rollback condition.
-5. Make only one narrow prompt-overlay experiment.
+5. Make only one narrow experiment: either a prompt-overlay change or one
+   bounded `optimized`/`story` ingestion-envelope change, never both.
 6. If existing results cannot distinguish competing explanations, optionally add at most one new diagnostic CAND- JSON probe using the signed candidate schema. Record the proposal first in benchmark_optimization/test-proposals.md.
 7. Validate all changed data and run the tests required by /optimize-sugarcube-prompts.
 8. Confirm the changed paths are entirely within the allowed boundaries.
@@ -71,6 +77,18 @@ At campaign completion, report:
 constraints:
 Follow /optimize-sugarcube-prompts and /run-sugarcube-benchmark exactly.
 
+Operator-supplied provisioning assumption: the configured models use bare
+Modelfiles with no added SYSTEM pre-prompt or response-format scaffolding. The
+protected benchmark may apply a signed ingestion profile selected by private
+PC configuration. Treat both provisioning and routing as fixed test
+conditions. Make benchmark instructions self-contained. Never propose or
+apply Modelfile, signed protocol-profile, profile-routing, or Ollama
+configuration changes during this campaign. Hermes may edit the bounded
+plain-text ingestion envelopes only when that is the experiment selected.
+Never infer a profile or family
+from an anonymous alias. If results suggest inconsistent framing, stop for
+operator review instead of querying Ollama.
+
 Run experiments sequentially. Never parallelize benchmark runs, model calls, or optimization experiments. Never start a second benchmark while a managed process or PC-side lock may still own the GPU.
 
 Invoke /run-sugarcube-benchmark at most once per experiment. Never retry after failure, timeout, SSH disconnect, ambiguous state, or an already-running result. A disconnected trigger may still have started a GPU run.
@@ -82,6 +100,7 @@ Never query Ollama, its API, ports, installed models, running model details, pro
 Never read, execute, or expose:
 - scripts/Get-HermesModelMapping.ps1;
 - model-aliases.private.json;
+- ingestion-routing.private.json or any model-to-profile mapping;
 - anonymization mappings;
 - PC-side configuration;
 - private logs;
@@ -113,6 +132,8 @@ Do not modify either Hermes skill while this goal is active.
 boundaries:
 Permitted experiment changes are limited to:
 - model_benchmark/prompt_overrides.json;
+- model_benchmark/ingestion_overrides.json, instead of prompt_overrides.json
+  in an envelope experiment;
 - one new benchmark_optimization/iteration-NN.md per experiment;
 - benchmark_optimization/test-proposals.md;
 - at most one new uniquely named JSON file per experiment under benchmark_optimization/candidate_tests/.
@@ -131,6 +152,11 @@ Never modify:
 - SSH or Scheduled Task configuration;
 - either Hermes skill or its references;
 - private PC-side files.
+
+Never change both override JSON files in one experiment. In an ingestion
+envelope, edit only `user_prefix` or `user_suffix` under exactly one of
+`optimized` or `story`. Never add Jinja, protocol/control tokens, role
+headers, stop sequences, family names, sampling parameters, or routing data.
 
 If progress requires a Python change, new signed check primitive, canonical test change, evaluator change, token-budget change, or trusted-commit update, stop and propose it for operator review instead of implementing it inside the goal.
 

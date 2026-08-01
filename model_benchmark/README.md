@@ -144,6 +144,7 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--timeout` | `120` | Seconds per model call |
 | `--num-predict` | `640` | Max tokens to generate |
 | `--temperature` | `0.2` | Sampling temperature |
+| `--seed` | unset | Non-negative Ollama sampling seed; repetition N uses seed + N |
 | `--runs` | `1` | Runs per model x variant x direction |
 | `--dry-run` | off | Score a fixture response, skip Ollama (CI mode) |
 | `--verbose` | off | Show model/variant/direction/repetition in progress bar |

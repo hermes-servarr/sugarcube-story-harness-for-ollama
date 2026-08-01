@@ -607,7 +607,17 @@ def execute_capability_cases(
     total = len(cfg.models) * len(case_list)
     completed = 0
     records = []
+    from model_benchmark.ingestion_routing import profile_for_model
     for model in cfg.models:
+        ingestion_profile = profile_for_model(
+            model,
+            getattr(cfg, "ingestion_routing_path", ""),
+        )
+        sampling_seed = (
+            int(cfg.random_seed)
+            if getattr(cfg, "random_seed", "")
+            else None
+        )
         for case in case_list:
             prompt = _build_prompt(case)
             configured_cap = _OUTPUT_BUDGETS[case.output_budget]
@@ -635,6 +645,8 @@ def execute_capability_cases(
                     temperature=cfg.temperature,
                     num_predict=case_num_predict,
                     label=f"capability-{case.id}",
+                    ingestion_profile=ingestion_profile,
+                    seed=sampling_seed,
                     **kwargs,
                 )
                 parsed = (

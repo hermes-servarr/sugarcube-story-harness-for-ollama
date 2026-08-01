@@ -12,6 +12,7 @@ import time
 
 import httpx
 
+from .ingestion_profiles import render_ingestion
 from .models import HarnessConfig
 
 
@@ -193,6 +194,8 @@ def _ollama_payload(
     temperature_override: float | None = None,
     num_predict_override: int | None = None,
     format_spec: str | dict | None = None,
+    ingestion_profile: str = "",
+    seed_override: int | None = None,
 ) -> dict:
     profile = model_profile(cfg.ollama_model)
     compact_mode = (
@@ -224,8 +227,22 @@ def _ollama_payload(
             "stop": ["<|endoftext|>", "<|im_end|>", "<|eot_id|>"],
         },
     }
+    selected_ingestion_profile = (
+        ingestion_profile
+        or getattr(cfg, "ingestion_profile", "")
+    )
+    if selected_ingestion_profile:
+        rendered = render_ingestion(selected_ingestion_profile, prompt)
+        payload["prompt"] = rendered.prompt
+        if rendered.raw:
+            payload["raw"] = True
+        for marker in rendered.stop:
+            if marker not in payload["options"]["stop"]:
+                payload["options"]["stop"].append(marker)
     if format_spec is not None:
         payload["format"] = format_spec
+    if seed_override is not None:
+        payload["options"]["seed"] = max(0, int(seed_override))
     return payload
 
 
@@ -238,6 +255,8 @@ async def call_ollama(
     num_predict: int | None = None,
     format_spec: str | dict | None = None,
     label: str = "",
+    ingestion_profile: str = "",
+    seed: int | None = None,
 ) -> str:
     url = f"{cfg.ollama_base_url.rstrip('/')}/api/generate"
     payload = _ollama_payload(
@@ -245,6 +264,8 @@ async def call_ollama(
         temperature_override=temperature,
         num_predict_override=num_predict,
         format_spec=format_spec,
+        ingestion_profile=ingestion_profile,
+        seed_override=seed,
     )
     t0 = time.monotonic()
     try:
@@ -271,6 +292,8 @@ def call_ollama_sync(
     num_predict: int | None = None,
     format_spec: str | dict | None = None,
     label: str = "",
+    ingestion_profile: str = "",
+    seed: int | None = None,
 ) -> str:
     """Sync variant for CLI / non-async callers."""
     url = f"{cfg.ollama_base_url.rstrip('/')}/api/generate"
@@ -279,6 +302,8 @@ def call_ollama_sync(
         temperature_override=temperature,
         num_predict_override=num_predict,
         format_spec=format_spec,
+        ingestion_profile=ingestion_profile,
+        seed_override=seed,
     )
     t0 = time.monotonic()
     try:

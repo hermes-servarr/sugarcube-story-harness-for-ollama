@@ -285,6 +285,7 @@ def test_candidate_mode_rejects_python_change(monkeypatch, tmp_path):
     ("path", "expected"),
     [
         ("model_benchmark/prompt_overrides.json", True),
+        ("model_benchmark/ingestion_overrides.json", True),
         ("benchmark_optimization/iteration-01.md", True),
         ("benchmark_optimization", True),
         ("model_benchmark/scoring.py", False),
@@ -294,6 +295,7 @@ def test_candidate_mode_rejects_python_change(monkeypatch, tmp_path):
 def test_candidate_path_matching(path, expected):
     patterns = [
         "model_benchmark/prompt_overrides.json",
+        "model_benchmark/ingestion_overrides.json",
         "benchmark_optimization/**",
     ]
 
@@ -355,3 +357,29 @@ def test_benchmark_args_enable_capability_ladder(tmp_path):
         "--candidate-test-dir",
         "benchmark_optimization/candidate_tests",
     ]
+
+
+def test_benchmark_args_write_private_ingestion_routing(tmp_path):
+    args = publisher._benchmark_args(
+        {
+            "models": ["private-model"],
+            "model_profiles": {"private-model": "llama3-neutral"},
+        },
+        tmp_path,
+    )
+
+    routing_path = tmp_path / "ingestion-routing.private.json"
+    assert args[-2:] == ["--ingestion-routing", str(routing_path)]
+    assert publisher.json.loads(routing_path.read_text(encoding="utf-8")) == {
+        "schema_version": 1,
+        "model_profiles": {"private-model": "llama3-neutral"},
+    }
+
+
+def test_benchmark_args_forward_sampling_seed(tmp_path):
+    args = publisher._benchmark_args(
+        {"models": ["private-model"], "seed": 42},
+        tmp_path,
+    )
+
+    assert args[-2:] == ["--seed", "42"]

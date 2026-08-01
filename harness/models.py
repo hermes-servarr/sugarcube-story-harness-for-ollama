@@ -413,6 +413,10 @@ class HarnessConfig(BaseModel):
     model_mode: str = "compact"   # auto | standard | compact
     # delimited = legacy PROSE:/CHOICES:/... text; json = strict JSON via Ollama format param
     output_format: str = "delimited"   # delimited | json
+    # Signed request-framing profile. The default preserves the existing
+    # /api/generate behavior; family-specific optimized/story profiles are
+    # explicit operator choices.
+    ingestion_profile: str = "harness-generate-neutral"
     # ── Ollama sampling — tuned for small/medium local models ─────────────────
     temperature: float = 0.7
     repeat_penalty: float = 1.15

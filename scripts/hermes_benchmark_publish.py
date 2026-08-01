@@ -294,6 +294,7 @@ def _update_checkout(
             "candidate_paths",
             [
                 "model_benchmark/prompt_overrides.json",
+                "model_benchmark/ingestion_overrides.json",
                 "benchmark_anon/results_anonymized.json",
                 "benchmark_optimization/**",
             ],
@@ -354,6 +355,8 @@ def _validate_candidate_files(repo: Path, changed_paths: list[str]) -> None:
             "benchmark_anon/results_anonymized.json"
         ) else 262_144
         if normalized == "model_benchmark/prompt_overrides.json":
+            limit = 40_000
+        if normalized == "model_benchmark/ingestion_overrides.json":
             limit = 40_000
         if normalized.startswith("benchmark_optimization/candidate_tests/"):
             if path.suffix.casefold() != ".json":
@@ -444,6 +447,7 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         ("--timeout", "timeout"),
         ("--num-predict", "num_predict"),
         ("--temperature", "temperature"),
+        ("--seed", "seed"),
     ):
         if key in config:
             args.extend([flag, str(config[key])])
@@ -454,6 +458,19 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         candidate_dir = config.get("candidate_test_dir")
         if candidate_dir:
             args.extend(["--candidate-test-dir", str(candidate_dir)])
+    model_profiles = config.get("model_profiles")
+    if model_profiles is not None:
+        routing_path = output_dir / "ingestion-routing.private.json"
+        with routing_path.open("w", encoding="utf-8", newline="\n") as handle:
+            json.dump(
+                {"schema_version": 1, "model_profiles": model_profiles},
+                handle,
+                indent=2,
+                sort_keys=True,
+            )
+            handle.write("\n")
+        os.chmod(routing_path, 0o600)
+        args.extend(["--ingestion-routing", str(routing_path)])
     return args
 
 
@@ -519,6 +536,17 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         raise PublishError("repo_path is not a Git working tree")
     git = str(config.get("git_executable", "git"))
     _update_checkout(config, repo=repo, git=git, log_handle=log_handle)
+    # Resolve benchmark modules from the verified checkout, not from an older
+    # editable-install path or the publisher's installation directory.
+    sys.path.insert(0, str(repo))
+    from harness.ingestion_profiles import (
+        IngestionEnvelopeError,
+        load_ingestion_envelopes,
+    )
+    try:
+        load_ingestion_envelopes()
+    except IngestionEnvelopeError as exc:
+        raise PublishError("invalid ingestion envelope configuration") from exc
 
     base_url = str(config.get("ollama_base_url", "http://127.0.0.1:11434"))
     inventory_timeout = int(config.get("inventory_timeout", 10))
@@ -527,6 +555,16 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
     missing = [model for model in selected if model not in installed]
     if missing:
         raise PublishError("one or more configured models are not installed")
+    model_profiles = config.get("model_profiles")
+    if model_profiles is not None:
+        if not isinstance(model_profiles, dict) or set(model_profiles) != set(selected):
+            raise PublishError("model_profiles must exactly match configured models")
+        from harness.ingestion_profiles import PROFILE_IDS
+        if not all(
+            isinstance(profile, str) and profile in PROFILE_IDS
+            for profile in model_profiles.values()
+        ):
+            raise PublishError("model_profiles contains an unknown profile")
     terms = _redaction_terms(installed, selected)
 
     state_dir = Path(config.get("state_dir", DEFAULT_STATE_DIR)).resolve()
@@ -551,7 +589,6 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
 
         # Import and invoke in this process: model tags never enter argv or the
         # environment, where another unprivileged process might inspect them.
-        sys.path.insert(0, str(repo))
         from model_benchmark.cli import main as benchmark_main
 
         previous_cwd = Path.cwd()

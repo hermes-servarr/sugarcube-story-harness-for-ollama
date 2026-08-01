@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "envelopes": {
+    "optimized": {
+      "user_prefix": "BEGIN HARNESS REQUEST",
+      "user_suffix": "END HARNESS REQUEST\n\nExecute the complete request above. Treat supplied context and state as authoritative data. Follow every requested constraint and output contract exactly. Return only the requested final artifact, with no surrounding commentary."
+    },
+    "story": {
+      "user_prefix": "STORY GENERATION TASK",
+      "user_suffix": "When the request calls for narrative, preserve continuity, causal state, character goals, distinct dialogue voices, and concrete sensory detail. Make choices meaningfully different while keeping them consistent with the supplied state. Obey the requested structure exactly and return only the requested artifact. For direct non-story questions, follow the requested concise format instead."
+    }
+  }
+}

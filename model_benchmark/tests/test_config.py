@@ -18,10 +18,10 @@ from model_benchmark.config import BenchmarkConfig, parse_cli_args, _build_parse
 class TestBenchmarkConfigFields:
     """Test the EXTENDED BenchmarkConfig dataclass per P2 §2 and P3 §1.1."""
 
-    def test_benchmark_config_20_fields(self):
-        """20 fields total (8 required + 12 optional)."""
+    def test_benchmark_config_21_fields(self):
+        """21 fields total (8 required + 13 optional)."""
         fields = list(BenchmarkConfig.__dataclass_fields__)
-        assert len(fields) == 20, f"Expected 20 fields, got {len(fields)}"
+        assert len(fields) == 21, f"Expected 21 fields, got {len(fields)}"
 
     def test_benchmark_config_required_fields(self):
         """8 required fields have no defaults."""
@@ -35,7 +35,8 @@ class TestBenchmarkConfigFields:
         optional = ["dry_run", "output_path", "json_output_path",
                     "checkpoint_every", "checkpoint_interval_seconds",
                     "output_dir", "verbose", "quiet", "anonymize",
-                    "baseline_dir", "random_seed", "force_rerun"]
+                    "baseline_dir", "random_seed", "force_rerun",
+                    "ingestion_routing_path"]
         for name in optional:
             assert name in BenchmarkConfig.__dataclass_fields__
 
@@ -55,6 +56,7 @@ class TestBenchmarkConfigFields:
         assert cfg.baseline_dir == ""
         assert cfg.random_seed == ""
         assert cfg.force_rerun is False
+        assert cfg.ingestion_routing_path == ""
 
     def test_benchmark_config_frozen(self):
         """Dataclass is frozen (immutable)."""
@@ -163,8 +165,8 @@ class TestParseCliArgs:
         assert isinstance(cfg, BenchmarkConfig)
         assert not isinstance(cfg, Namespace)
 
-    def test_parse_cli_args_all_20_fields_populated(self):
-        """All 20 fields populated after parsing."""
+    def test_parse_cli_args_all_21_fields_populated(self):
+        """All 21 fields populated after parsing."""
         cfg = parse_cli_args([])
         field_names = list(BenchmarkConfig.__dataclass_fields__)
         for name in field_names:
@@ -187,6 +189,7 @@ class TestBuildParser:
                     "checkpoint_every", "checkpoint_interval",
                     "output_dir", "verbose", "quiet", "anonymize",
                     "baseline", "seed", "force_rerun"}
+        expected.add("ingestion_routing")
         assert expected.issubset(actions), f"Missing: {expected - actions}"
 
     def test_build_parser_defaults(self):

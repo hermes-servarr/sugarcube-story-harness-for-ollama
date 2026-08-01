@@ -679,6 +679,16 @@ def run_single_model(
     # call_ollama_sync + parse_model_output[_json] directly — never
     # generate_story_output (no auto-repair).
     prompt = build_fixture_prompt(variant, direction)
+    from model_benchmark.ingestion_routing import profile_for_model
+    ingestion_profile = profile_for_model(
+        model,
+        getattr(cfg, "ingestion_routing_path", ""),
+    )
+    sampling_seed = (
+        int(cfg.random_seed) + run_index
+        if getattr(cfg, "random_seed", "")
+        else None
+    )
     harness_cfg = HarnessConfig(
         ollama_model=model,
         ollama_base_url=cfg.base_url,
@@ -693,6 +703,8 @@ def run_single_model(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 format_spec="json", label=f"benchmark-{model}-{variant}-{direction}",
+                ingestion_profile=ingestion_profile,
+                seed=sampling_seed,
             )
             parsed = parse_model_output_json(raw)
         else:
@@ -700,6 +712,8 @@ def run_single_model(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 label=f"benchmark-{model}-{variant}-{direction}",
+                ingestion_profile=ingestion_profile,
+                seed=sampling_seed,
             )
             parsed = parse_model_output(raw)
         elapsed = time.monotonic() - t0

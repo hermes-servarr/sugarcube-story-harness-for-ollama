@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-08-01",
+  "files": {
+    "alpaca.source.json": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    },
+    "gemma.source.jinja": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    },
+    "llama_template.source.json": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    },
+    "mistral_instruct.source.json": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    },
+    "qwen3.source.jinja": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    },
+    "llama3.source.jinja": {
+      "source": "operator-provided-example",
+      "runtime_authoritative": false
+    }
+  }
+}

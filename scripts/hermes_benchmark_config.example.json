@@ -5,6 +5,9 @@
   "models": [
     "replace-with-an-installed-model-tag"
   ],
+  "model_profiles": {
+    "replace-with-an-installed-model-tag": "harness-generate-neutral"
+  },
   "ollama_base_url": "http://127.0.0.1:11434",
   "publish_path": "benchmark_anon/results_anonymized.json",
   "git_remote": "origin",
@@ -17,6 +20,7 @@
   "trusted_code_commit": "REPLACE_WITH_SIGNED_TRUSTED_COMMIT_SHA",
   "candidate_paths": [
     "model_benchmark/prompt_overrides.json",
+    "model_benchmark/ingestion_overrides.json",
     "benchmark_anon/results_anonymized.json",
     "benchmark_optimization/**"
   ],
@@ -29,5 +33,6 @@
   "runs": 1,
   "timeout": 120,
   "num_predict": 640,
-  "temperature": 0.2
+  "temperature": 0.2,
+  "seed": 42
 }

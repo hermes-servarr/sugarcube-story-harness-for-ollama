@@ -1,9 +1,9 @@
 """CLI configuration for the model benchmark.
 
-This module is the **home** of the extended :class:`BenchmarkConfig` (with 9
-new fields per P2 §2) and the :func:`parse_cli_args` interface (P3 §1.2).
+This module is the home of the extended :class:`BenchmarkConfig` and the
+:func:`parse_cli_args` interface.
 
-The extended ``BenchmarkConfig`` (20 fields = 8 required + 12 optional) is the
+The extended ``BenchmarkConfig`` is the
 canonical run configuration type.  The original 11-field ``BenchmarkConfig``
 that lives in ``scoring.py`` is replaced by a re-export from this module, and
 the ``benchmark.py`` compatibility shim re-exports from here (P2 §5 migration
@@ -29,8 +29,8 @@ if TYPE_CHECKING:
 class BenchmarkConfig:
     """Run configuration — one CLI invocation's parameters.
 
-    Extends the original 11-field BenchmarkConfig (from scoring.py) with 9 new
-    fields for checkpoint cadence, output directory, verbosity, anonymization,
+    Extends the original BenchmarkConfig with operational fields for
+    checkpoint cadence, output directory, verbosity, anonymization,
     baseline comparison, random seed, and force-rerun control. All new fields
     are defaulted for backward compatibility.
     """
@@ -48,7 +48,7 @@ class BenchmarkConfig:
     output_path: str = ""
     json_output_path: str = ""
 
-    # ── New fields (9, all defaulted for backward compat) ──────────────────
+    # ── Operational fields, all defaulted for backward compatibility ───────
     checkpoint_every: int = 10
     """Persist a checkpoint after this many completed cases (default 10)."""
 
@@ -75,6 +75,9 @@ class BenchmarkConfig:
 
     force_rerun: bool = False
     """Ignore any existing checkpoint and recompute every case."""
+
+    ingestion_routing_path: str = ""
+    """PC-private model-to-profile routing JSON (empty = legacy behavior)."""
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -122,6 +125,8 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Explicit random seed for reproducibility")
     parser.add_argument("--force-rerun", action="store_true",
                         help="Ignore existing checkpoint and recompute every case")
+    parser.add_argument("--ingestion-routing", default="",
+                        help=argparse.SUPPRESS)
 
     return parser
 
@@ -152,4 +157,5 @@ def parse_cli_args(argv: list[str] | None = None) -> BenchmarkConfig:
         baseline_dir=args.baseline,
         random_seed=args.seed,
         force_rerun=args.force_rerun,
+        ingestion_routing_path=args.ingestion_routing,
     )

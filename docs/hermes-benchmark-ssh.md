@@ -217,6 +217,102 @@ environment (run `uv sync` in that clone first), change the example's Windows
 paths to Linux paths, and set `git_executable` to the Git binary. Configure
 non-interactive Git pull/push credentials for root in the dedicated clone.
 
+## Configure signed ingestion profiles
+
+Bare Modelfiles can be benchmarked with deterministic request framing without
+changing the models themselves. Add a private `model_profiles` object to the
+PC-side `config.json`. Its keys must exactly equal the `models` array. The
+mapping remains in the protected state directory and is not included in the
+published anonymized result.
+
+Available signed profile IDs are:
+
+| Profile | Request framing |
+| --- | --- |
+| `harness-generate-neutral` | Recommended production-like baseline: unchanged complete prompt through `/api/generate`, with the model's effective Ollama template active |
+| `ollama-native` | Let Ollama use the model's effective template |
+| `neutral-raw` | Send the benchmark prompt unchanged with `raw: true` |
+| `alpaca-neutral` | Neutral `Instruction` / `Response` headings |
+| `llama2-chat-neutral` | Llama 2 Chat `[INST]` framing without a system pre-prompt |
+| `llama3-neutral` | Llama 3 user/assistant header tokens |
+| `gemma-instruct-neutral` | Gemma user/model turn tokens; no system role |
+| `mistral-neutral` | Mistral `[INST] ... [/INST]` framing |
+| `qwen3-thinking` | Qwen3/Qwen3.6 ChatML with thinking permitted |
+| `qwen3-nonthinking` | Qwen3/Qwen3.6 ChatML with an empty completed think block |
+| `deepseek-r1-thinking` | DeepSeek-R1 user/assistant tokens and think prefix |
+
+Each mapped family also has three explicit modes. Replace the existing
+`-neutral` suffix (or append the mode to the family base) as follows:
+
+- `-official`: exact signed single-turn family framing with no semantic
+  envelope, for protocol verification;
+- `-optimized`: official framing plus the shared bounded `optimized` envelope;
+- `-story`: official framing plus the shared bounded `story` envelope.
+
+Examples are `llama3-official`, `llama3-optimized`, `llama3-story`,
+`qwen3-thinking-official`, `qwen3-thinking-optimized`, and
+`qwen3-thinking-story`. The corresponding forms exist for
+`harness-generate`, `alpaca`, `llama2-chat`, `gemma-instruct`, `mistral`,
+`qwen3-nonthinking`, and `deepseek-r1-thinking`. Existing `-neutral` IDs remain
+compatible aliases for the official single-turn forms.
+
+Example shape (use the actual private model tags only in the PC-side file):
+
+```json
+{
+  "models": ["first-private-tag", "second-private-tag"],
+  "model_profiles": {
+    "first-private-tag": "llama3-neutral",
+    "second-private-tag": "qwen3-thinking"
+  }
+}
+```
+
+Profile definitions are closed, signed code. Hermes may optimize the
+declarative benchmark prompt overlay, but it must not read or change this
+mapping or the signed framing.
+
+Use `harness-generate-neutral` as the general comparison profile when the goal
+is to predict behavior in the normal story harness. Keep family-specific and
+raw profiles as separate diagnostic experiments; do not combine their scores
+with the production-like baseline.
+
+Hermes may edit only the plain-text `optimized` and `story` envelope content
+in `model_benchmark/ingestion_overrides.json`. The signed loader rejects
+Jinja, special tokens, role markers, stop sequences, and oversized fragments.
+Protocol framing and private model routing therefore remain operator-owned.
+
+## Sampling policy
+
+The protected benchmark uses one sampling policy across template comparisons
+so a template change is not confounded with a temperature change. The example
+configuration sets temperature `0.2` and seed `42`; the seed is sent to Ollama,
+and repetitions derive subsequent seeds by adding their zero-based run index.
+With the current compact benchmark configuration, `0.2` remains below every
+model-profile temperature cap and is therefore the effective temperature.
+Top-k, top-p, and repeat penalty still come from the harness's small/medium/
+large runtime profiles (`30/0.88`, `40/0.90`, or `50/0.92` for top-k/top-p),
+so they remain constant for a given model across template experiments but are
+not identical across all models.
+
+This is a comparison policy, not every family's vendor-recommended generation
+policy. Qwen3 recommends temperature `0.6`, top-p `0.95`, and top-k `20` for
+thinking, while its non-thinking recommendation differs. DeepSeek-R1's
+published generation configuration also uses temperature `0.6` and top-p
+`0.95`. Evaluate such settings in a separate sampling campaign after choosing
+a template; never change sampling and template text in the same experiment.
+
+The Hermes optimization loop performs inference-time prompt/template search.
+It does not train, fine-tune, or update model weights. Temperature controls the
+randomness of generated benchmark responses only.
+
+The normal story harness exposes the same signed selection as
+`HarnessConfig.ingestion_profile`. Its default is
+`harness-generate-neutral`, which preserves existing `/api/generate` behavior.
+After an optimized or story profile wins a protected benchmark and receives
+operator approval, set the live project's profile to the corresponding signed
+ID so benchmark and production requests use the same framing and envelope.
+
 Create a password-locked account. It needs a real shell because `sshd` uses
 the account shell to launch forced commands; the key restriction below is what
 prevents interactive shell access.

@@ -473,6 +473,11 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help="Model tags to test (empty=auto-discover).",
     )
     p_run.add_argument(
+        "--ingestion-routing",
+        default="",
+        help=argparse.SUPPRESS,
+    )
+    p_run.add_argument(
         "--variants",
         nargs="*",
         choices=["compact", "full", "json", "thinking"],
@@ -1089,6 +1094,35 @@ def _cmd_run(
         cfg = parse_cli_args(legacy_argv)
     except SystemExit as e:
         return int(e.code) if isinstance(e.code, int) else 1
+    if cfg.random_seed:
+        try:
+            if int(cfg.random_seed) < 0:
+                raise ValueError
+        except ValueError:
+            if not quiet:
+                sys.stderr.write("Seed must be a non-negative integer.\n")
+            return 2
+    from harness.ingestion_profiles import (
+        IngestionEnvelopeError,
+        load_ingestion_envelopes,
+    )
+    try:
+        load_ingestion_envelopes()
+    except IngestionEnvelopeError as exc:
+        if not quiet:
+            sys.stderr.write(f"Invalid ingestion envelopes: {exc}\n")
+        return 2
+    if cfg.ingestion_routing_path:
+        from model_benchmark.ingestion_routing import load_ingestion_routing
+        try:
+            load_ingestion_routing(
+                cfg.ingestion_routing_path,
+                expected_models=cfg.models,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            if not quiet:
+                sys.stderr.write(f"Invalid private ingestion routing: {exc}\n")
+            return 2
 
     def report_matrix_progress(event: Any) -> None:
         if progress_callback is None:
@@ -1306,6 +1340,9 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
     models = getattr(args, "models", []) or []
     if models:
         out += ["--models", *models]
+    ingestion_routing = getattr(args, "ingestion_routing", "") or ""
+    if ingestion_routing:
+        out += ["--ingestion-routing", ingestion_routing]
     variants = getattr(args, "variants", []) or []
     if variants:
         out += ["--variants", *variants]
