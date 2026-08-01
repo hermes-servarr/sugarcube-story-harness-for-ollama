@@ -151,8 +151,99 @@ variant suffixes empty) if:
 
 ## After Metrics
 
-(Pending benchmark run)
+Benchmark completed and anonymized results were pushed. Run duration ~170 minutes.
+
+### Aggregate
+
+| Metric    | Exp02 (best) | Exp03   | Delta |
+|-----------|-------------|---------|-------|
+| Cases     | 1330         | 1330    | 0     |
+| Passed    | 308          | 301     | -7    |
+| Pass rate | 0.2316       | 0.2263  | -0.53pp |
+| Mean score| 0.6874       | 0.6859  | -0.0015 |
+
+### By Variant
+
+| Variant    | Exp02 pass | Exp03 pass | Delta |
+|------------|------------|------------|-------|
+| compact    | 89/285     | 79/285     | -10 (REGRESSION) |
+| full       | 16/456     | 10/456     | -6 (REGRESSION) |
+| json       | 93/190     | 99/190     | +6    |
+| plain_text | 101/152    | 101/152    | 0     |
+| thinking   | 9/247      | 12/247     | +3    |
+
+### By Model Alias (deltas from Exp02)
+
+| Alias    | Exp02 | Exp03 | Delta |
+|----------|-------|-------|-------|
+| Model_A  | 9     | 13    | +4    |
+| Model_B  | 15    | 15    | 0     |
+| Model_C  | 10    | 11    | +1    |
+| Model_D  | 23    | 24    | +1    |
+| Model_E  | 28    | 28    | 0     |
+| Model_F  | 22    | 22    | 0     |
+| Model_G  | 30    | 26    | -4 (REGRESSION) |
+| Model_H  | 25    | 25    | 0     |
+| Model_I  | 17    | 20    | +3    |
+| Model_J  | 26    | 22    | -4 (REGRESSION) |
+| Model_K  | 24    | 21    | -3 (REGRESSION) |
+| Model_L  | 24    | 23    | -1    |
+| Model_M  | 27    | 20    | -7 (REGRESSION) |
+| Model_S  | 16    | 18    | +2    |
+
+### Conversation Layout
+
+| Metric           | Exp02 | Exp03 |
+|------------------|-------|-------|
+| Passed            | 8/209 | 3/209 |
+| compact          | 5/19  | 1/19  |
+| thinking         | 3/57  | 2/57  |
+
+### Thinking Variant
+
+| Metric           | Exp02 | Exp03 |
+|------------------|-------|-------|
+| Passed            | 9/247 | 12/247 |
+| passage_structure | 150   | 153   |
+| thinking_quality  | 0     | 1     |
 
 ## Conclusion
 
-(Pending)
+Experiment 03 regressed the aggregate from 308 (23.16%) to 301 (22.63%), a
+decline of 7 passes (-0.53pp). The variant-split hypothesis was partially
+correct for json (+6, recovering toward baseline 104) and thinking (+3), but
+the compact variant dropped 10 passes (89->79) and the full variant dropped 6
+more (16->10, now well below the baseline of 24). Conversation layout also
+dropped from 8 to 3.
+
+The compact regression suggests that moving the markup instructions from
+global_suffix to the compact variant suffix changed how the instructions
+interact with the variant's prompt framework. The global_suffix position
+applies the instructions in a different context than the variant suffix,
+and the compact variant may depend on the global context for formatting
+guidance more than expected.
+
+Per-alias regressions: Model_G (-4), Model_J (-4), Model_K (-3), Model_M (-7).
+Model_M's -7 is material. The overlay is reverted to the Experiment 02
+configuration (all instructions in global_suffix, all variant suffixes empty),
+which was the verified best at 308/1330 (23.16%).
+
+No additional GPU run is needed for the byte-for-byte restored overlay.
+
+## Rollback
+
+Reverted to Experiment 02 overlay: all formatting instructions in
+global_suffix, all variant suffixes empty. Validated with json.tool and
+pytest (53 passed). Committed and pushed.
+
+## Next Decision
+
+The campaign has completed 2 experiments (Exp02 improved, Exp03 regressed and
+was reverted). The best aggregate is 308/1330 (23.16%). Target is 26.50%.
+
+Next experiment should target the full variant (456 cases, 3.51% pass in Exp02),
+which is the largest case count and the worst non-thinking pass rate. The full
+variant may need SugarCube-specific markup guidance that does not conflict
+with its format expectations. A full-variant-specific suffix that adds only
+the passage section names (without the conversation layout) could help full
+without hurting compact (which uses global_suffix) or json.
