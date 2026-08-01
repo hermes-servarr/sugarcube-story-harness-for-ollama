@@ -625,44 +625,13 @@ _DIRECTION_PROMPTS = {
 
 
 def build_fixture_prompt(variant: PromptVariant, direction: DirectionKey) -> str:
-    """Build a fixed-context prompt for the given variant using the real build_*_passage_prompt builder."""
-    # INV-3: delegates to the real harness.prompts builders — no inline prompt text.
-    human_prompt = _DIRECTION_PROMPTS[direction]
-    if variant == "compact":
-        return build_compact_passage_prompt(
-            premise=_FIXTURE_PREMISE,
-            story_points=_FIXTURE_STORY_POINTS,
-            arc_notes=_FIXTURE_ARC_MD,
-            entities_text=_FIXTURE_ENTITIES,
-            parent_prose=_FIXTURE_PARENT_PROSE,
-            snapshot_text=_FIXTURE_SNAPSHOT,
-            human_prompt=human_prompt,
-        )
-    elif variant == "full":
-        return build_full_passage_prompt(
-            premise=_FIXTURE_PREMISE,
-            story_points=_FIXTURE_STORY_POINTS,
-            arc_md=_FIXTURE_ARC_MD,
-            snapshot_text=_FIXTURE_SNAPSHOT,
-            entities_text=_FIXTURE_ENTITIES,
-            inspiration=_FIXTURE_INSPIRATION,
-            parent_prose=_FIXTURE_PARENT_PROSE,
-            human_prompt=human_prompt,
-            mode=_FIXTURE_MODE,
-        )
-    elif variant == "json":
-        return build_json_passage_prompt(
-            premise=_FIXTURE_PREMISE,
-            story_points=_FIXTURE_STORY_POINTS,
-            arc_md=_FIXTURE_ARC_MD,
-            snapshot_text=_FIXTURE_SNAPSHOT,
-            entities_text=_FIXTURE_ENTITIES,
-            inspiration=_FIXTURE_INSPIRATION,
-            parent_prose=_FIXTURE_PARENT_PROSE,
-            human_prompt=human_prompt,
-            mode=_FIXTURE_MODE,
-        )
-    raise ValueError(f"Unknown variant: {variant}")
+    """Delegate to the canonical A-H, four-variant fixture implementation."""
+    # Keeping a second implementation here caused the expanded D-H and
+    # thinking matrix to fail before Ollama was called and bypassed the prompt
+    # overlay. The compatibility surface now delegates to the canonical home.
+    from model_benchmark.fixtures import build_fixture_prompt as build_canonical
+
+    return build_canonical(variant, direction)
 
 
 # ── P3 Model Interaction ────────────────────────────────────────────────

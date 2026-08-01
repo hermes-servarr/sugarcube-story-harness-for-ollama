@@ -326,9 +326,15 @@ class TestBuildFixturePrompt:
         assert "gold" in prompt.lower()
 
     def test_all_directions_compact(self):
-        for d in ("A", "B", "C"):
+        for d in "ABCDEFGH":
             prompt = build_fixture_prompt("compact", d)
             assert len(prompt) > 100
+
+    def test_all_matrix_variants_and_directions_build(self):
+        for variant in ("compact", "full", "json", "thinking"):
+            for direction in "ABCDEFGH":
+                prompt = build_fixture_prompt(variant, direction)
+                assert len(prompt) > 100
 
     def test_uses_real_builders(self):
         # INV-3: must use real build_*_passage_prompt functions.
@@ -558,12 +564,12 @@ class TestInvariants:
         assert hasattr(harness.prompts, "build_compact_passage_prompt")
         assert hasattr(harness.prompts, "build_full_passage_prompt")
         assert hasattr(harness.prompts, "build_json_passage_prompt")
-        # Verify build_fixture_prompt imports and calls them (source contains the calls)
+        # The compatibility module must delegate to the canonical fixture
+        # implementation rather than maintaining a second partial matrix.
         import model_benchmark.benchmark as benchmark
         source = inspect.getsource(benchmark.build_fixture_prompt)
-        assert "build_compact_passage_prompt(" in source
-        assert "build_full_passage_prompt(" in source
-        assert "build_json_passage_prompt(" in source
+        assert "model_benchmark.fixtures" in source
+        assert "build_canonical(variant, direction)" in source
 
     # ── INV-4: PROMPT_VERSION Traceability ────────────────────────────────
     def test_inv4_prompt_version_from_live_import(self):
