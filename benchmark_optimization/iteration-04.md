@@ -81,8 +81,32 @@ Revert variants.full to empty string if:
 
 ## After Metrics
 
-(Pending benchmark run)
+Benchmark process exited with code 255 (SSH disconnect) and no output after
+approximately 50 minutes of running. The protected command did not complete
+successfully. Per stop condition #5 (SSH disconnect), the campaign is halted.
+
+No benchmark results were published. The full-variant suffix experiment was
+not validated.
 
 ## Conclusion
 
-(Pending)
+Experiment 04 was aborted at step 10 (benchmark invocation). The SSH
+connection to the benchmark PC disconnected (exit code 255, no output). This
+is stop condition #5: "/run-sugarcube-benchmark reports failure, timeout,
+SSH disconnect, ambiguous state, or any non-success result."
+
+The overlay has been reverted to the Experiment 02 verified best (all
+instructions in global_suffix, all variant suffixes empty). No additional GPU
+run is needed for the byte-for-byte restored overlay.
+
+## Rollback
+
+Reverted variants.full to empty string. Validated with json.tool and pytest
+(53 passed). Committed and pushed.
+
+## Operator Action Required
+
+1. Verify the benchmark PC is reachable and the SSH connection is stable.
+2. Verify no GPU run is still active on the PC from the disconnected session.
+3. Re-issue the /goal command to resume the campaign after the SSH issue
+   is resolved.
