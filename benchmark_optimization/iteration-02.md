@@ -189,8 +189,93 @@ Revert global_suffix to empty string if:
 
 ## After Metrics
 
-(Pending benchmark run)
+Benchmark completed and anonymized results were pushed. Run duration ~163 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 1330    | 1330    | 0     |
+| Passed    | 286     | 308     | +22   |
+| Pass rate | 0.2150  | 0.2316  | +1.66pp |
+| Mean score| 0.6813  | 0.6874  | +0.0061 |
+
+### By Variant
+
+| Variant    | Before pass | After pass | Before rate | After rate | Delta |
+|------------|-------------|------------|-------------|------------|-------|
+| compact    | 54/285      | 89/285     | 0.1895      | 0.3123     | +35   |
+| full       | 24/456      | 16/456     | 0.0526      | 0.0351     | -8 (REGRESSION) |
+| json       | 104/190     | 93/190     | 0.5474      | 0.4895     | -11 (REGRESSION) |
+| plain_text | 101/152     | 101/152    | 0.6645      | 0.6645     | 0     |
+| thinking   | 3/247       | 9/247      | 0.0121      | 0.0364     | +6    |
+
+### By Model Alias (regressions only)
+
+| Alias    | Before pass | After pass | Before rate | After rate | Delta |
+|----------|-------------|------------|-------------|------------|-------|
+| Model_A  | 15/70       | 9/70       | 0.2143      | 0.1286     | -6    |
+| Model_B  | 23/70       | 15/70      | 0.3286      | 0.2143     | -8    |
+| Model_C  | 15/70       | 10/70      | 0.2143      | 0.1429     | -5    |
+| Model_K  | 25/70       | 24/70      | 0.3571      | 0.3429     | -1    |
+| Model_S  | 18/70       | 16/70      | 0.2571      | 0.2286     | -2    |
+
+### Conversation Layout
+
+| Metric           | Before | After  |
+|------------------|--------|--------|
+| Cases/Passed     | 0/209  | 8/209  |
+| Pass rate        | 0.0%   | 3.83%  |
+| compact          | 0/19   | 5/19   |
+| full             | 0/114  | 0/114  |
+| json             | 0/19   | 0/19   |
+| thinking         | 0/57   | 3/57   |
+| mc_inner_monologue | 191  | 163    |
+| conversation_layout | 162  | 90     |
+| min_dialogue_turns  | 139  | 110    |
+
+### Writing Style
+
+| Metric           | Before | After  |
+|------------------|--------|--------|
+| Cases/Passed     | 2/95   | 2/95   |
+| Pass rate        | 2.11%  | 2.11%  |
+
+### Thinking Variant
+
+| Metric           | Before | After  |
+|------------------|--------|--------|
+| Cases/Passed     | 3/247  | 9/247  |
+| Pass rate        | 1.21%  | 3.64%  |
+| passage_structure | 130   | 150    |
+| markup_compliance | 192   | 167    |
+| thinking_quality  | 1     | 0      |
+
+### Context-Window Diagnostic
+
+Not present in this run (0 cases). Previous run had 133 diagnostic cases.
 
 ## Conclusion
 
-(Pending)
+The aggregate objective pass rate improved by 1.66 absolute pp (21.50% -> 23.16%).
+The improvement is concentrated in the compact variant (+35 passes, 18.95% -> 31.23%)
+and the thinking variant (+6 passes, 1.21% -> 3.64%). Conversation layout improved
+from 0% to 3.83% (8 passes), entirely in compact (5) and thinking (3).
+
+However, the experiment introduced regressions:
+- **json variant**: -11 passes (54.74% -> 48.95%). The SugarCube markup and passage-
+  section instructions in global_suffix likely conflict with JSON output formatting
+  expectations. JSON variant models may interpret the "===CHOICES=== etc." instructions
+  as overriding the JSON structure.
+- **full variant**: -8 passes (5.26% -> 3.51%). The global_suffix may add conflicting
+  formatting instructions that interfere with the full variant's existing behavior.
+- **Per-alias**: Model_A (-6), Model_B (-8), Model_C (-5), Model_S (-2) regressed.
+
+The overlay is retained because the aggregate improved. The next experiment should
+move the SugarCube markup and passage-structure instructions from global_suffix to
+variant-specific suffixes for compact and thinking only, keeping only the conversation
+layout guidance in global_suffix. This should recover the json and full regressions
+while preserving the compact and thinking gains.
+
+No stop condition has fired. Target (26.50%) not yet reached. Best aggregate so far:
+23.16%. Campaign continues.
