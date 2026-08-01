@@ -518,7 +518,7 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         "--context-window-sizes",
         nargs="+",
         type=int,
-        default=[2048, 4096, 8192, 16384, 32768],
+        default=[2048, 4096, 8192, 16384, 32768, 65536, 131072],
         help="Signed num_ctx levels for the diagnostic context sweep.",
     )
     p_run.add_argument(

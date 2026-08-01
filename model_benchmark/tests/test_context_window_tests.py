@@ -27,15 +27,19 @@ def test_context_ladder_is_bounded_sorted_and_prompt_grows():
     assert validate_context_sizes([2048, 4096, 8192]) == (2048, 4096, 8192)
     with pytest.raises(ValueError, match="sorted and unique"):
         validate_context_sizes([4096, 2048])
+    assert validate_context_sizes([65536, 131072]) == (65536, 131072)
     with pytest.raises(ValueError, match="outside the signed ladder"):
-        validate_context_sizes([131072])
+        validate_context_sizes([262144])
 
     small = build_context_probe_prompt(2048)
     large = build_context_probe_prompt(8192)
+    maximum = build_context_probe_prompt(131072)
     assert len(small) < len(large)
+    assert len(large) < len(maximum)
     for marker in ("EMBER-271", "GLASS-593", "HARBOR-847"):
         assert marker in small
         assert marker in large
+        assert marker in maximum
 
 
 def test_context_probe_records_acceptance_retrieval_tokens_and_progress(monkeypatch):

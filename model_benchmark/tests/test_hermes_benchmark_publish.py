@@ -422,7 +422,7 @@ def test_benchmark_args_enable_bounded_context_window_ladder(tmp_path):
             {
                 "models": ["private-model"],
                 "context_window_tests": True,
-                "context_window_sizes": [131072],
+                "context_window_sizes": [262144],
             },
             tmp_path,
         )

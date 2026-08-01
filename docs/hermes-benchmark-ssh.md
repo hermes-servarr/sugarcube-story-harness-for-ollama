@@ -314,15 +314,16 @@ The protected benchmark can run a separate, non-objective context sweep:
 ```json
 {
   "context_window_tests": true,
-  "context_window_sizes": [2048, 4096, 8192, 16384, 32768]
+  "context_window_sizes": [2048, 4096, 8192, 16384, 32768, 65536, 131072]
 }
 ```
 
-The signed ladder permits only `2048`, `4096`, `8192`, `16384`, `32768`, and
-`65536`. The default stops at 32768 to bound KV-cache pressure; add 65536 only
-after confirming the GPU can safely allocate it. Each request uses 32 output
-tokens and runs sequentially. It records Ollama's actual `prompt_eval_count`
-and checks deterministic markers near the beginning, middle, and end.
+The signed ladder permits only `2048`, `4096`, `8192`, `16384`, `32768`,
+`65536`, and `131072`. Each request uses 32 output tokens and runs
+sequentially. The 64K and 128K levels can substantially increase KV-cache
+pressure; an API or allocation failure is recorded as a rejected level rather
+than retried. The probe records Ollama's actual `prompt_eval_count` and checks
+deterministic markers near the beginning, middle, and end.
 
 The anonymized summary reports `max_accepted_num_ctx` (largest request without
 an API error) separately from `max_full_retrieval_num_ctx` (largest request

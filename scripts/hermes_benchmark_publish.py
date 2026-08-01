@@ -464,7 +464,7 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         context_sizes = validate_context_sizes(
             config.get(
                 "context_window_sizes",
-                [2048, 4096, 8192, 16384, 32768],
+                [2048, 4096, 8192, 16384, 32768, 65536, 131072],
             )
         )
         args.append("--context-window-tests")

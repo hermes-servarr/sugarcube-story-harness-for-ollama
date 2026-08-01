@@ -31,7 +31,7 @@
   "capability_tests": true,
   "candidate_test_dir": "benchmark_optimization/candidate_tests",
   "context_window_tests": false,
-  "context_window_sizes": [2048, 4096, 8192, 16384, 32768],
+  "context_window_sizes": [2048, 4096, 8192, 16384, 32768, 65536, 131072],
   "runs": 1,
   "timeout": 120,
   "num_predict": 640,
