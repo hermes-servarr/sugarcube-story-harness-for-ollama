@@ -127,7 +127,7 @@ Interpret the result:
   mappings, or repository history.
 - Do not pull, inspect, or transform benchmark results as part of this
   one-shot action. Result analysis belongs only to
-  `$optimize-sugarcube-prompts`; the PC-side publisher remains the only
+  `/optimize-sugarcube-prompts`; the PC-side publisher remains the only
   authority for anonymization and Git publication.
 - Do not repeat unexpected SSH diagnostics verbatim if they may contain
   host, user, path, or credential information. Summarize them generically.

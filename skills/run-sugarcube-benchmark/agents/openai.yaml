@@ -1,4 +1,4 @@
 interface:
   display_name: "Run SugarCube Benchmark"
   short_description: "Safely trigger and publish the LLM benchmark"
-  default_prompt: "Use $run-sugarcube-benchmark to run and publish the SugarCube model benchmark."
+  default_prompt: "Use /run-sugarcube-benchmark to run and publish the SugarCube model benchmark."

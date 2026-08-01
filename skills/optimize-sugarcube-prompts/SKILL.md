@@ -49,6 +49,9 @@ five experiments without a new explicit user instruction.
      or inability to fall back from structured generation;
    - whether conversation failures concern block ordering, dialogue-turn
      formatting, or the MC inner-monologue line;
+   - whether writing-style failures concern required dialogue register,
+     register leaking into narration, banned vocabulary, or narration
+     sentence length;
    - one narrow prompt hypothesis that could improve those failures.
 
 5. Create `benchmark_optimization/iteration-NN.md` containing baseline
@@ -79,7 +82,7 @@ five experiments without a new explicit user instruction.
 9. Commit only the overlay, the new iteration note, and the optional single
    new candidate probe and proposal-backlog update, then push to the
    configured branch. Never force-push.
-10. Invoke `$run-sugarcube-benchmark` exactly once and wait for completion.
+10. Invoke `/run-sugarcube-benchmark` exactly once and wait for completion.
     If it reports already-running, failure, timeout, disconnect, or ambiguous
     status, stop this experiment without retrying.
 11. Pull fast-forward-only again to receive the newly published anonymized
@@ -101,6 +104,9 @@ On the next goal turn, continue only if a stop condition has not fired.
 - Revert the last overlay change if aggregate performance declines.
 - Treat unchanged results as non-improving.
 - Do not infer or guess the real identity behind an alias.
+- Treat every alias as opaque. Model aliases remain alphabetic after
+  `Model_Z` (`Model_AA`, `Model_AB`, and so on); never interpret an alias as
+  a rank, model family, or stable identity outside the current mapping.
 
 ## Thinking Variant Rules
 
@@ -158,6 +164,16 @@ reasoning.
   coherent layout failures instead of describing them as one failure.
 - Conversation cases are signed capability tests. Do not weaken their layout,
   turn count, ordering, or SugarCube-italic requirement in an overlay.
+
+## Writing-Style Rules
+
+- Use the summary's `writing_style` section and its signed check names.
+- Distinguish required register inside dialogue from register leaking into
+  narration, banned vocabulary, and excessive narration sentence length.
+- Treat writing-style cases as capability diagnostics. Do not weaken their
+  signed lexicons, sentence caps, checks, or thresholds.
+- Never copy signed guide phrases into a candidate task or iteration note;
+  refer only to the guide and failed check names exposed by the summary.
 
 ## Candidate Test Rules
 
