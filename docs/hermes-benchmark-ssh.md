@@ -307,6 +307,31 @@ The Hermes optimization loop performs inference-time prompt/template search.
 It does not train, fine-tune, or update model weights. Temperature controls the
 randomness of generated benchmark responses only.
 
+## Optional context-window diagnostic
+
+The protected benchmark can run a separate, non-objective context sweep:
+
+```json
+{
+  "context_window_tests": true,
+  "context_window_sizes": [2048, 4096, 8192, 16384, 32768]
+}
+```
+
+The signed ladder permits only `2048`, `4096`, `8192`, `16384`, `32768`, and
+`65536`. The default stops at 32768 to bound KV-cache pressure; add 65536 only
+after confirming the GPU can safely allocate it. Each request uses 32 output
+tokens and runs sequentially. It records Ollama's actual `prompt_eval_count`
+and checks deterministic markers near the beginning, middle, and end.
+
+The anonymized summary reports `max_accepted_num_ctx` (largest request without
+an API error) separately from `max_full_retrieval_num_ctx` (largest request
+where all markers survived in order). Ollama may accept and silently truncate
+a request, so the second value is the useful effective-context measurement. A
+pass at the highest configured level is a lower bound, not a proven maximum.
+Dataset `capability_context_window` is excluded from optimization pass rates
+and rollback decisions.
+
 The normal story harness exposes the same signed selection as
 `HarnessConfig.ingestion_profile`. Its default is
 `harness-generate-neutral`, which preserves existing `/api/generate` behavior.

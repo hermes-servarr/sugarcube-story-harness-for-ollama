@@ -94,6 +94,16 @@ class ModelProfile:
     inspiration_chars: int
 
 
+@dataclass(frozen=True)
+class OllamaGenerationResult:
+    """Generated text plus tokenizer/runtime counters returned by Ollama."""
+
+    response: str
+    prompt_eval_count: int = 0
+    eval_count: int = 0
+    done_reason: str = ""
+
+
 def _is_small_model(model_name: str) -> bool:
     return bool(_SMALL_MODEL_RE.search(model_name))
 
@@ -296,6 +306,32 @@ def call_ollama_sync(
     seed: int | None = None,
 ) -> str:
     """Sync variant for CLI / non-async callers."""
+    return call_ollama_sync_detailed(
+        cfg,
+        prompt,
+        timeout,
+        temperature=temperature,
+        num_predict=num_predict,
+        format_spec=format_spec,
+        label=label,
+        ingestion_profile=ingestion_profile,
+        seed=seed,
+    ).response
+
+
+def call_ollama_sync_detailed(
+    cfg: HarnessConfig,
+    prompt: str,
+    timeout: float = 120.0,
+    *,
+    temperature: float | None = None,
+    num_predict: int | None = None,
+    format_spec: str | dict | None = None,
+    label: str = "",
+    ingestion_profile: str = "",
+    seed: int | None = None,
+) -> OllamaGenerationResult:
+    """Sync generation retaining Ollama's actual token counters."""
     url = f"{cfg.ollama_base_url.rstrip('/')}/api/generate"
     payload = _ollama_payload(
         cfg, prompt,
@@ -311,10 +347,16 @@ def call_ollama_sync(
             resp = client.post(url, json=payload)
             _raise_if_missing(resp, cfg.ollama_model)
             resp.raise_for_status()
-            out = resp.json().get("response", "")
+            data = resp.json()
+            result = OllamaGenerationResult(
+                response=str(data.get("response", "")),
+                prompt_eval_count=max(0, int(data.get("prompt_eval_count", 0) or 0)),
+                eval_count=max(0, int(data.get("eval_count", 0) or 0)),
+                done_reason=str(data.get("done_reason", "") or ""),
+            )
         _log_call(cfg, payload, label, format_spec,
                   status="ok", ms=int((time.monotonic() - t0) * 1000))
-        return out
+        return result
     except Exception as e:
         _log_call(cfg, payload, label, format_spec,
                   status="error", ms=int((time.monotonic() - t0) * 1000), detail=str(e))

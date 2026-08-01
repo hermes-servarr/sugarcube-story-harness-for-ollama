@@ -194,6 +194,19 @@ def test_private_progress_file_includes_safe_model_alias_and_runtime(tmp_path):
     assert "model=Model_AA" in log.getvalue()
 
 
+def test_private_progress_accepts_context_window_phase(tmp_path):
+    publisher._write_private_progress(
+        tmp_path,
+        {"phase": "context_window", "completed": 2, "total": 5},
+        log_handle=io.StringIO(),
+    )
+
+    progress = publisher.json.loads(
+        (tmp_path / "progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["phase"] == "context_window"
+
+
 def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):
     captured = iter(("", "main", "AA BB CC"))
     logged_commands = []
@@ -388,6 +401,31 @@ def test_benchmark_args_enable_capability_ladder(tmp_path):
         "--candidate-test-dir",
         "benchmark_optimization/candidate_tests",
     ]
+
+
+def test_benchmark_args_enable_bounded_context_window_ladder(tmp_path):
+    args = publisher._benchmark_args(
+        {
+            "models": ["private-model"],
+            "context_window_tests": True,
+            "context_window_sizes": [2048, 4096, 8192],
+        },
+        tmp_path,
+    )
+
+    assert "--context-window-tests" in args
+    start = args.index("--context-window-sizes")
+    assert args[start + 1:start + 4] == ["2048", "4096", "8192"]
+
+    with pytest.raises(ValueError, match="outside the signed ladder"):
+        publisher._benchmark_args(
+            {
+                "models": ["private-model"],
+                "context_window_tests": True,
+                "context_window_sizes": [131072],
+            },
+            tmp_path,
+        )
 
 
 def test_benchmark_args_write_private_ingestion_routing(tmp_path):

@@ -137,6 +137,57 @@ def test_candidate_results_are_excluded_from_objective(tmp_path):
     assert summary["candidate_tests"]["pass_rate"] == 1.0
 
 
+def test_context_window_results_are_diagnostic_and_summarized(tmp_path):
+    result_path = tmp_path / "results.json"
+    result_path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:base:compact:1",
+                    "model_alias": "Model_A",
+                    "status": "PASS",
+                    "normalized_score": 1.0,
+                    "dataset": "capability_core",
+                },
+                {
+                    "test_id": "Model_A:CTX-4096:plain_text:1",
+                    "model_alias": "Model_A",
+                    "status": "PASS",
+                    "normalized_score": 1.0,
+                    "dataset": "capability_context_window",
+                    "split": "num_ctx_4096",
+                    "input_tokens": 3900,
+                    "runtime_seconds": 1.5,
+                },
+                {
+                    "test_id": "Model_A:CTX-8192:plain_text:1",
+                    "model_alias": "Model_A",
+                    "status": "FAIL",
+                    "normalized_score": 0.5,
+                    "dataset": "capability_context_window",
+                    "split": "num_ctx_8192",
+                    "input_tokens": 8150,
+                    "runtime_seconds": 2.5,
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(result_path)
+
+    assert summary["total_cases"] == 1
+    context = summary["context_window"]
+    assert context["diagnostic_only"] is True
+    assert context["cases"] == 2
+    assert context["configured_num_ctx_levels"] == [4096, 8192]
+    model = context["by_model_alias"]["Model_A"]
+    assert model["max_accepted_num_ctx"] == 8192
+    assert model["max_full_retrieval_num_ctx"] == 4096
+    assert model["accepted_at_least_configured_max"] is True
+    assert model["retrieved_at_least_configured_max"] is False
+
+
 def test_plain_text_results_are_reported_by_context_profile(tmp_path):
     path = tmp_path / "results.json"
     path.write_text(

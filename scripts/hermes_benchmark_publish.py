@@ -459,6 +459,16 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         candidate_dir = config.get("candidate_test_dir")
         if candidate_dir:
             args.extend(["--candidate-test-dir", str(candidate_dir)])
+    if bool(config.get("context_window_tests", False)):
+        from model_benchmark.context_window_tests import validate_context_sizes
+        context_sizes = validate_context_sizes(
+            config.get(
+                "context_window_sizes",
+                [2048, 4096, 8192, 16384, 32768],
+            )
+        )
+        args.append("--context-window-tests")
+        args.extend(["--context-window-sizes", *map(str, context_sizes)])
     model_profiles = config.get("model_profiles")
     if model_profiles is not None:
         routing_path = output_dir / "ingestion-routing.private.json"
@@ -483,7 +493,9 @@ def _write_private_progress(
 ) -> None:
     """Atomically persist identity-free progress for PC-side inspection."""
     phase = str(payload.get("phase", "unknown"))
-    if phase not in {"starting", "matrix", "capability", "finalizing"}:
+    if phase not in {
+        "starting", "matrix", "capability", "context_window", "finalizing"
+    }:
         phase = "unknown"
     progress: dict[str, Any] = {
         "schema_version": 1,

@@ -56,6 +56,8 @@ experiments only.
      suspected output-budget exhaustion;
    - whether plain-text failures concern retrieval, requested answer length,
      or inability to fall back from structured generation;
+   - context-window acceptance and full-retrieval ceilings when that optional
+     diagnostic is present;
    - whether conversation failures concern block ordering, dialogue-turn
      formatting, or the MC inner-monologue line;
    - whether writing-style failures concern required dialogue register,
@@ -163,6 +165,17 @@ reasoning.
 - Compare paired M/XL or S/XL cases before attributing a failure to context
   length. A word-limit failure is instruction following; a missing known
   context needle is retrieval.
+
+## Context-Window Diagnostic Rules
+
+- Use the summary's `context_window` section only when present. It is excluded
+  from the aggregate objective.
+- Distinguish `max_accepted_num_ctx` from `max_full_retrieval_num_ctx` because
+  Ollama can accept a request while truncating its beginning.
+- Treat a pass at the largest configured level as a lower bound, not an exact
+  maximum. Never infer a model family's advertised context window.
+- Do not change the configured ladder, `num_ctx`, model routing, or GPU settings
+  inside an optimization experiment. Those are operator-owned settings.
 
 ## Conversation Layout Rules
 

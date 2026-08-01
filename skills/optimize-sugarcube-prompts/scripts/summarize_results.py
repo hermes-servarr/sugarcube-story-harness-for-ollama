@@ -121,6 +121,63 @@ def _style_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return _signed_check_summary(records, "STYLE")
 
 
+def _context_window_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Report transport acceptance separately from full-context retrieval."""
+    by_alias: dict[str, Any] = {}
+    configured_levels: set[int] = set()
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in records:
+        grouped[str(row.get("model_alias", "(missing)"))].append(row)
+    for alias, rows in sorted(grouped.items()):
+        levels = []
+        for row in rows:
+            split = str(row.get("split", ""))
+            try:
+                requested = int(split.removeprefix("num_ctx_"))
+            except ValueError:
+                continue
+            configured_levels.add(requested)
+            status = str(row.get("status", "ERROR"))
+            levels.append(
+                {
+                    "requested_num_ctx": requested,
+                    "request_accepted": status != "ERROR",
+                    "full_retrieval": status == "PASS",
+                    "prompt_eval_count": int(row.get("input_tokens", 0) or 0),
+                    "runtime_seconds": float(row.get("runtime_seconds", 0.0) or 0.0),
+                }
+            )
+        levels.sort(key=lambda item: item["requested_num_ctx"])
+        accepted = [
+            item["requested_num_ctx"]
+            for item in levels if item["request_accepted"]
+        ]
+        retained = [
+            item["requested_num_ctx"]
+            for item in levels if item["full_retrieval"]
+        ]
+        by_alias[alias] = {
+            "max_accepted_num_ctx": max(accepted, default=0),
+            "max_full_retrieval_num_ctx": max(retained, default=0),
+            "levels": levels,
+        }
+    highest_level = max(configured_levels, default=0)
+    for value in by_alias.values():
+        value["accepted_at_least_configured_max"] = (
+            highest_level > 0 and value["max_accepted_num_ctx"] == highest_level
+        )
+        value["retrieved_at_least_configured_max"] = (
+            highest_level > 0
+            and value["max_full_retrieval_num_ctx"] == highest_level
+        )
+    return {
+        "diagnostic_only": True,
+        "cases": len(records),
+        "configured_num_ctx_levels": sorted(configured_levels),
+        "by_model_alias": by_alias,
+    }
+
+
 def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
@@ -129,8 +186,18 @@ def summarize(path: Path) -> dict[str, Any]:
     candidate_records = [
         row for row in records if row.get("dataset") == "capability_candidate"
     ]
+    context_window_records = [
+        row
+        for row in records
+        if row.get("dataset") == "capability_context_window"
+    ]
     objective_records = [
-        row for row in records if row.get("dataset") != "capability_candidate"
+        row
+        for row in records
+        if row.get("dataset") not in {
+            "capability_candidate",
+            "capability_context_window",
+        }
     ]
     scores = [
         float(row.get("normalized_score", 0.0)) for row in objective_records
@@ -193,6 +260,7 @@ def summarize(path: Path) -> dict[str, Any]:
             ),
             "by_tier": _group(candidate_records, "difficulty"),
         },
+        "context_window": _context_window_summary(context_window_records),
         "representative_failures": samples,
     }
 

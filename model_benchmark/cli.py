@@ -510,6 +510,18 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help="Directory containing data-only candidate capability probes.",
     )
     p_run.add_argument(
+        "--context-window-tests",
+        action="store_true",
+        help="Run the optional diagnostic context-window ladder.",
+    )
+    p_run.add_argument(
+        "--context-window-sizes",
+        nargs="+",
+        type=int,
+        default=[2048, 4096, 8192, 16384, 32768],
+        help="Signed num_ctx levels for the diagnostic context sweep.",
+    )
+    p_run.add_argument(
         "--debug",
         action="store_true",
         help=(
@@ -1202,6 +1214,45 @@ def _cmd_run(
                 cfg,
                 cases,
                 progress_callback=report_capability_progress,
+            )
+        )
+
+    if getattr(args, "context_window_tests", False) and not cfg.dry_run:
+        from model_benchmark.context_window_tests import (
+            execute_context_window_tests,
+            validate_context_sizes,
+        )
+
+        context_sizes = validate_context_sizes(
+            getattr(args, "context_window_sizes", [])
+        )
+
+        def report_context_progress(
+            completed: int,
+            total: int,
+            current_model: str,
+        ) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "phase": "context_window",
+                    "completed": int(completed),
+                    "total": int(total),
+                    "percent": (
+                        float(completed / total * 100.0)
+                        if total
+                        else 100.0
+                    ),
+                    "current_model": current_model,
+                }
+            )
+
+        results.extend(
+            execute_context_window_tests(
+                cfg,
+                context_sizes,
+                progress_callback=report_context_progress,
             )
         )
 

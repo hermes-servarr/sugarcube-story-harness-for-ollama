@@ -43,6 +43,8 @@ For every experiment:
    - plain-text, conversation-layout, and writing-style diagnostics;
    - failed evaluator and signed-check categories;
    - context, complexity, and conversation-length slopes where available;
+   - diagnostic context-window acceptance and full-retrieval ceilings where
+     available;
    - regressions by opaque model alias, without attempting to identify models.
 4. Create the next unused benchmark_optimization/iteration-NN.md with:
    - baseline metrics;
@@ -120,6 +122,11 @@ Preserve all configured directions and all protected variants. Do not make outpu
 Plain-text cases are diagnostic and intentionally bypass the passage overlay. Do not change prompt_overrides.json in response to plain-text failures.
 
 Candidate probes are diagnostic-only. Their results must remain excluded from aggregate objective pass rates, targets, rollback decisions, and campaign success claims.
+
+Context-window probes are diagnostic-only. Distinguish a request being
+accepted from all beginning/middle/end markers being retrieved. A pass at the
+largest configured level is only a lower bound. Never change context-window
+sizes or `num_ctx` during this campaign.
 
 Conversation tests must retain their signed block order, exact dialogue-turn rules, endpoints, speaker alternation, and MC inner-monologue format.
 
