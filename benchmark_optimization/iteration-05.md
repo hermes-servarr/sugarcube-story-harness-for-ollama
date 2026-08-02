@@ -135,8 +135,86 @@ Revert variants.thinking to empty string if:
 
 ## After Metrics
 
-(Pending benchmark run)
+Benchmark completed and anonymized results were pushed. Run duration ~50 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 280     | 280     | 0     |
+| Passed    | 78      | 78      | 0     |
+| Pass rate | 0.2786  | 0.2786  | 0     |
+| Mean score| 0.8061  | 0.7996  | -0.0065 |
+
+### By Variant
+
+| Variant    | Before pass | After pass | Before rate | After rate | Delta |
+|------------|-------------|------------|-------------|------------|-------|
+| compact    | 24/60       | 24/60      | 0.4000      | 0.4000     | 0     |
+| full       | 4/96        | 4/96       | 0.0417      | 0.0417     | 0     |
+| json       | 19/40       | 19/40      | 0.4750      | 0.4750     | 0     |
+| plain_text | 27/32       | 27/32      | 0.8438      | 0.8438     | 0     |
+| thinking   | 4/52        | 4/52       | 0.0769      | 0.0769     | 0     |
+
+### Thinking Variant Detail
+
+| Metric                    | Before | After | Delta |
+|---------------------------|--------|-------|-------|
+| passage_structure failures| 23     | 36    | +13   |
+| markup_compliance         | 29     | 28    | -1    |
+| macro_usage               | 28     | 27    | -1    |
+| thinking_quality          | 0      | 0     | 0     |
+| mean_score                | 0.7019 | 0.6667| -0.035|
+
+### Per-Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 10          | 10         | 0     |
+| Model_B | 25          | 27         | +2    |
+| Model_C | 27          | 25         | -2    |
+| Model_D | 16          | 16         | 0     |
+
+### Representative Failures (thinking)
+
+Three thinking cases now show "Empty raw response" with all categories
+reporting "Empty text" (was 1 in the baseline). This is an increase in
+empty-response thinking cases, suggesting output-budget exhaustion is
+aggravated by the additional thinking suffix instructions.
 
 ## Conclusion
 
-(Pending benchmark run)
+The experiment is non-improving. Aggregate pass rate is unchanged (78/280 =
+27.86%). The thinking variant pass rate is unchanged (4/52 = 7.69%). However,
+thinking passage_structure failures increased from 23 to 36 and the thinking
+variant mean score declined from 0.7019 to 0.6667. Three thinking cases now
+show "Empty raw response" (up from one in baseline).
+
+**Suspected output-budget exhaustion:** The additional thinking suffix
+instructions may be consuming output token budget during the reasoning phase,
+leaving insufficient budget for the final passage. The increase in
+passage_structure failures (23 to 36) and empty-response cases (1 to 3)
+supports this. Per skill rules, the anonymized summary cannot prove the cause,
+and output budgets are operator-owned settings that cannot be changed in this
+campaign.
+
+The overlay is reverted to the baseline (all variant suffixes empty,
+global_suffix retaining the Exp02 content from the previous campaign).
+
+## Rollback
+
+Reverted variants.thinking to empty string. Validated with json.tool and
+pytest (53 passed). Committed and pushed. No additional GPU run needed for
+the byte-for-byte restored overlay.
+
+## Next Decision
+
+Experiment 05 is the first non-improving experiment in this campaign. The
+best aggregate remains 78/280 (27.86%), equal to the campaign baseline.
+Target is 32.86%.
+
+Next experiment should target the full variant (96 cases, 4.17% pass), the
+largest case count with the worst non-thinking pass rate. A full-variant
+suffix adding only SugarCube markup guidance (without conversation layout,
+which is already in global_suffix) may help the full variant without
+affecting other variants.

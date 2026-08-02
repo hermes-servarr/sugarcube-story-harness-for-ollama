@@ -5,7 +5,7 @@
     "compact": "",
     "full": "",
     "json": "",
-    "thinking": "After your reasoning, output one complete final passage with all required sections in this exact order: ===CHOICES===, ===PROSE===, ===SUMMARY===. Use SugarCube markup only: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis."
+    "thinking": ""
   },
   "directions": {
     "A": "",
