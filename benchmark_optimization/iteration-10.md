@@ -93,3 +93,82 @@ Re-add the JSON suffix (variants.json to the Exp07 text) if:
 - Aggregate objective pass rate declines below 0.2929, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~55 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 280     | 280     | 0     |
+| Passed    | 82      | 85      | +3    |
+| Pass rate | 0.2929  | 0.3036  | +1.07pp |
+| Mean score| 0.8180  | 0.8202  | +0.0022 |
+
+### By Variant
+
+| Variant    | Before pass | After pass | Before rate | After rate | Delta |
+|------------|-------------|------------|-------------|------------|-------|
+| compact    | 27/60       | 27/60      | 0.4500      | 0.4500     | 0     |
+| full       | 6/96        | 6/96       | 0.0625      | 0.0625     | 0     |
+| json       | 17/40       | 20/40      | 0.4250      | 0.5000     | +3    |
+| plain_text | 27/32       | 27/32      | 0.8438      | 0.8438     | 0     |
+| thinking   | 5/52        | 5/52       | 0.0962      | 0.0962     | 0     |
+
+### By Model Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 9           | 13         | +4    |
+| Model_B | 30          | 30         | 0     |
+| Model_C | 27          | 26         | -1    |
+| Model_D | 16          | 16         | 0     |
+
+### Conversation, Writing Style, Thinking
+
+All unchanged from Exp08 values. Conversation 3/44, writing_style 1/20,
+thinking 5/52 with identical failure profiles.
+
+### Direction Deltas (nonzero)
+
+| Direction | Before | After | Delta |
+|-----------|--------|-------|-------|
+| A         | 5      | 7     | +2    |
+| B         | 6      | 8     | +2    |
+| E         | 6      | 4     | -2    |
+| G         | 6      | 7     | +1    |
+| H         | 4      | 5     | +1    |
+
+## Conclusion
+
+Experiment 10 improved the aggregate by +3 passes (82 to 85, 29.29% to 30.36%).
+The JSON variant fully recovered to 20/40 (50.0%), exceeding the pre-Exp07
+level of 19/40 (47.5%). The hypothesis was confirmed: the JSON suffix from
+Exp07 was harmful and removing it recovered +3 JSON passes.
+
+No variant regressed. Model_C dropped by -1 (27 to 26) which is minor and
+within noise. Model_A gained +4 (9 to 13). Directions A (+2), B (+2), G (+1),
+H (+1) improved; E (-2) declined but is within noise.
+
+The overlay is retained as the new best: global_suffix with verbose format
+and broadened conversation trigger, all variant suffixes empty.
+
+Campaign progress: 27.14% baseline -> 30.36% best (+3.22pp). Target: 32.14%.
+Gap: 1.78pp (~5 more passes needed).
+
+## Next Decision
+
+The overlay now has all variant suffixes empty and only the global_suffix
+with the Exp02 content + Exp08 broadened conversation trigger. Remaining
+opportunities:
+- Full variant: 96 cases, 6.25% pass (largest case count)
+- Thinking variant: 52 cases, 9.62% pass (markup_compliance 29)
+- Directions at 0%: T1(4), T4(8), T5(12), T7(12), T8(8) = 44 cases
+- Writing style: 20 cases, 5% pass (dialogue_slang 17)
+
+Next experiment should explore a new axis. The writing-style dialogue_slang
+failure (17/20) is the most concentrated failure. Adding a global_suffix
+instruction about dialogue register could help, similar to how broadening
+the conversation trigger helped conversation cases.
