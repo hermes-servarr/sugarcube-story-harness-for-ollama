@@ -137,3 +137,117 @@ Revert global_suffix to the Exp08 version if:
 - Aggregate objective pass rate declines below 0.2929, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~50 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 280     | 280     | 0     |
+| Passed    | 82      | 80      | -2    |
+| Pass rate | 0.2929  | 0.2857  | -0.72pp |
+| Mean score| 0.8180  | 0.8092  | -0.0088 |
+
+### By Variant
+
+| Variant    | Before pass | After pass | Before rate | After rate | Delta |
+|------------|-------------|------------|-------------|------------|-------|
+| compact    | 27/60       | 21/60      | 0.4500      | 0.3500     | -6 (REGRESSION) |
+| full       | 6/96        | 10/96      | 0.0625      | 0.1042     | +4    |
+| json       | 17/40       | 19/40      | 0.4250      | 0.4750     | +2    |
+| plain_text | 27/32       | 27/32      | 0.8438      | 0.8438     | 0     |
+| thinking   | 5/52        | 3/52       | 0.0962      | 0.0577     | -2 (REGRESSION) |
+
+### By Model Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 9           | 18         | +9    |
+| Model_B | 30          | 24         | -6 (REGRESSION) |
+| Model_C | 27          | 20         | -7 (REGRESSION) |
+| Model_D | 16          | 18         | +2    |
+
+### Conversation Layout
+
+| Metric              | Before | After |
+|---------------------|--------|-------|
+| Passed              | 3/44   | 1/44  |
+| mc_inner_monologue  | 38     | 42    |
+| conversation_layout | 21     | 28    |
+
+### Writing Style
+
+| Metric              | Before | After |
+|---------------------|--------|-------|
+| Passed              | 1/20   | 3/20  |
+| dialogue_slang      | 17     | 16    |
+
+### Thinking Variant
+
+| Metric               | Before | After |
+|----------------------|--------|-------|
+| Passed               | 5/52   | 3/52  |
+| markup_compliance    | 29     | 33    |
+| passage_structure    | 18     | 24    |
+
+### Direction Deltas (nonzero)
+
+| Direction | Before | After | Delta |
+|-----------|--------|-------|-------|
+| C         | 5      | 7     | +2    |
+| F         | 5      | 2     | -3    |
+| H         | 4      | 8     | +4    |
+| T3        | 2      | 1     | -1    |
+| T6        | 27     | 23    | -4    |
+| T9        | 4      | 5     | +1    |
+
+## Conclusion
+
+Experiment 09 regressed. Aggregate declined from 82/280 (29.29%) to 80/280
+(28.57%), a loss of 2 passes. The condensed global_suffix had mixed effects:
+
+Helped:
+- full: +4 (6 to 10, 6.25% to 10.42%) - best full result in campaign
+- json: +2 (17 to 19, 42.5% to 47.5%) - recovered to pre-Exp07 level
+- writing_style: +2 (1 to 3, 5% to 15%)
+- Model_A: +9 (9 to 18)
+- Direction H: +4
+
+Harmed:
+- compact: -6 (27 to 21, 45% to 35%) - major regression
+- thinking: -2 (5 to 3, 9.62% to 5.77%) - reverted Exp08 gain
+- conversation: -2 (3 to 1, 6.82% to 2.27%)
+- Model_B: -6 (30 to 24)
+- Model_C: -7 (27 to 20)
+- T6: -4
+
+The condensed suffix helped the full variant (which has longer context and
+benefits from concise instructions) but hurt the compact variant (which
+has shorter context and relied on the verbose instructions). This suggests
+that instruction verbosity has variant-specific effects: compact needs
+verbose instructions while full benefits from concision.
+
+The rollback condition fired (aggregate declined below 0.2929). The
+overlay is reverted to the Exp08 best: global_suffix with verbose format
+and broadened conversation trigger + json variant suffix from Exp07.
+
+## Rollback
+
+Reverted global_suffix to the Exp08 version (verbose format with broadened
+conversation trigger). Validated with json.tool and pytest (53 passed).
+Committed and pushed. No additional GPU run needed for the restored overlay.
+
+## Next Decision
+
+Experiment 09 revealed that concision helps full (+4) and json (+2) but
+harms compact (-6). The compact variant depends on verbose instructions in
+global_suffix. The full variant benefits from concise instructions.
+
+Next experiment should explore a direction-specific overlay. The directions
+at 0% (T1, T4, T5, T7, T8) account for 44 cases all failing. These are
+capability-specific tests that may need targeted guidance. Alternatively,
+the writing-style improvement (+2) from the condensed suffix suggests the
+verbose instructions may interfere with writing-style compliance.
