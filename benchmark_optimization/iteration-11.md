@@ -98,3 +98,92 @@ Remove the writing-style trigger sentence from global_suffix if:
 - Aggregate objective pass rate declines below 0.3036, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~55 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 280     | 280     | 0     |
+| Passed    | 85      | 78      | -7    |
+| Pass rate | 0.3036  | 0.2786  | -2.50pp |
+| Mean score| 0.8202  | 0.8092  | -0.0110 |
+
+### By Variant
+
+| Variant    | Before pass | After pass | Delta |
+|------------|-------------|------------|-------|
+| compact    | 27/60       | 21/60      | -6 (REGRESSION) |
+| full       | 6/96        | 7/96       | +1    |
+| json       | 20/40       | 19/40      | -1    |
+| plain_text | 27/32       | 27/32      | 0     |
+| thinking   | 5/52        | 4/52       | -1    |
+
+### By Model Alias
+
+| Alias   | Before | After | Delta |
+|---------|--------|-------|-------|
+| Model_A | 13     | 13    | 0     |
+| Model_B | 30     | 25    | -5 (REGRESSION) |
+| Model_C | 26     | 24    | -2    |
+| Model_D | 16     | 16    | 0     |
+
+### Writing Style
+
+| Metric              | Before | After |
+|---------------------|--------|-------|
+| Passed              | 1/20   | 3/20  |
+| dialogue_slang      | 17     | 16    |
+
+### Conversation Layout
+
+| Metric              | Before | After |
+|---------------------|--------|-------|
+| Passed              | 3/44   | 1/44  |
+
+## Conclusion
+
+Experiment 11 regressed severely. Aggregate declined from 85/280 (30.36%)
+to 78/280 (27.86%), a loss of 7 passes. The writing-style trigger helped
+writing_style (+2, 1 to 3) and dialogue_slang (-1, 17 to 16), but the
+additional global_suffix sentence harmed compact (-6), conversation (-2),
+thinking (-1), and json (-1). Model_B dropped -5.
+
+The writing-style trigger sentence added 99 characters to global_suffix.
+This is similar to Exp09's finding: longer global_suffix text hurts compact.
+The compact variant is sensitive to global_suffix length. Even a single
+additional sentence causes significant regression.
+
+The rollback condition fired (aggregate declined below 0.3036). The overlay
+is reverted to the Exp10 best (global_suffix without the writing-style
+trigger, all variant suffixes empty).
+
+## Rollback
+
+Reverted global_suffix to the Exp10 version (removed the writing-style
+trigger sentence). Validated with json.tool and pytest (53 passed).
+Committed and pushed. No additional GPU run needed for the restored overlay.
+
+## Next Decision
+
+Experiments 09 and 11 both show that adding text to global_suffix harms
+compact (-6 each). The compact variant is at its ceiling with the current
+global_suffix length. Future experiments should avoid modifying
+global_suffix and instead use direction-specific or variant-specific
+suffixes that don't affect compact.
+
+The writing-style improvement (+2) from the trigger is real but cannot
+be retained without harming compact. A direction-specific overlay for
+writing-style directions (e.g., directions that contain writing-style
+tests) could isolate the benefit without affecting compact. However,
+writing-style is a diagnostic category, not a direction. The directions
+A-H are SugarCube story directions, and T-tests are capability tiers.
+
+Next experiment should target the full variant (96 cases, 6.25%) with
+a full-variant suffix, but prior experiments (Exp04 aborted, Exp06
+regressed) showed full-variant suffixes are risky. A different approach:
+add a direction-specific suffix for direction H (currently at 25%, 4/16)
+or direction D (25%, 4/16), which are the worst A-H directions.
