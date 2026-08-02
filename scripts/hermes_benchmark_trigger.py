@@ -16,6 +16,7 @@ from typing import Any
 
 STATE_DIR = Path("C:/ProgramData/HermesBenchmark/state")
 STATUS_PATH = STATE_DIR / "task-status.json"
+PROGRESS_PATH = STATE_DIR / "public-progress.json"
 TRIGGER_LOCK_PATH = STATE_DIR / "trigger.lock"
 TASK_NAME = "HermesBenchmarkPublisher"
 POLL_SECONDS = 3
@@ -136,10 +137,60 @@ def _emit_terminal(status: dict[str, Any]) -> int:
     return returncode
 
 
+def _duration_label(seconds: float) -> str:
+    value = max(0, min(int(round(seconds)), 7 * 24 * 60 * 60))
+    hours, remainder = divmod(value, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+def _progress_message(progress: dict[str, Any]) -> str | None:
+    if progress.get("phase") not in {
+        "starting",
+        "matrix",
+        "capability",
+        "context_window",
+        "finalizing",
+    }:
+        return None
+    try:
+        completed = max(0, int(progress["overall_completed"]))
+        total = max(1, int(progress["overall_total"]))
+        phase_completed = max(0, int(progress.get("completed", 0)))
+        phase_total = max(0, int(progress.get("total", 0)))
+        elapsed = max(0.0, float(progress.get("overall_elapsed_seconds", 0.0)))
+    except (KeyError, TypeError, ValueError):
+        return None
+    completed = min(completed, total)
+    percent = completed / total * 100.0
+    message = (
+        f"Benchmark progress: {completed}/{total} ({percent:.1f}%); "
+        f"phase={progress['phase']} {phase_completed}/{phase_total}; "
+        f"elapsed={_duration_label(elapsed)}"
+    )
+    try:
+        eta = float(progress["overall_eta_seconds"])
+    except (KeyError, TypeError, ValueError):
+        eta = -1.0
+    if 0 <= eta <= 7 * 24 * 60 * 60:
+        basis = (
+            "previous run"
+            if progress.get("estimate_basis") == "previous_successful_run"
+            else "current rate"
+        )
+        message += f"; ETA={_duration_label(eta)} ({basis})"
+    return message + "."
+
+
 def trigger(
     *,
     status_path: Path = STATUS_PATH,
     lock_path: Path = TRIGGER_LOCK_PATH,
+    progress_path: Path = PROGRESS_PATH,
     task_name: str = TASK_NAME,
 ) -> int:
     if os.environ.get("SSH_ORIGINAL_COMMAND", "") != "run":
@@ -154,6 +205,11 @@ def trigger(
                 return 75
 
             request_id = secrets.token_hex(16)
+            try:
+                progress_path.unlink(missing_ok=True)
+            except OSError:
+                print(FAILURE_MESSAGE)
+                return 1
             _write_status(
                 status_path,
                 {"request_id": request_id, "state": "queued"},
@@ -172,6 +228,7 @@ def trigger(
                 )
                 raise
             startup_deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+            last_progress_key: tuple[str, int] | None = None
 
             while True:
                 status = _read_status(status_path)
@@ -180,6 +237,22 @@ def trigger(
                         return _emit_terminal(status)
                     if status.get("state") == "running":
                         startup_deadline = float("inf")
+
+                progress = _read_status(progress_path)
+                progress_message = _progress_message(progress)
+                if progress_message is not None:
+                    try:
+                        overall_completed = int(progress["overall_completed"])
+                        overall_total = max(1, int(progress["overall_total"]))
+                        progress_key = (
+                            str(progress["phase"]),
+                            int(overall_completed / overall_total * 100),
+                        )
+                    except (KeyError, TypeError, ValueError):
+                        progress_key = None
+                    if progress_key is not None and progress_key != last_progress_key:
+                        print(progress_message, flush=True)
+                        last_progress_key = progress_key
 
                 if time.monotonic() >= startup_deadline:
                     _write_status(

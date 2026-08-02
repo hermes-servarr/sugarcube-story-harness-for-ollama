@@ -7,6 +7,9 @@ Use this prompt only after:
    `optimize-sugarcube-prompts` skills are installed and approved in Hermes.
 3. No benchmark is already running.
 
+The campaign begins with one fresh protected baseline run before any experiment
+files are changed. That baseline run does not count toward the ten experiments.
+
 Paste the complete block below into Hermes as one message:
 
 ```text
@@ -15,7 +18,9 @@ Paste the complete block below into Hermes as one message:
 outcome:
 Improve the aggregate objective pass rate of the anonymized SugarCube benchmark while preserving test difficulty, coverage, grading integrity, privacy, and GPU safety. Explore a broad set of narrow, falsifiable prompt hypotheses, retain the best verified prompt overlay, map what helps and harms each measured capability, record every experiment, and finish with a concise campaign report.
 
-Use the current anonymized public result as the campaign baseline. An improvement of at least 5 absolute percentage points over that baseline, with no unreverted aggregate, variant, capability, or material per-alias regression, is a success milestone to record; it is not a reason to end the campaign early.
+Before changing any experiment file, establish a fresh campaign baseline: fast-forward pull main, invoke /run-sugarcube-benchmark exactly once, wait for protected completion, fast-forward pull the newly published anonymized result, and summarize it. This baseline run is separate from the ten experiments and does not count as an experiment. Do not reuse the pre-campaign public result as the baseline. If the protected result is reported as successfully completed but unchanged, the existing public result may be used as the fresh baseline. Any other failure, already-running response, timeout, disconnect, or ambiguous state is a campaign stop condition and must not be retried.
+
+Use that fresh anonymized result as the campaign baseline. An improvement of at least 5 absolute percentage points over that baseline, with no unreverted aggregate, variant, capability, or material per-alias regression, is a success milestone to record; it is not a reason to end the campaign early.
 
 Complete 10 successful benchmark experiments unless a safety or verification stop condition fires. This campaign-specific continuation rule replaces the skill's default target-reached and consecutive-non-improvement stopping rules. An experiment counts only after:
 1. one hypothesis is recorded;
@@ -77,6 +82,7 @@ notes and do not repeat a semantically equivalent change unless the new test
 isolates a clearly different hypothesis.
 
 At campaign completion, report:
+- whether the fresh baseline run completed and the baseline result used;
 - number of completed and aborted experiments;
 - starting and best aggregate objective pass rates;
 - per-variant before/best results;
@@ -105,6 +111,8 @@ from an anonymous alias. If results suggest inconsistent framing, stop for
 operator review instead of querying Ollama.
 
 Run experiments sequentially. Never parallelize benchmark runs, model calls, or optimization experiments. Never start a second benchmark while a managed process or PC-side lock may still own the GPU.
+
+When monitoring the managed benchmark process, use its identity-free whole-run progress lines to track completed/total work units and phase progress. When an ETA is available, set the next process wait to the estimated remaining time plus a five-minute margin, with a minimum of 900 seconds and a maximum equal to the process tool's longest supported wait. Before the first ETA is available, wait 1800 seconds or use the longest supported duration if lower. After a wait timeout, recalculate from the newest progress line. Never fall back to repeated 180-second waits. The first successful run establishes a duration estimate for later runs with the same workload. A wait timeout means only that the same process is still running: keep the same process ID, never invoke the SSH command again, never start a second benchmark, and never kill the process merely because the wait elapsed.
 
 Invoke /run-sugarcube-benchmark at most once per experiment. Never retry after failure, timeout, SSH disconnect, ambiguous state, or an already-running result. A disconnected trigger may still have started a GPU run.
 

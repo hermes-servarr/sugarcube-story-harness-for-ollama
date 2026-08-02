@@ -130,3 +130,25 @@ def test_trigger_rejects_any_other_remote_command(monkeypatch, tmp_path, capsys)
         lock_path=tmp_path / "trigger.lock",
     ) == 1
     assert capsys.readouterr().out.strip() == trigger.FAILURE_MESSAGE
+
+
+def test_trigger_formats_identity_free_whole_run_progress():
+    message = trigger._progress_message(
+        {
+            "phase": "capability",
+            "completed": 7,
+            "total": 33,
+            "overall_completed": 39,
+            "overall_total": 65,
+            "overall_elapsed_seconds": 1800,
+            "overall_eta_seconds": 1200,
+            "estimate_basis": "previous_successful_run",
+            "current_model": "must-not-leak",
+        }
+    )
+
+    assert message == (
+        "Benchmark progress: 39/65 (60.0%); phase=capability 7/33; "
+        "elapsed=30m 0s; ETA=20m 0s (previous run)."
+    )
+    assert "must-not-leak" not in message

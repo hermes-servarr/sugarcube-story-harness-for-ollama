@@ -1138,6 +1138,70 @@ def _cmd_run(
                 sys.stderr.write(f"Invalid private ingestion routing: {exc}\n")
             return 2
 
+    capability_cases: tuple[Any, ...] = ()
+    if getattr(args, "capability_tests", False) and not cfg.dry_run:
+        from model_benchmark.capability_tests import load_cases
+
+        capability_cases = tuple(
+            load_cases(candidate_dir=Path(getattr(args, "candidate_test_dir")))
+        )
+
+    context_sizes: tuple[int, ...] = ()
+    if getattr(args, "context_window_tests", False) and not cfg.dry_run:
+        from model_benchmark.context_window_tests import validate_context_sizes
+
+        context_sizes = validate_context_sizes(
+            getattr(args, "context_window_sizes", [])
+        )
+
+    model_count = len(cfg.models)
+    matrix_total = (
+        model_count
+        * len(cfg.variants)
+        * len(cfg.directions)
+        * max(1, cfg.runs)
+    )
+    capability_total = model_count * len(capability_cases)
+    context_total = model_count * len(context_sizes)
+    overall_total = matrix_total + capability_total + context_total
+    benchmark_started_clock = time.monotonic()
+
+    if progress_callback is not None:
+        progress_callback(
+            {
+                "phase": "starting",
+                "completed": 0,
+                "total": 0,
+                "overall_completed": 0,
+                "overall_total": overall_total,
+                "overall_percent": 0.0,
+                "overall_elapsed_seconds": 0.0,
+                "overall_eta_seconds": -1.0,
+                "matrix_total": matrix_total,
+                "capability_total": capability_total,
+                "context_window_total": context_total,
+            }
+        )
+
+    def _overall_fields(completed: int) -> dict[str, float | int]:
+        elapsed = time.monotonic() - benchmark_started_clock
+        percent = completed / overall_total * 100.0 if overall_total else 100.0
+        eta = (
+            elapsed * (overall_total - completed) / completed
+            if completed > 0 and elapsed > 0
+            else -1.0
+        )
+        return {
+            "overall_completed": completed,
+            "overall_total": overall_total,
+            "overall_percent": percent,
+            "overall_elapsed_seconds": elapsed,
+            "overall_eta_seconds": eta,
+            "matrix_total": matrix_total,
+            "capability_total": capability_total,
+            "context_window_total": context_total,
+        }
+
     def report_matrix_progress(event: Any) -> None:
         if progress_callback is None:
             return
@@ -1154,6 +1218,7 @@ def _cmd_run(
                 "error_count": int(event.error_count),
                 "timeout_count": int(event.timeout_count),
                 "current_model": str(event.model_alias),
+                **_overall_fields(int(event.completed)),
             }
         )
 
@@ -1170,8 +1235,6 @@ def _cmd_run(
     )
 
     benchmark_started_at = datetime.now(timezone.utc)
-    benchmark_started_clock = time.monotonic()
-
     if cfg.dry_run:
         # Fixture dry-run: produces scored records without calling Ollama.
         runner.dry_run()
@@ -1182,11 +1245,7 @@ def _cmd_run(
     if getattr(args, "capability_tests", False) and not cfg.dry_run:
         from model_benchmark.capability_tests import (
             execute_capability_cases,
-            load_cases,
         )
-        cases = tuple(load_cases(
-            candidate_dir=Path(getattr(args, "candidate_test_dir"))
-        ))
 
         def report_capability_progress(
             completed: int,
@@ -1206,13 +1265,14 @@ def _cmd_run(
                         else 100.0
                     ),
                     "current_model": current_model,
+                    **_overall_fields(matrix_total + int(completed)),
                 }
             )
 
         results.extend(
             execute_capability_cases(
                 cfg,
-                cases,
+                capability_cases,
                 progress_callback=report_capability_progress,
             )
         )
@@ -1220,11 +1280,6 @@ def _cmd_run(
     if getattr(args, "context_window_tests", False) and not cfg.dry_run:
         from model_benchmark.context_window_tests import (
             execute_context_window_tests,
-            validate_context_sizes,
-        )
-
-        context_sizes = validate_context_sizes(
-            getattr(args, "context_window_sizes", [])
         )
 
         def report_context_progress(
@@ -1245,6 +1300,9 @@ def _cmd_run(
                         else 100.0
                     ),
                     "current_model": current_model,
+                    **_overall_fields(
+                        matrix_total + capability_total + int(completed)
+                    ),
                 }
             )
 

@@ -77,6 +77,16 @@ inspection.
 Monitor only the recorded process using `process` action=`wait` or
 `process` action=`poll`.
 
+- Read the identity-free `Benchmark progress:` lines emitted by the managed
+  process. They report whole-run completed/total work units, phase progress,
+  elapsed time, and—when available—an ETA based on a previous successful run
+  with the same workload. They never authorize inspection of PC-side files.
+- If an ETA is present, choose the next wait as the estimated remaining time
+  plus a five-minute margin, with a minimum of 900 seconds and a maximum equal
+  to the process tool's longest supported wait. If no ETA is available yet,
+  wait 1800 seconds (or the longest supported duration if lower).
+- After a wait timeout, read the newest progress line and recalculate the next
+  wait. Do not fall back to repeated 180-second waits.
 - A wait/poll timeout means the process is still being monitored; it is
   not permission to start another command.
 - Repeated wait/poll calls on the same ID are allowed.
@@ -136,4 +146,6 @@ Interpret the result:
 
 Treat only one of the two exact completion messages as confirmed
 completion. The forced command intentionally returns no model inventory,
-raw output, progress details, Git output, or private failure details.
+raw output, model/test identities, per-case outcomes, Git output, or private
+failure details. Its aggregate progress lines are informational, not terminal
+success messages.

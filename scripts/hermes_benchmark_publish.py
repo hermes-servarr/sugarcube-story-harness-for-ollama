@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import os
 import re
 import shutil
@@ -37,6 +38,8 @@ class PublishError(RuntimeError):
 
 
 COMMAND_TIMEOUT_SECONDS = 120
+PUBLIC_PROGRESS_NAME = "public-progress.json"
+RUNTIME_HISTORY_NAME = "runtime-history.json"
 
 
 def _load_config(path: Path) -> dict[str, Any]:
@@ -505,6 +508,11 @@ def _write_private_progress(
     for key in (
         "completed",
         "total",
+        "overall_completed",
+        "overall_total",
+        "matrix_total",
+        "capability_total",
+        "context_window_total",
         "pass_count",
         "fail_count",
         "error_count",
@@ -512,9 +520,22 @@ def _write_private_progress(
     ):
         if key in payload:
             progress[key] = max(0, int(payload[key]))
-    for key in ("percent", "elapsed_seconds", "eta_seconds"):
+    for key in (
+        "percent",
+        "elapsed_seconds",
+        "eta_seconds",
+        "overall_percent",
+        "overall_elapsed_seconds",
+        "overall_eta_seconds",
+        "estimated_total_seconds",
+    ):
         if key in payload:
             progress[key] = float(payload[key])
+    if payload.get("estimate_basis") in {
+        "previous_successful_run",
+        "current_run_rate",
+    }:
+        progress["estimate_basis"] = payload["estimate_basis"]
     current_model_alias = payload.get("current_model_alias")
     if (
         isinstance(current_model_alias, str)
@@ -566,6 +587,144 @@ def _write_private_progress(
     log_handle.flush()
 
 
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}-",
+        suffix=".json",
+        dir=path.parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+        os.chmod(path, 0o600)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
+def _workload_from_progress(payload: dict[str, Any]) -> dict[str, int] | None:
+    keys = ("matrix_total", "capability_total", "context_window_total")
+    try:
+        workload = {key: max(0, int(payload[key])) for key in keys}
+    except (KeyError, TypeError, ValueError):
+        return None
+    return workload if sum(workload.values()) > 0 else None
+
+
+def _read_runtime_estimate(
+    path: Path,
+    workload: dict[str, int] | None,
+) -> float | None:
+    if workload is None:
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            history = json.load(handle)
+        if history.get("workload") != workload:
+            return None
+        samples = [
+            float(value)
+            for value in history.get("samples_seconds", [])
+            if math.isfinite(float(value)) and float(value) > 0
+        ]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+    if not samples:
+        return None
+    ordered = sorted(samples)
+    middle = len(ordered) // 2
+    return (
+        ordered[middle]
+        if len(ordered) % 2
+        else (ordered[middle - 1] + ordered[middle]) / 2.0
+    )
+
+
+def _record_runtime_sample(
+    path: Path,
+    workload: dict[str, int] | None,
+    duration_seconds: float,
+) -> None:
+    if (
+        workload is None
+        or not math.isfinite(duration_seconds)
+        or duration_seconds <= 0
+    ):
+        return
+    samples: list[float] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            history = json.load(handle)
+        if history.get("workload") == workload:
+            samples = [
+                float(value)
+                for value in history.get("samples_seconds", [])
+                if math.isfinite(float(value)) and float(value) > 0
+            ]
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    samples = [*samples[-4:], duration_seconds]
+    _atomic_write_json(
+        path,
+        {
+            "schema_version": 1,
+            "workload": workload,
+            "samples_seconds": samples,
+        },
+    )
+
+
+def _write_public_progress(path: Path, payload: dict[str, Any]) -> None:
+    """Publish only aggregate, identity-free counters for the SSH trigger."""
+    phase = payload.get("phase")
+    if phase not in {
+        "starting",
+        "matrix",
+        "capability",
+        "context_window",
+        "finalizing",
+    }:
+        return
+    snapshot: dict[str, Any] = {
+        "schema_version": 1,
+        "phase": phase,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    for key in (
+        "completed",
+        "total",
+        "overall_completed",
+        "overall_total",
+    ):
+        try:
+            snapshot[key] = max(0, int(payload[key]))
+        except (KeyError, TypeError, ValueError):
+            pass
+    for key in (
+        "overall_percent",
+        "overall_elapsed_seconds",
+        "overall_eta_seconds",
+        "estimated_total_seconds",
+    ):
+        try:
+            value = float(payload[key])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(value) and value >= 0:
+            snapshot[key] = value
+    if payload.get("estimate_basis") in {
+        "previous_successful_run",
+        "current_run_rate",
+    }:
+        snapshot["estimate_basis"] = payload["estimate_basis"]
+    _atomic_write_json(path, snapshot)
+
+
 def _publish(config: dict[str, Any], log_handle: Any) -> bool:
     repo = Path(config["repo_path"]).resolve()
     if not (repo / ".git").exists():
@@ -612,8 +771,12 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
     state_dir = Path(config.get("state_dir", DEFAULT_STATE_DIR)).resolve()
     state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(state_dir, 0o700)
+    public_progress_path = state_dir / PUBLIC_PROGRESS_NAME
+    runtime_history_path = state_dir / RUNTIME_HISTORY_NAME
     run_dir = Path(tempfile.mkdtemp(prefix="run-", dir=state_dir))
     os.chmod(run_dir, 0o700)
+    current_workload: dict[str, int] | None = None
+    prior_duration_estimate: float | None = None
 
     try:
         _write_private_progress(
@@ -623,7 +786,35 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
         )
 
         def record_progress(payload: dict[str, Any]) -> None:
+            nonlocal current_workload, prior_duration_estimate
             safe_payload = dict(payload)
+            workload = _workload_from_progress(safe_payload)
+            if workload is not None and workload != current_workload:
+                current_workload = workload
+                prior_duration_estimate = _read_runtime_estimate(
+                    runtime_history_path,
+                    current_workload,
+                )
+            try:
+                overall_elapsed = max(
+                    0.0,
+                    float(safe_payload.get("overall_elapsed_seconds", 0.0)),
+                )
+                overall_completed = max(
+                    0,
+                    int(safe_payload.get("overall_completed", 0)),
+                )
+            except (TypeError, ValueError):
+                overall_elapsed, overall_completed = 0.0, 0
+            if prior_duration_estimate is not None:
+                safe_payload["estimated_total_seconds"] = prior_duration_estimate
+                safe_payload["overall_eta_seconds"] = max(
+                    0.0,
+                    prior_duration_estimate - overall_elapsed,
+                )
+                safe_payload["estimate_basis"] = "previous_successful_run"
+            elif overall_completed > 0:
+                safe_payload["estimate_basis"] = "current_run_rate"
             current_model = safe_payload.pop("current_model", None)
             model_progress = progress_aliases.get(current_model)
             if model_progress is not None:
@@ -636,6 +827,7 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
                 safe_payload,
                 log_handle=log_handle,
             )
+            _write_public_progress(public_progress_path, safe_payload)
 
         # Import and invoke in this process: model tags never enter argv or the
         # environment, where another unprivileged process might inspect them.
@@ -656,24 +848,40 @@ def _publish(config: dict[str, Any], log_handle: Any) -> bool:
             raise PublishError(f"benchmark failed with exit status {exit_code}")
 
         benchmark_total_seconds = time.monotonic() - benchmark_started_clock
+        _record_runtime_sample(
+            runtime_history_path,
+            current_workload,
+            benchmark_total_seconds,
+        )
         log_handle.write(
             f"benchmark_total_runtime_seconds={benchmark_total_seconds:.3f}\n"
         )
         log_handle.flush()
 
+        final_progress = {
+            "phase": "finalizing",
+            "completed": 1,
+            "total": 1,
+            "percent": 100.0,
+            "elapsed_seconds": benchmark_total_seconds,
+            "eta_seconds": 0.0,
+            "total_run_seconds": benchmark_total_seconds,
+            "overall_completed": (
+                sum(current_workload.values()) if current_workload else 1
+            ),
+            "overall_total": sum(current_workload.values()) if current_workload else 1,
+            "overall_percent": 100.0,
+            "overall_elapsed_seconds": benchmark_total_seconds,
+            "overall_eta_seconds": 0.0,
+            "estimated_total_seconds": benchmark_total_seconds,
+            "estimate_basis": "current_run_rate",
+        }
         _write_private_progress(
             run_dir,
-            {
-                "phase": "finalizing",
-                "completed": 1,
-                "total": 1,
-                "percent": 100.0,
-                "elapsed_seconds": benchmark_total_seconds,
-                "eta_seconds": 0.0,
-                "total_run_seconds": benchmark_total_seconds,
-            },
+            final_progress,
             log_handle=log_handle,
         )
+        _write_public_progress(public_progress_path, final_progress)
         source = _latest_anonymized_result(run_dir)
         with source.open("r", encoding="utf-8") as handle:
             public_data = prepare_public_results(json.load(handle), terms)

@@ -125,9 +125,10 @@ Windows OpenSSH forced sessions may prevent Git for Windows' nested SSH
 transport from completing even when the same command works in a normal logon.
 The restricted trigger therefore starts an on-demand Scheduled Task. The task
 runs under a fresh `hermes-benchmark` password logon, while the trigger waits
-for an identity-free status file and relays only one of the publisher's four
-allowlisted messages. Task Scheduler's `IgnoreNew` policy, the trigger lock,
-and the publisher's run lock all independently prevent overlapping runs.
+for identity-free status/progress files, streams allowlisted aggregate progress,
+and finishes with one of the publisher's four allowlisted messages. Task
+Scheduler's `IgnoreNew` policy, the trigger lock, and the publisher's run lock
+all independently prevent overlapping runs.
 
 Create the task from elevated PowerShell. Task Scheduler stores the account
 credential as an LSA-protected secret; rotate the task credential whenever the
@@ -382,11 +383,20 @@ The Hermes server can then trigger a run:
 ssh -T hermes-benchmark@BENCHMARK_PC run
 ```
 
-The SSH response is deliberately generic. Model names, benchmark progress,
-Git output, tracebacks, and raw results go only to the root-readable
-`/var/lib/hermes-benchmark/last-run.log` on Linux or
+The SSH response is deliberately restricted. It streams only identity-free
+whole-run progress lines (completed/total work units, phase counters, elapsed
+time, and an ETA) followed by one allowlisted terminal message. Model names,
+test IDs, per-case outcomes, Git output, tracebacks, and raw results go only to
+the root-readable `/var/lib/hermes-benchmark/last-run.log` on Linux or
 `C:\ProgramData\HermesBenchmark\state\last-run.log` on Windows. Temporary
 internal results are deleted after every attempt.
+
+The stable `public-progress.json` contains only the fields permitted in those
+progress lines. After a successful benchmark execution, `runtime-history.json`
+retains up to five durations for the same aggregate workload shape. The median
+provides an immediate first ETA on later runs; during the first run, ETA uses
+the observed whole-run completion rate. Neither file contains model names,
+anonymous model aliases, test IDs, outputs, scores, or private configuration.
 
 While a benchmark is active, its private `run-*` directory contains an
 atomically replaced `progress.json`. It reports the phase, completed and total

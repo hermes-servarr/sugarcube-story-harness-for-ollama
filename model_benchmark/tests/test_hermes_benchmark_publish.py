@@ -207,6 +207,53 @@ def test_private_progress_accepts_context_window_phase(tmp_path):
     assert progress["phase"] == "context_window"
 
 
+def test_public_progress_contains_only_aggregate_timing(tmp_path):
+    path = tmp_path / "public-progress.json"
+    publisher._write_public_progress(
+        path,
+        {
+            "phase": "capability",
+            "completed": 4,
+            "total": 20,
+            "overall_completed": 36,
+            "overall_total": 100,
+            "overall_percent": 36.0,
+            "overall_elapsed_seconds": 900.0,
+            "overall_eta_seconds": 1600.0,
+            "estimate_basis": "previous_successful_run",
+            "current_model": "private-model-name",
+            "current_model_alias": "Model_A",
+            "current_test": "private-test-id",
+        },
+    )
+
+    progress = publisher.json.loads(path.read_text(encoding="utf-8"))
+    rendered = publisher.json.dumps(progress)
+    assert progress["overall_completed"] == 36
+    assert progress["overall_total"] == 100
+    assert progress["overall_eta_seconds"] == 1600.0
+    assert progress["estimate_basis"] == "previous_successful_run"
+    assert "private-model-name" not in rendered
+    assert "Model_A" not in rendered
+    assert "private-test-id" not in rendered
+
+
+def test_runtime_estimate_uses_matching_previous_workload(tmp_path):
+    path = tmp_path / "runtime-history.json"
+    workload = {
+        "matrix_total": 32,
+        "capability_total": 33,
+        "context_window_total": 0,
+    }
+    publisher._record_runtime_sample(path, workload, 1200.0)
+
+    assert publisher._read_runtime_estimate(path, workload) == 1200.0
+    assert publisher._read_runtime_estimate(
+        path,
+        {**workload, "capability_total": 34},
+    ) is None
+
+
 def test_update_checkout_requires_allowlisted_signer(monkeypatch, tmp_path):
     captured = iter(("", "main", "AA BB CC"))
     logged_commands = []
