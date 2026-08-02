@@ -12,12 +12,19 @@ import pytest
 
 from model_benchmark.runner import (
     BenchmarkRunner,
+    result_record_from_model_run,
     register_signal_handler,
     unregister_signal_handler,
     _emergency_checkpoint_handler,
 )
-from model_benchmark.scoring import BenchmarkConfig
+from model_benchmark.scoring import (
+    BenchmarkConfig,
+    CategoryResult,
+    ModelRunResult,
+    run_single_model,
+)
 from model_benchmark.schema import CheckpointState
+from harness.models import ModelOutput
 
 
 def _make_config(dry_run: bool = True) -> BenchmarkConfig:
@@ -33,6 +40,56 @@ def _make_config(dry_run: bool = True) -> BenchmarkConfig:
         runs=1,
         dry_run=dry_run,
     )
+
+
+def test_result_record_excludes_na_categories_from_denominator():
+    run = ModelRunResult(
+        model_name="test-model",
+        variant="compact",
+        direction="A",
+        run_index=0,
+        raw_response="output",
+        parsed_output=ModelOutput(prose="output"),
+        category_results=(
+            CategoryResult("markup_compliance", True, 1.0, "ok"),
+            CategoryResult(
+                "link_setter_syntax",
+                False,
+                0.0,
+                "N/A",
+                applicable=False,
+            ),
+        ),
+        overall_pass=True,
+    )
+
+    record = result_record_from_model_run(run)
+
+    assert record.max_score == 1.0
+    assert record.score == 1.0
+    assert record.normalized_score == 1.0
+    assert record.status == "PASS"
+
+
+def test_core_run_passes_and_records_configured_seed(monkeypatch):
+    captured = {}
+
+    def fake_call(*args, **kwargs):
+        captured["seed"] = kwargs["seed"]
+        return (
+            "PROSE:\n$gold is visible. <<set $seen to true>>\n"
+            "CHOICES:\n- Continue | Move on\nSUMMARY:\nThe flag changed."
+        )
+
+    monkeypatch.setattr("model_benchmark.scoring.call_ollama_sync", fake_call)
+    cfg = _make_config(dry_run=False)
+    object.__setattr__(cfg, "random_seed", "42")
+
+    run = run_single_model("test-model", "compact", "A", cfg)
+
+    assert captured["seed"] == 42
+    assert run.random_seed == "42"
+    assert result_record_from_model_run(run).random_seed == "42"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

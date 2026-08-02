@@ -9,6 +9,7 @@ from model_benchmark.capability_tests import (
     _score_checks,
     execute_capability_cases,
     load_cases,
+    select_capability_suite,
     validate_case,
 )
 from model_benchmark.config import BenchmarkConfig
@@ -35,6 +36,18 @@ def _candidate(**overrides):
     }
     data.update(overrides)
     return data
+
+
+def test_default_capability_suite_is_passage_only():
+    all_cases = load_cases()
+
+    core = select_capability_suite(all_cases)
+
+    assert core
+    assert len(core) < len(all_cases)
+    assert all(case.source == "core" for case in core)
+    assert all(case.response_mode == "passage" for case in core)
+    assert select_capability_suite(all_cases, include_diagnostics=True) == tuple(all_cases)
 
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
@@ -210,6 +223,7 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
         captured["prompt"] = prompt
         captured["config_num_predict"] = config.num_predict
         captured["call_num_predict"] = kwargs["num_predict"]
+        captured["seed"] = kwargs["seed"]
         return "7319"
 
     monkeypatch.setattr(
@@ -225,6 +239,7 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
         num_predict=640,
         temperature=0.2,
         runs=1,
+        random_seed="7319",
     )
 
     record = execute_capability_cases(cfg, [case])[0]
@@ -233,8 +248,11 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
     assert "PROSE/CHOICES/SUMMARY section labels" in captured["prompt"]
     assert captured["config_num_predict"] == 32
     assert captured["call_num_predict"] == 32
+    assert captured["seed"] == 7319
     assert record.status == "PASS"
     assert record.subcategory == "plain_text"
+    assert record.dataset == "capability_retrieval_transport"
+    assert record.random_seed == "7319"
     assert len(record.scored_result.category_results) == 1
 
 

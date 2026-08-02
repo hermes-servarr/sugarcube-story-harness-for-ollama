@@ -215,6 +215,52 @@ class TestScoreMacroUsage:
         assert result.score == 0.0
 
 
+class TestApplicability:
+    def test_non_thinking_and_absent_setter_checks_are_na(self):
+        from model_benchmark.scoring import score_response as score_with_applicability
+
+        raw = "PROSE:\nText.\nCHOICES:\n- Continue | Go on\nSUMMARY:\nDone."
+        results = {
+            item.name: item
+            for item in score_with_applicability(raw, _parse(raw), "compact", "B")
+        }
+
+        assert results["thinking_quality"].applicable is False
+        assert results["link_setter_syntax"].applicable is False
+        assert results["variable_scoping"].applicable is False
+        assert results["macro_usage"].applicable is True  # direction B requires <<if>>
+
+    def test_emitted_construct_makes_hygiene_check_applicable(self):
+        from model_benchmark.scoring import score_response as score_with_applicability
+
+        raw = "PROSE:\nText.\nCHOICES:\n- [[Continue|Next]]\nSUMMARY:\nDone."
+        result = next(
+            item for item in score_with_applicability(raw, _parse(raw), "compact", "B")
+            if item.name == "link_setter_syntax"
+        )
+
+        assert result.applicable is True
+        assert result.passed is False
+
+    def test_case_requirements_override_direction_defaults(self):
+        from model_benchmark.scoring import score_response as score_with_applicability
+
+        raw = "PROSE:\nThe archive code is 7319.\nCHOICES:\n- Continue | Go on\nSUMMARY:\nFound it."
+        results = {
+            item.name: item
+            for item in score_with_applicability(
+                raw,
+                _parse(raw),
+                "compact",
+                "C",
+                required_categories=frozenset(),
+            )
+        }
+
+        assert results["macro_usage"].applicable is False
+        assert results["naked_interpolation"].applicable is False
+
+
 # ── Category 5: Naked interpolation ──────────────────────────────────────
 
 class TestScoreNakedInterpolation:

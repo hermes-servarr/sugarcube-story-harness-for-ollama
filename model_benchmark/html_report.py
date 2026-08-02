@@ -258,7 +258,7 @@ def _model_run_result_to_row(run: Any, index: int) -> dict[str, Any]:
     else:
         status = "FAIL"
     # Score: mean of category scores in [0,1].
-    scores = [c["score"] for c in categories]
+    scores = [c["score"] for c in categories if c["applicable"]]
     score = sum(scores) / len(scores) if scores else 0.0
     return {
         "id": f"{run.model_name}-{run.variant}-{run.direction}-{run.run_index}",
@@ -291,6 +291,7 @@ def _category_to_dict(cat: Any) -> dict[str, Any]:
         "score": float(cat.score),
         "details": cat.details,
         "evidence": list(getattr(cat, "evidence", ())),
+        "applicable": bool(getattr(cat, "applicable", True)),
     }
 
 
@@ -849,8 +850,13 @@ def _render_detail_row(row: dict[str, Any], index: int) -> str:
         parts.append('<table class="cat-table">')
         parts.append("<tr><th>Category</th><th>Pass</th><th>Score</th><th>Details</th></tr>")
         for c in cats:
-            verdict = "PASS" if c["passed"] else "FAIL"
-            vclass = "pass" if c["passed"] else "fail"
+            applicable = c.get("applicable", True)
+            verdict = (
+                "N/A"
+                if not applicable
+                else ("PASS" if c["passed"] else "FAIL")
+            )
+            vclass = "" if not applicable else ("pass" if c["passed"] else "fail")
             parts.append(
                 f"<tr><td>{_esc(c['name'])}</td>"
                 f'<td class="{vclass}">{verdict}</td>'

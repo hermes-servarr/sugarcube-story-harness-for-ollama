@@ -91,10 +91,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 # ── Existing benchmark structures + functions ───────────────────────────
-# Import from ``benchmark`` (the compatibility shim / canonical surface).
-# This keeps the module working regardless of whether benchmark.py is later
-# reduced to a re-export shim over scoring.py / fixtures.py.
-from model_benchmark.benchmark import (
+# Use the extracted scoring implementation.  ``benchmark.py`` remains the
+# legacy compatibility surface, while active benchmark runs need the
+# applicability-aware scorer defined here.
+from model_benchmark.scoring import (
     BenchmarkConfig,
     ModelRunResult,
     PROMPT_VERSION,
@@ -430,9 +430,14 @@ def result_record_from_model_run(
     every category passed, ``FAIL`` if any failed, ``ERROR`` if the run
     captured an infrastructure error (``run.error`` non-empty).
     """
-    n_cats = len(run.category_results)
-    n_passed = sum(1 for c in run.category_results if c.passed)
-    overall_pass = all(c.passed for c in run.category_results) if n_cats else False
+    applicable_categories = tuple(
+        c for c in run.category_results if getattr(c, "applicable", True)
+    )
+    n_cats = len(applicable_categories)
+    n_passed = sum(1 for c in applicable_categories if c.passed)
+    overall_pass = (
+        all(c.passed for c in applicable_categories) if n_cats else False
+    )
     max_score = float(n_cats) if n_cats else 1.0
     score = float(n_passed)
     normalized_score = (score / max_score) if max_score > 0 else 0.0
@@ -460,8 +465,16 @@ def result_record_from_model_run(
         test_version=f"v{PROMPT_VERSION}",
         capability=_CAPABILITY,
         # category: use the first failing category if any, else the first one.
-        # The full 6-category breakdown is preserved in ``scored_result``.
-        category=run.category_results[0].name if run.category_results else "markup_compliance",
+        # The full category breakdown, including N/A checks, is preserved in
+        # ``scored_result``.
+        category=(
+            next((c.name for c in applicable_categories if not c.passed), None)
+            or (
+                applicable_categories[0].name
+                if applicable_categories
+                else "markup_compliance"
+            )
+        ),
         subcategory=run.variant,
         difficulty=run.direction,
         dataset="sugarcube_fixtures",
@@ -469,7 +482,7 @@ def result_record_from_model_run(
         repetition=run.run_index + 1,
         input_summary=run.variant,
         expected_behavior="SugarCube-compliant PROSE/CHOICES/SUMMARY",
-        reference_rubric="6-category scoring (INV-9)",
+        reference_rubric="applicability-aware category scoring (INV-9)",
         actual_output_raw=run.raw_response,
         parsed_output=run.parsed_output,
         score=score,
@@ -478,7 +491,7 @@ def result_record_from_model_run(
         pass_threshold=1.0,
         status=status,
         failure_category=failure_category,  # type: ignore[arg-type]
-        evaluator_reasoning="6 scorers from scoring.py (INV-2/9/10)",
+        evaluator_reasoning="applicable scorers from scoring.py (INV-2/9/10)",
         evaluator_confidence=1.0,
         runtime_seconds=run.elapsed_seconds,
         input_tokens=0,
@@ -491,7 +504,7 @@ def result_record_from_model_run(
         config_alias=f"temp={0.2}",
         prompt_version=PROMPT_VERSION,
         evaluator_version=EVALUATOR_VERSION,
-        random_seed="",
+        random_seed=str(getattr(run, "random_seed", "") or ""),
         timestamp_start=ts_end,
         timestamp_end=ts_end,
         artifact_refs=(),
@@ -951,7 +964,7 @@ class BenchmarkRunner:
             repetition=item.repetition,
             input_summary=item.variant,
             expected_behavior="SugarCube-compliant PROSE/CHOICES/SUMMARY",
-            reference_rubric="6-category scoring (INV-9)",
+            reference_rubric="applicability-aware category scoring (INV-9)",
             actual_output_raw="",
             parsed_output=empty,
             score=0.0,
@@ -973,7 +986,7 @@ class BenchmarkRunner:
             config_alias="",
             prompt_version=PROMPT_VERSION,
             evaluator_version=EVALUATOR_VERSION,
-            random_seed="",
+            random_seed=str(getattr(self.config, "random_seed", "") or ""),
             timestamp_start=ts,
             timestamp_end=ts,
             provenance="new",
@@ -1018,7 +1031,7 @@ class BenchmarkRunner:
             config_alias="",
             prompt_version=PROMPT_VERSION,
             evaluator_version=EVALUATOR_VERSION,
-            random_seed="",
+            random_seed=str(getattr(self.config, "random_seed", "") or ""),
             timestamp_start=ts,
             timestamp_end=ts,
             provenance="resumed",
@@ -1042,7 +1055,7 @@ class BenchmarkRunner:
             raw_response=_DRY_RUN_RESPONSE,
             parsed_output=parsed,
             category_results=tuple(results),
-            overall_pass=all(r.passed for r in results),
+            overall_pass=all(r.passed for r in results if r.applicable),
             elapsed_seconds=0.0,
         )
         rec = result_record_from_model_run(run, run_id=self.run_id, provenance="new")

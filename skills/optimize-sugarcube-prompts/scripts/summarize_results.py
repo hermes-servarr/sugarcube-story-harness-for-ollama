@@ -40,7 +40,11 @@ def _failed_evaluator_categories(
         if not isinstance(categories, list):
             continue
         for category in categories:
-            if isinstance(category, dict) and not category.get("passed", False):
+            if (
+                isinstance(category, dict)
+                and category.get("applicable", True)
+                and not category.get("passed", False)
+            ):
                 failures[str(category.get("name") or "unspecified")] += 1
     return failures
 
@@ -191,33 +195,47 @@ def summarize(path: Path) -> dict[str, Any]:
         for row in records
         if row.get("dataset") == "capability_context_window"
     ]
-    objective_records = [
+    passage_records = [
         row
         for row in records
         if row.get("dataset") not in {
             "capability_candidate",
             "capability_context_window",
         }
+        and str(row.get("subcategory", "")).lower() != "plain_text"
+    ]
+    plain_text_records = [
+        row
+        for row in records
+        if row.get("dataset") not in {
+            "capability_candidate",
+            "capability_context_window",
+        }
+        and str(row.get("subcategory", "")).lower() == "plain_text"
     ]
     scores = [
-        float(row.get("normalized_score", 0.0)) for row in objective_records
+        float(row.get("normalized_score", 0.0)) for row in passage_records
     ]
-    passed = sum(row.get("status") == "PASS" for row in objective_records)
+    passed = sum(row.get("status") == "PASS" for row in passage_records)
     failures = Counter(
         str(row.get("failure_category") or "unspecified")
-        for row in objective_records
+        for row in passage_records
         if row.get("status") != "PASS"
     )
     samples = []
     for row in sorted(
-        (item for item in objective_records if item.get("status") != "PASS"),
+        (item for item in passage_records if item.get("status") != "PASS"),
         key=lambda item: float(item.get("normalized_score", 0.0)),
     )[:8]:
         category_details = []
         scored = row.get("scored_result")
         if isinstance(scored, dict):
             for category in scored.get("category_results", []):
-                if isinstance(category, dict) and not category.get("passed", False):
+                if (
+                    isinstance(category, dict)
+                    and category.get("applicable", True)
+                    and not category.get("passed", False)
+                ):
                     category_details.append(
                         {
                             "name": str(category.get("name", "")),
@@ -236,21 +254,25 @@ def summarize(path: Path) -> dict[str, Any]:
                 "failed_categories": category_details[:4],
             }
         )
-    total = len(objective_records)
+    total = len(passage_records)
     return {
+        "headline": "passage_generation",
         "total_cases": total,
         "passed": passed,
         "pass_rate": round(passed / total, 4) if total else 0.0,
         "mean_score": round(statistics.fmean(scores), 4) if scores else 0.0,
         "failure_categories": dict(failures.most_common()),
-        "by_model_alias": _group(objective_records, "model_alias"),
-        "by_variant": _group(objective_records, "subcategory"),
-        "by_direction": _group(objective_records, "difficulty"),
-        "by_context_profile": _group(objective_records, "split"),
-        "thinking_variant": _thinking_summary(objective_records),
-        "plain_text": _plain_text_summary(objective_records),
-        "conversation_layout": _conversation_summary(objective_records),
-        "writing_style": _style_summary(objective_records),
+        "by_model_alias": _group(passage_records, "model_alias"),
+        "by_variant": _group(passage_records, "subcategory"),
+        "by_direction": _group(passage_records, "difficulty"),
+        "by_context_profile": _group(passage_records, "split"),
+        "thinking_variant": _thinking_summary(passage_records),
+        "plain_text": {
+            "diagnostic_only": True,
+            **_plain_text_summary(plain_text_records),
+        },
+        "conversation_layout": _conversation_summary(passage_records),
+        "writing_style": _style_summary(passage_records),
         "candidate_tests": {
             "diagnostic_only": True,
             **(

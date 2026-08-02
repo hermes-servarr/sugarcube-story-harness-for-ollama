@@ -502,7 +502,15 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     p_run.add_argument(
         "--capability-tests",
         action="store_true",
-        help="Also run the signed capability ladder and validated candidate probes.",
+        help="Also run the passage-generation capability core.",
+    )
+    p_run.add_argument(
+        "--diagnostic-tests",
+        action="store_true",
+        help=(
+            "With --capability-tests, also run plain-text retrieval/transport "
+            "cases and validated candidate probes."
+        ),
     )
     p_run.add_argument(
         "--candidate-test-dir",
@@ -1140,10 +1148,18 @@ def _cmd_run(
 
     capability_cases: tuple[Any, ...] = ()
     if getattr(args, "capability_tests", False) and not cfg.dry_run:
-        from model_benchmark.capability_tests import load_cases
+        from model_benchmark.capability_tests import load_cases, select_capability_suite
 
-        capability_cases = tuple(
-            load_cases(candidate_dir=Path(getattr(args, "candidate_test_dir")))
+        include_diagnostics = bool(getattr(args, "diagnostic_tests", False))
+        capability_cases = select_capability_suite(
+            load_cases(
+                candidate_dir=(
+                    Path(getattr(args, "candidate_test_dir"))
+                    if include_diagnostics
+                    else None
+                )
+            ),
+            include_diagnostics=include_diagnostics,
         )
 
     context_sizes: tuple[int, ...] = ()

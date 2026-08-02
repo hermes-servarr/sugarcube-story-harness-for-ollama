@@ -67,7 +67,7 @@ import re
 import sys
 import time
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal
 
@@ -149,12 +149,18 @@ _CATEGORY_ORDER: tuple[CategoryName, ...] = (
 
 @dataclass(frozen=True)
 class CategoryResult:
-    """One scoring category's verdict for a single model response — 6 per run."""
+    """One scoring category's verdict for a single model response.
+
+    ``applicable`` is false when the case neither requires nor emits the
+    construct measured by this category.  Such results are reported as N/A
+    and must not contribute to pass-rate or normalized-score denominators.
+    """
     name: CategoryName
     passed: bool
     score: float
     details: str
     evidence: tuple[str, ...] = ()
+    applicable: bool = True
 
 
 @dataclass(frozen=True)
@@ -170,6 +176,7 @@ class ModelRunResult:
     overall_pass: bool
     elapsed_seconds: float = 0.0
     error: str = ""
+    random_seed: str = ""
 
 
 @dataclass(frozen=True)
@@ -650,17 +657,16 @@ def score_thinking_quality(thinking_text: str, direction: DirectionKey) -> Categ
     - Shows structured analysis (multiple reasoning steps)
     - References the story context (premise, entities, etc.)
 
-    For non-thinking responses (empty thinking_text), returns a passing
-    result with score 1.0 so it doesn't penalize non-thinking models.
-    The category is only meaningful for the "thinking" prompt variant.
+    Empty thinking content fails this scorer.  The orchestrator marks the
+    category N/A for non-thinking variants, so only a thinking case can be
+    penalized for omitting its requested reasoning.
     """
     if not thinking_text or not thinking_text.strip():
-        # Non-thinking response: neutral pass, no penalty
         return CategoryResult(
             name="thinking_quality",
-            passed=True,
-            score=1.0,
-            details="No thinking content (non-thinking variant or model).",
+            passed=False,
+            score=0.0,
+            details="Thinking variant produced no thinking content.",
         )
 
     # Sub-checks (INV-10): 5 checks
@@ -738,7 +744,9 @@ def score_thinking_quality(thinking_text: str, direction: DirectionKey) -> Categ
 
 
 def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant,
-                   direction: DirectionKey = "A") -> list[CategoryResult]:
+                   direction: DirectionKey = "A", *,
+                   required_categories: frozenset[str] | None = None,
+                   ) -> list[CategoryResult]:
     """Run all scorers on one response; returns exactly 7 CategoryResult (one per category).
 
     For thinking variants, extracts thinking content and scores it separately.
@@ -752,15 +760,65 @@ def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant,
     # For the 6 format scorers, use the stripped output if thinking was detected
     format_raw = extraction.output_text if extraction.has_thinking else raw
 
+    # A hygiene scorer becomes a capability measurement only when the task
+    # requires its construct or the response attempts to emit that construct.
+    # Keeping the result as N/A preserves visibility without awarding a
+    # vacuous pass (for example, "no invalid setter" when there is no setter).
+    if required_categories is None:
+        requires_state_write = direction == "A"
+        requires_macro = direction in {"A", "B", "C", "D", "E", "F", "G", "H"}
+        requires_interpolation = direction == "C"
+        requires_link_setter = False
+    else:
+        requires_state_write = "variable_scoping" in required_categories
+        requires_macro = "macro_usage" in required_categories
+        requires_interpolation = "naked_interpolation" in required_categories
+        requires_link_setter = "link_setter_syntax" in required_categories
+    emits_state_write = bool(re.search(r"<<\s*set\b|\bsetup\.\w+", format_raw, re.I))
+    emits_macro = bool(re.search(r"<<\s*/?\w+\b", format_raw))
+    interpolation_text = parsed.prose or format_raw
+    non_macro_text = " ".join(re.split(r"<<[^>]*>>", interpolation_text))
+    emits_interpolation = bool(
+        re.search(r"(?<![\w])\$[A-Za-z_]\w*", non_macro_text)
+        or re.search(r"<<\s*print\b", interpolation_text, re.I)
+    )
+    emits_link_or_setter = bool(
+        re.search(r"\[\[|<<\s*(?:link|button)\b", format_raw, re.I)
+    )
+
+    def conditional(result: CategoryResult, applicable: bool) -> CategoryResult:
+        if applicable:
+            return result
+        return replace(
+            result,
+            passed=False,
+            score=0.0,
+            details="N/A: construct neither required nor emitted by this case.",
+            evidence=(),
+            applicable=False,
+        )
+
     # INV-9: exactly 7 results in canonical category order.
     results = [
         score_markup_compliance(format_raw),
-        score_variable_scoping(format_raw),
+        conditional(
+            score_variable_scoping(format_raw),
+            requires_state_write or emits_state_write,
+        ),
         score_passage_structure(format_raw, parsed),
-        score_macro_usage(format_raw),
-        score_naked_interpolation(parsed.prose or format_raw),
-        score_link_setter_syntax(format_raw, parsed),
-        score_thinking_quality(thinking_text, direction),
+        conditional(score_macro_usage(format_raw), requires_macro or emits_macro),
+        conditional(
+            score_naked_interpolation(parsed.prose or format_raw),
+            requires_interpolation or emits_interpolation,
+        ),
+        conditional(
+            score_link_setter_syntax(format_raw, parsed),
+            requires_link_setter or emits_link_or_setter,
+        ),
+        conditional(
+            score_thinking_quality(thinking_text, direction),
+            variant == "thinking",
+        ),
     ]
     return results
 
@@ -792,6 +850,11 @@ def run_single_model(
         temperature=cfg.temperature,
         num_predict=cfg.num_predict,
     )
+    configured_seed = str(getattr(cfg, "random_seed", "") or "")
+    try:
+        sampling_seed = int(configured_seed) if configured_seed else None
+    except ValueError:
+        sampling_seed = None
 
     t0 = time.monotonic()
     try:
@@ -800,6 +863,7 @@ def run_single_model(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 format_spec="json", label=f"benchmark-{model}-{variant}-{direction}",
+                seed=sampling_seed,
             )
             parsed = parse_model_output_json(raw)
         else:
@@ -807,12 +871,13 @@ def run_single_model(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 label=f"benchmark-{model}-{variant}-{direction}",
+                seed=sampling_seed,
             )
             parsed = parse_model_output(raw)
         elapsed = time.monotonic() - t0
 
         results = score_response(raw, parsed, variant, direction)
-        overall = all(r.passed for r in results)
+        overall = all(r.passed for r in results if r.applicable)
 
         return ModelRunResult(
             model_name=model,
@@ -824,6 +889,7 @@ def run_single_model(
             category_results=tuple(results),
             overall_pass=overall,
             elapsed_seconds=elapsed,
+            random_seed=configured_seed,
         )
     except Exception as e:
         elapsed = time.monotonic() - t0
@@ -849,6 +915,7 @@ def run_single_model(
             overall_pass=False,
             elapsed_seconds=elapsed,
             error=str(e),
+            random_seed=configured_seed,
         )
 
 
@@ -880,7 +947,7 @@ def build_model_report(model: str, runs: list[ModelRunResult]) -> ModelReport:
         passed = 0
         for run in runs:
             for cr in run.category_results:
-                if cr.name == cat_name:
+                if cr.name == cat_name and cr.applicable:
                     total += 1
                     if cr.passed:
                         passed += 1
@@ -892,10 +959,11 @@ def build_model_report(model: str, runs: list[ModelRunResult]) -> ModelReport:
             passed=passed,
         ))
 
-    # P1 §4.1 Q1 default: unweighted pass-count average across the 6 categories.
+    # Unweighted pass-rate average across categories with non-zero coverage.
+    covered_entries = [entry for entry in summary_entries if entry.total > 0]
     overall_score = (
-        sum(e.pass_rate for e in summary_entries) / len(summary_entries)
-        if summary_entries else 0.0
+        sum(entry.pass_rate for entry in covered_entries) / len(covered_entries)
+        if covered_entries else 0.0
     )
     runs_passed = sum(1 for r in runs if r.overall_pass)
 

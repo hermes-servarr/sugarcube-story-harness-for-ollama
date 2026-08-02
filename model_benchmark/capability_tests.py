@@ -655,7 +655,24 @@ def execute_capability_cases(
                     else parse_model_output(raw)
                 )
                 categories = (
-                    score_response(raw, parsed, case.variant, case.direction_key)
+                    score_response(
+                        raw,
+                        parsed,
+                        case.variant,
+                        case.direction_key,
+                        required_categories=frozenset(
+                            {
+                                "variable_scoping"
+                                for check in case.checks
+                                if check["check"] == "variable"
+                            }
+                            | {
+                                "macro_usage"
+                                for check in case.checks
+                                if check["check"] in {"macro", "balanced_macro"}
+                            }
+                        ),
+                    )
                     if case.response_mode == "passage"
                     else []
                 )
@@ -680,11 +697,23 @@ def execute_capability_cases(
                 raw_response=raw,
                 parsed_output=parsed,
                 category_results=tuple(categories),
-                overall_pass=not error and all(item.passed for item in categories),
+                overall_pass=not error and all(
+                    item.passed
+                    for item in categories
+                    if getattr(item, "applicable", True)
+                ),
                 elapsed_seconds=time.monotonic() - started,
                 error=error,
+                random_seed=str(sampling_seed) if sampling_seed is not None else "",
             )
             record = result_record_from_model_run(run)
+            dataset = (
+                "capability_candidate"
+                if case.source == "candidate"
+                else "capability_retrieval_transport"
+                if case.response_mode == "plain_text"
+                else "capability_core"
+            )
             records.append(
                 dataclasses.replace(
                     record,
@@ -698,7 +727,7 @@ def execute_capability_cases(
                         else "plain_text"
                     ),
                     difficulty=f"T{case.tier}",
-                    dataset=f"capability_{case.source}",
+                    dataset=dataset,
                     split=(
                         f"{case.context_size}-{case.task_complexity}-"
                         f"{case.distractor_density}"
@@ -715,3 +744,19 @@ def execute_capability_cases(
                 except Exception:
                     pass
     return records
+
+
+def select_capability_suite(
+    cases: Iterable[CapabilityCase],
+    *,
+    include_diagnostics: bool = False,
+) -> tuple[CapabilityCase, ...]:
+    """Select the passage core, optionally retaining diagnostic case families."""
+    case_list = tuple(cases)
+    if include_diagnostics:
+        return case_list
+    return tuple(
+        case
+        for case in case_list
+        if case.source == "core" and case.response_mode == "passage"
+    )

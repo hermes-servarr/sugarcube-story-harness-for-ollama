@@ -210,9 +210,46 @@ def test_plain_text_results_are_reported_by_context_profile(tmp_path):
 
     summary = MODULE.summarize(path)
 
+    assert summary["headline"] == "passage_generation"
+    assert summary["total_cases"] == 0
+    assert summary["plain_text"]["diagnostic_only"] is True
     assert summary["plain_text"]["cases"] == 1
     assert summary["plain_text"]["pass_rate"] == 1.0
     assert summary["plain_text"]["by_context_profile"]["XL-K1-D0"]["passed"] == 1
+
+
+def test_plain_text_does_not_inflate_passage_headline(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:compact:A:1",
+                    "model_alias": "Model_A",
+                    "dataset": "sugarcube_fixtures",
+                    "subcategory": "compact",
+                    "normalized_score": 0.0,
+                    "status": "FAIL",
+                },
+                {
+                    "test_id": "Model_A:T0-PLAIN-EXACT:compact:1",
+                    "model_alias": "Model_A",
+                    "dataset": "capability_core",
+                    "subcategory": "plain_text",
+                    "normalized_score": 1.0,
+                    "status": "PASS",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)
+
+    assert summary["total_cases"] == 1
+    assert summary["pass_rate"] == 0.0
+    assert summary["plain_text"]["cases"] == 1
+    assert summary["plain_text"]["pass_rate"] == 1.0
 
 
 def test_conversation_layout_reports_failed_signed_checks(tmp_path):

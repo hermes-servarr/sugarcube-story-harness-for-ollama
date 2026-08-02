@@ -29,6 +29,7 @@ Covers:
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from html.parser import HTMLParser
 
 import pytest
@@ -514,6 +515,23 @@ class TestDetailContent:
         html_doc = generate_html_report(_make_run_results(1))
         assert "evidence1" in html_doc
         assert 'class="evidence-list"' in html_doc
+
+    def test_non_applicable_category_renders_as_na(self) -> None:
+        run = _make_run_result()
+        categories = (
+            *run.category_results[:-1],
+            CategoryResult(
+                "link_setter_syntax",
+                False,
+                0.0,
+                "N/A: construct neither required nor emitted by this case.",
+                applicable=False,
+            ),
+        )
+
+        html_doc = generate_html_report(replace(run, category_results=categories))
+
+        assert ">N/A</td>" in html_doc
 
     def test_raw_output_in_detail(self) -> None:
         html_doc = generate_html_report(_make_run_results(1))
