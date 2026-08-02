@@ -13,11 +13,11 @@ Paste the complete block below into Hermes as one message:
 /goal Run a bounded SugarCube prompt-optimization campaign using /optimize-sugarcube-prompts. Perform one complete, sequential experiment per goal turn. Continue automatically across goal turns until a defined completion or stop condition occurs. Do not create a separate shell loop.
 
 outcome:
-Improve the aggregate objective pass rate of the anonymized SugarCube benchmark while preserving test difficulty, coverage, grading integrity, privacy, and GPU safety. Retain the best verified prompt overlay, record every experiment, and finish with a concise campaign report.
+Improve the aggregate objective pass rate of the anonymized SugarCube benchmark while preserving test difficulty, coverage, grading integrity, privacy, and GPU safety. Explore a broad set of narrow, falsifiable prompt hypotheses, retain the best verified prompt overlay, map what helps and harms each measured capability, record every experiment, and finish with a concise campaign report.
 
-Use the current anonymized public result as the campaign baseline. The early-success target is an improvement of at least 5 absolute percentage points over that baseline, with no unreverted aggregate, variant, capability, or material per-alias regression.
+Use the current anonymized public result as the campaign baseline. An improvement of at least 5 absolute percentage points over that baseline, with no unreverted aggregate, variant, capability, or material per-alias regression, is a success milestone to record; it is not a reason to end the campaign early.
 
-Complete no more than five successful benchmark experiments. An experiment counts only after:
+Complete 10 successful benchmark experiments unless a safety or verification stop condition fires. This campaign-specific continuation rule replaces the skill's default target-reached and consecutive-non-improvement stopping rules. An experiment counts only after:
 1. one hypothesis is recorded;
 2. its allowed changes are validated and pushed;
 3. /run-sugarcube-benchmark is invoked exactly once;
@@ -46,6 +46,8 @@ For every experiment:
    - diagnostic context-window acceptance and full-retrieval ceilings where
      available;
    - regressions by opaque model alias, without attempting to identify models.
+   - the experiment axis, the tested hypothesis, and whether each observed
+     effect was helpful, harmful, mixed, or unchanged.
 4. Create the next unused benchmark_optimization/iteration-NN.md with:
    - baseline metrics;
    - observable failure behavior;
@@ -63,7 +65,16 @@ For every experiment:
 11. After confirmed success, fast-forward pull the newly published anonymized result.
 12. Run the summarizer again and append exact before/after metrics, regressions, conclusion, and next decision to the iteration note.
 13. Commit and push the completed iteration note.
-14. If the experiment regressed objective performance, restore the previous best overlay, validate it, commit the rollback, and record the regression. Do not spend another GPU run merely to prove that a byte-for-byte restored overlay matches its previously verified result.
+14. If the experiment regressed objective performance, fully map the regression across aggregate, variant, capability, signed-check category, and opaque-alias metrics; restore the previous best overlay; validate it; commit the rollback; and continue with a materially different hypothesis on the next goal turn. Do not spend another GPU run merely to prove that a byte-for-byte restored overlay matches its previously verified result. A cleanly recorded and reverted regression counts as a completed experiment and is useful campaign evidence, not a campaign stop.
+
+Across the campaign, deliberately explore different evidence-supported axes
+rather than repeatedly rewording the same idea. Candidate axes include global
+instruction hierarchy, variant-specific formatting, thinking-to-final
+transition, conversation layout, writing style, concision, and a single
+direction-specific weakness. Keep every individual experiment narrow enough
+to attribute its effect. Before choosing an experiment, review prior iteration
+notes and do not repeat a semantically equivalent change unless the new test
+isolates a clearly different hypothesis.
 
 At campaign completion, report:
 - number of completed and aborted experiments;
@@ -72,6 +83,8 @@ At campaign completion, report:
 - thinking, conversation-layout, writing-style, and plain-text findings;
 - the best retained overlay and why it was retained;
 - reverted experiments and regressions;
+- an experiment map listing every tested axis and its helpful, harmful, mixed,
+  or unchanged effects;
 - diagnostic probes and proposed future tests;
 - exact stop condition reached;
 - whether operator action is required.
@@ -170,18 +183,23 @@ If progress requires a Python change, new signed check primitive, canonical test
 stop when:
 Stop immediately and provide the campaign report when the first of these occurs:
 
-1. Five benchmark experiments have completed.
-2. The best aggregate objective pass rate improves by at least 5 absolute percentage points over the campaign baseline, with no unreverted material regression.
-3. Two consecutive completed experiments fail to improve the best aggregate objective pass rate.
-4. A regression cannot be cleanly reverted to the previously verified overlay.
-5. /run-sugarcube-benchmark reports failure, already-running, timeout, SSH disconnect, ambiguous state, or any non-success result.
-6. Git pull, validation, commit, or push fails.
-7. Changed paths fall outside the permitted boundaries.
-8. Result anonymization, model privacy, mapping privacy, or repository safety becomes uncertain.
-9. A thinking result suggests output-budget exhaustion or truncation requiring operator review.
-10. Progress requires protected code, canonical tests, scoring, evaluators, thresholds, token budgets, PC configuration, or signed baseline changes.
-11. The public result is missing, malformed, unchanged unexpectedly, or cannot be safely compared.
-12. Any condition makes it unclear whether another GPU run is already active.
+1. Ten benchmark experiments have completed.
+2. A regression cannot be cleanly reverted to the previously verified overlay.
+3. /run-sugarcube-benchmark reports failure, already-running, timeout, SSH disconnect, ambiguous state, or any non-success result.
+4. Git pull, validation, commit, or push fails.
+5. Changed paths fall outside the permitted boundaries.
+6. Result anonymization, model privacy, mapping privacy, or repository safety becomes uncertain.
+7. A thinking result suggests output-budget exhaustion or truncation requiring operator review.
+8. Progress requires protected code, canonical tests, scoring, evaluators, thresholds, token budgets, PC configuration, or signed baseline changes.
+9. The public result is missing, malformed, unchanged unexpectedly, or cannot be safely compared.
+10. Any condition makes it unclear whether another GPU run is already active.
+
+Do not stop because an experiment regresses, produces unchanged results, misses
+the success milestone, reaches the success milestone, or because several
+experiments in a row fail to improve. Record the evidence, restore the best
+verified overlay when necessary, select a materially different hypothesis,
+and continue until all 10 experiments complete or a safety/verification stop
+condition above fires.
 
 When stopped by a failure or safety condition, do not retry, improvise around the restriction, or continue with another experiment. Preserve the last verified best overlay and state exactly what the operator must inspect or approve.
 ```
