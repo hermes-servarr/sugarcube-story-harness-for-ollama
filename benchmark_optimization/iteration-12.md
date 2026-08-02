@@ -96,3 +96,58 @@ Revert directions.H to empty string if:
 - Aggregate objective pass rate declines below 0.3036, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~55 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 280     | 280     | 0     |
+| Passed    | 85      | 85      | 0     |
+| Pass rate | 0.3036  | 0.3036  | 0     |
+| Mean score| 0.8202  | 0.8196  | -0.0006 |
+
+### By Variant
+
+All variants identical to Exp10. compact 27/60, full 6/96, json 20/40,
+plain_text 27/32, thinking 5/52.
+
+### By Direction
+
+All directions identical to Exp10. Direction H: 5/16 (unchanged).
+
+### By Model Alias
+
+All aliases identical to Exp10. Model_A 13, Model_B 30, Model_C 26, Model_D 16.
+
+## Conclusion
+
+Experiment 12 is non-improving. The aggregate pass rate is unchanged
+(85/280 = 30.36%). Direction H pass rate is unchanged (5/16 = 31.25%).
+No variant, alias, or direction changed. The direction-H suffix had
+zero observable effect.
+
+The direction-specific suffix may not be reaching the model's attention
+in the context of the full prompt, or direction H's failures are not
+passage_structure related (the suffix only reinforced section names that
+are already in global_suffix). The global_suffix already names the
+required sections; repeating them in a direction-specific suffix adds
+no new information.
+
+The overlay is retained because it did not regress. The direction-H
+suffix is harmless but ineffective. It may be removed in a future cleanup
+but is left in place to avoid spending a GPU run on a byte-for-byte
+restoration.
+
+## Next Decision
+
+Direction-specific suffixes that repeat global_suffix content are
+ineffective. The next experiment should try a direction-specific suffix
+with different content, or explore another axis entirely. The full
+variant (96 cases, 6.25%) remains the largest opportunity. Exp09 showed
+the condensed global_suffix helped full (+4) but hurt compact (-6). A
+full-variant-specific suffix with concise markup guidance (not section
+names, which failed in Exp06) could help full without affecting compact.
