@@ -4,7 +4,7 @@
   "variants": {
     "compact": "",
     "full": "",
-    "json": "Your output must be valid JSON. Use SugarCube markup (not Markdown) inside JSON string values.",
+    "json": "",
     "thinking": ""
   },
   "directions": {
