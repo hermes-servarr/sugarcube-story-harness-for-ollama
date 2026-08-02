@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "global_suffix": "Format your output using SugarCube markup, not Markdown.\n\nRequired passage sections in this exact order:\n===CHOICES===\n===PROSE===\n===SUMMARY===\n\nSugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.\n\nWhen the task requests a conversation scene, use this layout inside the PROSE section:\nDIALOGUE:\nSpeaker: \"Spoken words.\"\nSpeaker: \"Reply words.\"\nINNER MONOLOGUE:\nMC: //Private thoughts.//",
+  "global_suffix": "Format your output using SugarCube markup, not Markdown.\n\nRequired passage sections in this exact order:\n===CHOICES===\n===PROSE===\n===SUMMARY===\n\nSugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.\n\nWhen the task involves dialogue or conversation between characters, use this layout inside the PROSE section:\nDIALOGUE:\nSpeaker: \"Spoken words.\"\nSpeaker: \"Reply words.\"\nINNER MONOLOGUE:\nMC: //Private thoughts.//",
   "variants": {
     "compact": "",
     "full": "",
@@ -15,6 +15,6 @@
     "E": "",
     "F": "",
     "G": "",
-    "H": ""
+    "H": "Organize your output into the required passage sections: ===CHOICES===, ===PROSE===, ===SUMMARY===."
   }
 }
