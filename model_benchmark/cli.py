@@ -489,8 +489,8 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         choices=["canary", "core", "full"],
         default="",
         help=(
-            "Named built-in workload: canary=20 calls/model, "
-            "core=62 calls/model, full=70 calls/model."
+            "Named built-in workload: canary=16 calls/model, "
+            "core=28 calls/model, full=82 calls/model."
         ),
     )
     p_run.add_argument(
@@ -502,7 +502,7 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     p_run.add_argument(
         "--capability-tests",
         action="store_true",
-        help="Also run the passage-generation capability core.",
+        help="Also run the architecture-neutral harness handoff core.",
     )
     p_run.add_argument(
         "--diagnostic-tests",

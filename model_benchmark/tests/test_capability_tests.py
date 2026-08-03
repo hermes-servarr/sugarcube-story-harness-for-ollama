@@ -8,13 +8,15 @@ from model_benchmark.capability_tests import (
     CapabilityCaseError,
     _build_prompt,
     _score_checks,
+    _score_raw_contract,
+    _score_structured_handoff,
     execute_capability_cases,
     load_cases,
     select_capability_suite,
     validate_case,
 )
 from model_benchmark.config import BenchmarkConfig
-from harness.parsers import parse_model_output
+from harness.parsers import parse_model_output, parse_model_output_json
 
 
 def _candidate(**overrides):
@@ -39,15 +41,15 @@ def _candidate(**overrides):
     return data
 
 
-def test_default_capability_suite_is_passage_only():
+def test_default_capability_suite_is_refactor_handoff_contract():
     all_cases = load_cases()
 
     core = select_capability_suite(all_cases)
 
     assert core
     assert len(core) < len(all_cases)
-    assert all(case.source == "core" for case in core)
-    assert all(case.response_mode == "passage" for case in core)
+    assert all(case.source == "harness" for case in core)
+    assert all(case.response_mode == "harness_passage" for case in core)
     assert select_capability_suite(all_cases, include_diagnostics=True) == tuple(all_cases)
 
 
@@ -58,19 +60,20 @@ def test_named_capability_profiles_have_stable_sizes():
     core = select_capability_suite(cases, profile="core")
     full = select_capability_suite(cases, profile="full")
 
-    assert len(canary) == 12
-    assert len(core) == 30
-    assert len(full) == 38
-    assert all(case.response_mode == "passage" for case in core)
+    assert len(canary) == 8
+    assert len(core) == 12
+    assert len(full) == 50
+    assert all(case.response_mode == "harness_passage" for case in core)
     assert any(case.response_mode == "plain_text" for case in full)
 
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
     cases = load_cases(candidate_dir=None)
-    assert len(cases) == 38
+    assert len(cases) == 50
+    legacy_cases = [case for case in cases if case.source == "core"]
     retrieval = {
         case.context_size
-        for case in cases
+        for case in legacy_cases
         if case.id.startswith("T6-RETRIEVE-")
     }
 
@@ -79,33 +82,33 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
         case.tier == 9
         and case.context_size == "XL"
         and case.task_complexity == "K4"
-        for case in cases
+        for case in legacy_cases
     )
     prompts = {
         case.context_size: len(_build_prompt(case))
-        for case in cases
+        for case in legacy_cases
         if case.id.startswith("T6-RETRIEVE-")
     }
     assert prompts["S"] < prompts["M"] < prompts["L"] < prompts["XL"]
     plain_tiny = {
         case.context_size
-        for case in cases
+        for case in legacy_cases
         if case.id.startswith("T6-PLAIN-TINY-")
     }
     assert plain_tiny == {"S", "XL"}
-    assert any(case.id == "T9-PLAIN-FALLBACK-XL" for case in cases)
+    assert any(case.id == "T9-PLAIN-FALLBACK-XL" for case in legacy_cases)
     tier_zero_plain = next(
-        case for case in cases if case.id == "T0-PLAIN-EXACT"
+        case for case in legacy_cases if case.id == "T0-PLAIN-EXACT"
     )
     assert tier_zero_plain.response_mode == "plain_text"
     assert tier_zero_plain.output_budget == "tiny"
     conversation_variants = {
-        case.variant for case in cases if "CONVERSATION" in case.id
+        case.variant for case in legacy_cases if "CONVERSATION" in case.id
     }
     assert conversation_variants == {"compact", "full", "json", "thinking"}
     thinking_conversation_profiles = {
         (case.context_size, case.task_complexity)
-        for case in cases
+        for case in legacy_cases
         if "CONVERSATION-THINKING" in case.id
     }
     assert thinking_conversation_profiles == {
@@ -119,12 +122,12 @@ def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
             for check in case.checks
             if check["check"] == "exact_dialogue_turns"
         )
-        for case in cases
+        for case in legacy_cases
         if "CONVERSATION-ENDPOINTS" in case.id
     }
     assert endpoint_turn_counts == {4, 8, 16}
     endpoint_case = next(
-        case for case in cases if case.id == "T9-CONVERSATION-ENDPOINTS-16"
+        case for case in legacy_cases if case.id == "T9-CONVERSATION-ENDPOINTS-16"
     )
     assert "We need to discuss the Accord of Glass." not in endpoint_case.task
     assert "Then we have an agreement." not in endpoint_case.task
@@ -140,6 +143,122 @@ def test_candidate_schema_rejects_code_fields_and_weak_checks():
             candidate=True,
             source="candidate",
         )
+
+
+def test_harness_contract_scores_transport_separately_from_handoff():
+    case = _case("T0-HARNESS-COMPACT")
+    repaired_shape = """Here is the requested scene.
+PROSE:
+The apprentice studies the key.
+
+CHOICES:
+- Use it | Open the sealed door
+- Hide it | Avoid the mentor
+"""
+    parsed = parse_model_output(repaired_shape)
+
+    raw_contract = _score_raw_contract(case, repaired_shape)
+    handoff = _score_structured_handoff(parsed)
+    semantics = _score_checks(case, repaired_shape, parsed)
+
+    assert raw_contract.passed is False
+    assert raw_contract.gating is False
+    assert handoff.passed is True
+    assert semantics.passed is True
+
+
+def test_harness_contract_uses_production_prompt_without_optimization_overlay():
+    harness_case = _case("T3-HARNESS-CONVERSATION")
+    legacy_case = _case("T3-CONVERSATION-FULL")
+
+    harness_prompt = _build_prompt(harness_case)
+    legacy_prompt = _build_prompt(legacy_case)
+
+    assert "OPTIMIZATION GUIDANCE:" not in harness_prompt
+    assert "OPTIMIZATION GUIDANCE:" in legacy_prompt
+
+
+def test_harness_state_and_input_checks_use_normalized_fields():
+    state_case = _case("T1-HARNESS-STATE-JSON")
+    state_raw = json.dumps({
+        "prose": "The suspect finally confesses.",
+        "choices": [
+            {"text": "Book them", "hint": "Close the interview"},
+            {"text": "Press on", "hint": "Ask who helped"},
+        ],
+        "state": {"$hasConfession": True},
+        "summary": "The suspect confesses.",
+        "beats": ["The confession is made.", "The detective chooses a response."],
+    })
+    form_case = _case("T2-HARNESS-FORM-JSON")
+    form_raw = json.dumps({
+        "prose": "ARIA requests a callsign and consent.",
+        "choices": [{"text": "Continue", "hint": "Confirm the setup"}],
+        "inputs": [
+            {"kind": "textbox", "var": "$callsign", "label": "Callsign"},
+            {"kind": "radiobutton", "var": "$consent", "label": "Consent"},
+        ],
+        "summary": "The pilot completes setup.",
+        "beats": ["ARIA opens setup.", "The pilot provides details."],
+    })
+
+    assert _score_checks(
+        state_case, state_raw, parse_model_output_json(state_raw)
+    ).passed is True
+    assert _score_checks(
+        form_case, form_raw, parse_model_output_json(form_raw)
+    ).passed is True
+
+
+def test_harness_json_execution_uses_schema_and_refactor_dataset(monkeypatch):
+    case = _case("T0-HARNESS-JSON")
+    captured = {}
+    response = json.dumps({
+        "prose": "The artifact hums in the cargo bay.",
+        "choices": [
+            {"text": "Activate it", "hint": "Risk first contact"},
+            {"text": "Report it", "hint": "Contact Central Command"},
+        ],
+        "summary": "The pilot weighs two responses to the artifact.",
+        "beats": ["The artifact activates.", "The pilot must choose."],
+    })
+
+    def fake_call(config, prompt, **kwargs):
+        captured["format_spec"] = kwargs["format_spec"]
+        captured["prompt"] = prompt
+        return OllamaGenerationResult(
+            response=response,
+            prompt_eval_count=100,
+            eval_count=40,
+            done_reason="stop",
+        )
+
+    monkeypatch.setattr(
+        "model_benchmark.capability_tests.call_ollama_sync_detailed",
+        fake_call,
+    )
+    cfg = BenchmarkConfig(
+        models=("private-model",),
+        variants=("json",),
+        directions=("C",),
+        base_url="http://127.0.0.1:11434",
+        timeout=30,
+        num_predict=640,
+        temperature=0.2,
+        runs=1,
+    )
+
+    record = execute_capability_cases(cfg, [case])[0]
+
+    assert isinstance(captured["format_spec"], dict)
+    assert captured["format_spec"]["type"] == "object"
+    assert "OPTIMIZATION GUIDANCE:" not in captured["prompt"]
+    assert record.status == "PASS"
+    assert record.dataset == "capability_harness"
+    assert record.test_version == "harness-contract-v1"
+    assert [
+        category.name for category in record.scored_result.category_results
+    ] == ["raw_contract", "structured_handoff", "capability_observables"]
 
     with pytest.raises(CapabilityCaseError, match="non-trivial"):
         validate_case(

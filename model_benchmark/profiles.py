@@ -20,19 +20,34 @@ CANARY_MATRIX_CASES = (
     ("thinking", "H"),
 )
 
+CORE_MATRIX_CASES = (
+    ("compact", "A"),
+    ("compact", "C"),
+    ("compact", "E"),
+    ("compact", "G"),
+    ("full", "A"),
+    ("full", "B"),
+    ("full", "D"),
+    ("full", "F"),
+    ("json", "B"),
+    ("json", "C"),
+    ("json", "F"),
+    ("json", "H"),
+    ("thinking", "D"),
+    ("thinking", "E"),
+    ("thinking", "G"),
+    ("thinking", "H"),
+)
+
 CANARY_CAPABILITY_IDS = (
-    "T0-MARKUP",
-    "T1-STATE-READ-WRITE",
-    "T2-BRANCH-STATE",
-    "T3-SWITCH",
-    "T4-LOOP-CAPTURE",
-    "T5-FORM",
-    "T6-RETRIEVE-S",
-    "T6-RETRIEVE-XL",
-    "T2-CONVERSATION-COMPACT",
-    "T5-CONVERSATION-JSON",
-    "T2-STYLE-CANT-COMPACT",
-    "T9-THINKING-XL",
+    "T0-HARNESS-COMPACT",
+    "T0-HARNESS-JSON",
+    "T1-HARNESS-STATE-FULL",
+    "T2-HARNESS-FORM-JSON",
+    "T3-HARNESS-CONTINUITY-M",
+    "T3-HARNESS-CONVERSATION",
+    "T7-HARNESS-DISTRACTOR",
+    "T9-HARNESS-THINKING-XL",
 )
 
 
@@ -44,6 +59,8 @@ def resolve_matrix_cases(
     """Return ordered variant/direction pairs for a named or custom run."""
     if profile == "canary":
         return CANARY_MATRIX_CASES
-    if profile in {"core", "full"}:
+    if profile == "core":
+        return CORE_MATRIX_CASES
+    if profile == "full":
         return tuple(product(ALL_VARIANTS, ALL_DIRECTIONS))
     return tuple(product(variants, directions))

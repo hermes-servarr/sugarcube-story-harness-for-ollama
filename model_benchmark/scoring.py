@@ -152,8 +152,9 @@ class CategoryResult:
     """One scoring category's verdict for a single model response.
 
     ``applicable`` is false when the case neither requires nor emits the
-    construct measured by this category.  Such results are reported as N/A
-    and must not contribute to pass-rate or normalized-score denominators.
+    construct measured by this category. Such results are reported as N/A.
+    ``gating`` is false for a measured diagnostic that should remain visible
+    without controlling the end-to-end verdict or headline denominator.
     """
     name: CategoryName
     passed: bool
@@ -161,6 +162,7 @@ class CategoryResult:
     details: str
     evidence: tuple[str, ...] = ()
     applicable: bool = True
+    gating: bool = True
 
 
 @dataclass(frozen=True)

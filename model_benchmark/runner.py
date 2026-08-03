@@ -438,11 +438,13 @@ def result_record_from_model_run(
     defined in ``p2_data_structures.md`` §3.5.  The overall score is the
     fraction of the 6 categories that passed (matching the existing
     ``ModelReport.overall_score`` convention).  The status is ``PASS`` if
-    every category passed, ``FAIL`` if any failed, ``ERROR`` if the run
-    captured an infrastructure error (``run.error`` non-empty).
+    every applicable gating category passed, ``FAIL`` if any gating category
+    failed, ``ERROR`` if the run captured an infrastructure error
+    (``run.error`` non-empty).
     """
     applicable_categories = tuple(
-        c for c in run.category_results if getattr(c, "applicable", True)
+        c for c in run.category_results
+        if getattr(c, "applicable", True) and getattr(c, "gating", True)
     )
     n_cats = len(applicable_categories)
     n_passed = sum(1 for c in applicable_categories if c.passed)

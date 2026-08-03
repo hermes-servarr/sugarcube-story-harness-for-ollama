@@ -112,6 +112,30 @@ def test_result_record_excludes_na_categories_from_denominator():
     assert record.status == "PASS"
 
 
+def test_result_record_excludes_non_gating_diagnostics_from_headline():
+    run = ModelRunResult(
+        model_name="test-model",
+        variant="compact",
+        direction="A",
+        run_index=0,
+        raw_response="recoverable output",
+        parsed_output=ModelOutput(prose="usable"),
+        category_results=(
+            CategoryResult(
+                "raw_contract", False, 0.0, "parser recovery needed", gating=False
+            ),
+            CategoryResult("structured_handoff", True, 1.0, "usable"),
+        ),
+        overall_pass=True,
+    )
+
+    record = result_record_from_model_run(run)
+
+    assert record.max_score == 1.0
+    assert record.score == 1.0
+    assert record.status == "PASS"
+
+
 def test_core_run_passes_and_records_configured_seed(monkeypatch):
     captured = {}
 

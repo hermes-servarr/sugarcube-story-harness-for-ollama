@@ -140,7 +140,7 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |
 | `--variants` | `compact full json` | Prompt variants to test |
 | `--directions` | `A B C` | Direction prompts (A: inventory/set flag, B: conditional, C: stats) |
-| `--profile` | custom | Named workload: `canary` (20 calls/model), `core` (62), or `full` (70) |
+| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), or `full` (82) |
 | `--base-url` | `http://localhost:11434` | Ollama server URL |
 | `--timeout` | `120` | Seconds per model call |
 | `--num-predict` | `640` | Max tokens to generate |
@@ -164,9 +164,9 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 
 | Profile | Matrix | Capability | Calls/model | Use |
 |---------|--------|------------|-------------|-----|
-| `canary` | 8-case covering array | 12 representative passage cases | 20 | Routine prompt iteration |
-| `core` | 4 variants × 8 directions | 30 passage cases | 62 | Broad comparison and promotion checks |
-| `full` | 4 variants × 8 directions | All 38 built-in cases | 70 | Release, scorer, and benchmark validation |
+| `canary` | 8-case covering array | 8 harness-contract cases | 16 | Routine prompt iteration |
+| `core` | 16-case covering array | 12 harness-contract cases | 28 | Architecture and refactor comparison |
+| `full` | 4 variants × 8 directions | All 50 built-in cases | 82 | Historical probes, stress, and scorer validation |
 
 Profiles imply capability tests. `--diagnostic-tests` additionally includes
 validated candidate probes. The context-window ladder remains opt-in for every
@@ -174,6 +174,14 @@ profile. Without `--profile`, `--variants`, `--directions`, and
 `--capability-tests` retain their previous custom behavior.
 Only compare runs that use the same profile and seed policy; profile changes
 change the benchmark cohort and denominator.
+
+The harness-contract cases score three independent layers: raw transport,
+normalized story handoff, and semantic observables. Raw transport is diagnostic
+rather than gating, so a future AST, constrained-output, or repair path can be
+compared on final usability without being credited as better raw model
+compliance. Historical direct-SugarCube probes remain available in `full`.
+See `model_benchmark/docs/refactor-contract.md` for the ownership boundary and
+rules for adding AST, staged-generation, compiler, and browser adapters.
 
 ## The 6 Scoring Categories
 

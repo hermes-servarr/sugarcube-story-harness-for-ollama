@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from harness.models import HarnessConfig
+from harness.models import HarnessConfig, ModelOutput
 from harness.ollama_client import call_ollama_sync_detailed
-from harness.parsers import parse_model_output, parse_model_output_json
+from harness.parsers import parse_json_object, parse_model_output, parse_model_output_json
 from harness.prompts import (
     build_compact_passage_prompt,
     build_full_passage_prompt,
@@ -31,6 +31,7 @@ from model_benchmark.thinking import extract_thinking
 
 
 CORE_CASES_PATH = Path(__file__).with_name("capability_cases.json")
+HARNESS_CASES_PATH = Path(__file__).with_name("harness_cases.json")
 CANDIDATE_CASES_DIR = Path("benchmark_optimization/candidate_tests")
 _ID_RE = re.compile(r"^(?:T\d|CAND-T\d)-[A-Z0-9-]+$")
 _VARIABLE_RE = re.compile(r"^\$[A-Za-z_]\w*$")
@@ -39,7 +40,7 @@ _ALLOWED_CONTEXTS = set(FIXTURE_CONTEXTS)
 _ALLOWED_SIZES = {"S", "M", "L", "XL"}
 _ALLOWED_COMPLEXITIES = {"K1", "K2", "K3", "K4"}
 _ALLOWED_DISTRACTORS = {"D0", "D1"}
-_ALLOWED_RESPONSE_MODES = {"passage", "plain_text"}
+_ALLOWED_RESPONSE_MODES = {"passage", "harness_passage", "plain_text"}
 _OUTPUT_BUDGETS = {
     "tiny": 32,
     "short": 96,
@@ -69,6 +70,12 @@ _ALLOWED_CHECKS = {
     "slang_confined_to_dialogue",
     "banned_register",
     "max_sentence_words",
+    "choice_hints",
+    "state_value",
+    "input_field",
+    "min_beats",
+    "natural_dialogue_turns",
+    "inner_monologue",
 }
 _NEEDLES = {
     "archive_code": "7319",
@@ -213,6 +220,12 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             "slang_confined_to_dialogue": {"check", "name"},
             "banned_register": {"check", "name"},
             "max_sentence_words": {"check", "count"},
+            "choice_hints": {"check"},
+            "state_value": {"check", "name", "value"},
+            "input_field": {"check", "name", "kind"},
+            "min_beats": {"check", "count"},
+            "natural_dialogue_turns": {"check", "count"},
+            "inner_monologue": {"check"},
         }[kind]
         if set(raw_check) - permitted:
             raise CapabilityCaseError("check contains unknown fields")
@@ -230,6 +243,27 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             if not _VARIABLE_RE.fullmatch(name):
                 raise CapabilityCaseError("invalid variable name")
             check["name"] = name
+            nontrivial = True
+        elif kind == "state_value":
+            name = _bounded_string(check.get("name"), "state variable name", 64)
+            if not _VARIABLE_RE.fullmatch(name):
+                raise CapabilityCaseError("invalid state variable name")
+            if not isinstance(check.get("value"), (str, int, float, bool)):
+                raise CapabilityCaseError("state_value value must be scalar")
+            check["name"] = name
+            nontrivial = True
+        elif kind == "input_field":
+            name = _bounded_string(check.get("name"), "input variable name", 64)
+            input_kind = _bounded_string(check.get("kind"), "input kind", 24)
+            if not _VARIABLE_RE.fullmatch(name):
+                raise CapabilityCaseError("invalid input variable name")
+            if input_kind not in {
+                "textbox", "numberbox", "textarea", "checkbox",
+                "radiobutton", "listbox", "cycle",
+            }:
+                raise CapabilityCaseError("invalid input kind")
+            check["name"] = name
+            check["kind"] = input_kind
             nontrivial = True
         elif kind == "context_needle":
             if check.get("name") not in _NEEDLES:
@@ -249,7 +283,8 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
             nontrivial = True
         elif kind in {
             "min_choices", "max_words", "min_words", "min_dialogue_turns",
-            "exact_dialogue_turns", "max_sentence_words",
+            "exact_dialogue_turns", "max_sentence_words", "min_beats",
+            "natural_dialogue_turns",
         }:
             count = check.get("count")
             upper = (
@@ -285,6 +320,7 @@ def validate_case(data: Any, *, candidate: bool, source: str) -> CapabilityCase:
 def load_cases(
     *,
     core_path: Path = CORE_CASES_PATH,
+    harness_path: Path = HARNESS_CASES_PATH,
     candidate_dir: Path | None = CANDIDATE_CASES_DIR,
 ) -> list[CapabilityCase]:
     core_data = json.loads(core_path.read_text(encoding="utf-8"))
@@ -293,6 +329,13 @@ def load_cases(
     cases = [
         validate_case(item, candidate=False, source="core") for item in core_data
     ]
+    harness_data = json.loads(harness_path.read_text(encoding="utf-8"))
+    if not isinstance(harness_data, list):
+        raise CapabilityCaseError("harness capability file must contain an array")
+    cases.extend(
+        validate_case(item, candidate=False, source="harness")
+        for item in harness_data
+    )
     if candidate_dir and candidate_dir.is_dir():
         paths = sorted(candidate_dir.glob("*.json"))
         if len(paths) > 20:
@@ -407,6 +450,8 @@ def _build_prompt(case: CapabilityCase) -> str:
     )
     if case.variant == "compact":
         prompt = build_compact_passage_prompt(arc_notes=ctx.arc_md, **kwargs)
+        if case.response_mode == "harness_passage":
+            return prompt
         return apply_prompt_overlay(
             prompt, variant=case.variant, direction=case.direction_key
         )
@@ -422,6 +467,8 @@ def _build_prompt(case: CapabilityCase) -> str:
         prompt = build_json_passage_prompt(**common)
     else:
         prompt = build_thinking_passage_prompt(**common)
+    if case.response_mode == "harness_passage":
+        return prompt
     return apply_prompt_overlay(
         prompt, variant=case.variant, direction=case.direction_key
     )
@@ -577,6 +624,32 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
                 len(re.findall(r"\b[\w'-]+\b", sentence)) <= check["count"]
                 for sentence in sentences
             )
+        elif kind == "choice_hints":
+            choices = getattr(parsed, "choices", ()) or ()
+            ok = bool(choices) and all(
+                choice.text.strip() and choice.hint.strip() for choice in choices
+            )
+        elif kind == "state_value":
+            state = getattr(parsed, "state", {}) or {}
+            ok = state.get(check["name"]) == check["value"]
+        elif kind == "input_field":
+            inputs = getattr(parsed, "inputs", ()) or ()
+            ok = any(
+                field.var == check["name"] and field.kind == check["kind"]
+                for field in inputs
+            )
+        elif kind == "min_beats":
+            ok = len(getattr(parsed, "beats", ()) or ()) >= check["count"]
+        elif kind == "natural_dialogue_turns":
+            prose = getattr(parsed, "prose", "") or ""
+            turns = re.findall(
+                r'(?m)^\s*[A-Za-z][A-Za-z0-9 _-]*:\s*["“][^"”\n]+["”]\s*$',
+                prose,
+            )
+            ok = len(turns) >= check["count"]
+        elif kind == "inner_monologue":
+            prose = getattr(parsed, "prose", "") or ""
+            ok = re.search(r"//[^/\n]+//", prose) is not None
         passed += int(ok)
         evidence.append(f"{kind}={'pass' if ok else 'fail'}")
     score = passed / len(case.checks)
@@ -594,6 +667,50 @@ def _score_checks(case: CapabilityCase, raw: str, parsed: Any) -> CategoryResult
             f"failed={','.join(failed) if failed else 'none'}"
         ),
         evidence=tuple(evidence),
+    )
+
+
+def _score_raw_contract(case: CapabilityCase, raw: str) -> CategoryResult:
+    extraction = extract_thinking(raw)
+    text = extraction.output_text if extraction.has_thinking else raw
+    if case.variant == "json":
+        data = parse_json_object(text)
+        passed = isinstance(data, dict) and {
+            "prose", "choices"
+        }.issubset(data)
+    else:
+        stripped = text.lstrip()
+        passed = stripped.startswith("PROSE:") and bool(
+            re.search(r"(?m)^CHOICES:\s*$", stripped)
+        )
+    return CategoryResult(
+        name="raw_contract",
+        passed=passed,
+        score=1.0 if passed else 0.0,
+        details=(
+            "raw response follows the requested transport envelope"
+            if passed
+            else "raw response required normalization or recovery"
+        ),
+        evidence=(f"raw_contract={'pass' if passed else 'fail'}",),
+        gating=False,
+    )
+
+
+def _score_structured_handoff(parsed: Any) -> CategoryResult:
+    prose_ok = bool((getattr(parsed, "prose", "") or "").strip())
+    choices = getattr(parsed, "choices", ()) or ()
+    choices_ok = bool(choices) and all(choice.text.strip() for choice in choices)
+    passed = prose_ok and choices_ok
+    return CategoryResult(
+        name="structured_handoff",
+        passed=passed,
+        score=(int(prose_ok) + int(choices_ok)) / 2,
+        details=f"prose={'pass' if prose_ok else 'fail'}; choices={'pass' if choices_ok else 'fail'}",
+        evidence=(
+            f"prose={'pass' if prose_ok else 'fail'}",
+            f"choices={'pass' if choices_ok else 'fail'}",
+        ),
     )
 
 
@@ -636,8 +753,12 @@ def execute_capability_cases(
             error = ""
             try:
                 kwargs: dict[str, Any] = {}
-                if case.variant == "json" and case.response_mode == "passage":
-                    kwargs["format_spec"] = "json"
+                if case.variant == "json" and case.response_mode != "plain_text":
+                    kwargs["format_spec"] = (
+                        ModelOutput.model_json_schema()
+                        if case.response_mode == "harness_passage"
+                        else "json"
+                    )
                 generated = call_ollama_sync_detailed(
                     harness_cfg,
                     prompt,
@@ -652,31 +773,39 @@ def execute_capability_cases(
                 raw = generated.response
                 parsed = (
                     parse_model_output_json(raw)
-                    if case.variant == "json" and case.response_mode == "passage"
+                    if case.variant == "json" and case.response_mode != "plain_text"
                     else parse_model_output(raw)
                 )
-                categories = (
-                    score_response(
-                        raw,
-                        parsed,
-                        case.variant,
-                        case.direction_key,
-                        required_categories=frozenset(
-                            {
-                                "variable_scoping"
-                                for check in case.checks
-                                if check["check"] == "variable"
-                            }
-                            | {
-                                "macro_usage"
-                                for check in case.checks
-                                if check["check"] in {"macro", "balanced_macro"}
-                            }
-                        ),
+                if case.response_mode == "harness_passage":
+                    categories = [
+                        _score_raw_contract(case, raw),
+                        _score_structured_handoff(parsed),
+                    ]
+                else:
+                    categories = (
+                        score_response(
+                            raw,
+                            parsed,
+                            case.variant,
+                            case.direction_key,
+                            required_categories=frozenset(
+                                {
+                                    "variable_scoping"
+                                    for check in case.checks
+                                    if check["check"] == "variable"
+                                }
+                                | {
+                                    "macro_usage"
+                                    for check in case.checks
+                                    if check["check"] in {
+                                        "macro", "balanced_macro"
+                                    }
+                                }
+                            ),
+                        )
+                        if case.response_mode == "passage"
+                        else []
                     )
-                    if case.response_mode == "passage"
-                    else []
-                )
                 categories.append(_score_checks(case, raw, parsed))
             except Exception as exc:
                 raw = ""
@@ -702,6 +831,7 @@ def execute_capability_cases(
                     item.passed
                     for item in categories
                     if getattr(item, "applicable", True)
+                    and getattr(item, "gating", True)
                 ),
                 elapsed_seconds=time.monotonic() - started,
                 error=error,
@@ -714,16 +844,26 @@ def execute_capability_cases(
             dataset = (
                 "capability_candidate"
                 if case.source == "candidate"
+                else "capability_harness"
+                if case.source == "harness"
                 else "capability_retrieval_transport"
                 if case.response_mode == "plain_text"
-                else "capability_core"
+                else "capability_legacy"
             )
             records.append(
                 dataclasses.replace(
                     record,
                     test_id=f"{model}:{case.id}:{case.variant}:1",
-                    test_version="capability-v1",
-                    capability="sugarcube_capability_ladder",
+                    test_version=(
+                        "harness-contract-v1"
+                        if case.source == "harness"
+                        else "capability-v1"
+                    ),
+                    capability=(
+                        "harness_story_handoff"
+                        if case.source == "harness"
+                        else "sugarcube_capability_ladder"
+                    ),
                     category="capability_observables",
                     subcategory=(
                         case.variant
@@ -756,14 +896,14 @@ def select_capability_suite(
     include_diagnostics: bool = False,
     profile: str = "core",
 ) -> tuple[CapabilityCase, ...]:
-    """Select the passage core, optionally retaining diagnostic case families."""
+    """Select the refactor contract, optionally retaining diagnostic families."""
     case_list = tuple(cases)
     if include_diagnostics:
         return case_list
     if profile == "canary":
         from model_benchmark.profiles import CANARY_CAPABILITY_IDS
 
-        by_id = {case.id: case for case in case_list if case.source == "core"}
+        by_id = {case.id: case for case in case_list if case.source == "harness"}
         missing = [
             case_id for case_id in CANARY_CAPABILITY_IDS if case_id not in by_id
         ]
@@ -773,9 +913,9 @@ def select_capability_suite(
             )
         return tuple(by_id[case_id] for case_id in CANARY_CAPABILITY_IDS)
     if profile == "full":
-        return tuple(case for case in case_list if case.source == "core")
+        return tuple(case for case in case_list if case.source != "candidate")
     return tuple(
         case
         for case in case_list
-        if case.source == "core" and case.response_mode == "passage"
+        if case.source == "harness"
     )

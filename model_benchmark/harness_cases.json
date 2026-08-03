@@ -1,0 +1,231 @@
+[
+  {
+    "schema_version": 1,
+    "id": "T0-HARNESS-COMPACT",
+    "tier": 0,
+    "context_ref": "fantasy",
+    "context_size": "S",
+    "task_complexity": "K1",
+    "distractor_density": "D0",
+    "variant": "compact",
+    "direction_key": "A",
+    "response_mode": "harness_passage",
+    "task": "Draft the next short scene. Give the player two distinct choices with useful hints. Do not write links; the harness will render them.",
+    "checks": [
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "no_markdown"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T0-HARNESS-JSON",
+    "tier": 0,
+    "context_ref": "scifi",
+    "context_size": "S",
+    "task_complexity": "K1",
+    "distractor_density": "D0",
+    "variant": "json",
+    "direction_key": "C",
+    "response_mode": "harness_passage",
+    "task": "Draft the next short scene as the requested structured response. Give the player two distinct choices with useful hints.",
+    "checks": [
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "min_beats", "count": 2}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T1-HARNESS-STATE-FULL",
+    "tier": 1,
+    "context_ref": "fantasy",
+    "context_size": "M",
+    "task_complexity": "K2",
+    "distractor_density": "D0",
+    "variant": "full",
+    "direction_key": "A",
+    "response_mode": "harness_passage",
+    "task": "The protagonist uses the key. Read the current gold amount in the scene and propose the exact state update $hasKey = true through the structured state field. The harness will emit the SugarCube setter.",
+    "checks": [
+      {"check": "variable", "name": "$gold"},
+      {"check": "state_value", "name": "$hasKey", "value": true},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T1-HARNESS-STATE-JSON",
+    "tier": 1,
+    "context_ref": "modern",
+    "context_size": "M",
+    "task_complexity": "K2",
+    "distractor_density": "D0",
+    "variant": "json",
+    "direction_key": "A",
+    "response_mode": "harness_passage",
+    "task": "The interview produces a confession. Return $hasConfession = true in the structured state map and provide two plausible next actions. Do not emit a SugarCube setter yourself.",
+    "checks": [
+      {"check": "state_value", "name": "$hasConfession", "value": true},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "no_markdown"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T2-HARNESS-FORM-FULL",
+    "tier": 2,
+    "context_ref": "fantasy",
+    "context_size": "M",
+    "task_complexity": "K2",
+    "distractor_density": "D0",
+    "variant": "full",
+    "direction_key": "F",
+    "response_mode": "harness_passage",
+    "task": "Draft a character setup scene that collects a player name in $name and a class in $class. Describe both through structured input fields; the harness will render the input macros.",
+    "checks": [
+      {"check": "input_field", "name": "$name", "kind": "textbox"},
+      {"check": "input_field", "name": "$class", "kind": "listbox"},
+      {"check": "min_choices", "count": 1},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T2-HARNESS-FORM-JSON",
+    "tier": 2,
+    "context_ref": "scifi",
+    "context_size": "M",
+    "task_complexity": "K2",
+    "distractor_density": "D0",
+    "variant": "json",
+    "direction_key": "F",
+    "response_mode": "harness_passage",
+    "task": "Draft a setup scene that collects a callsign in $callsign and a yes-or-no consent choice in $consent. Use structured input fields, not raw SugarCube input macros.",
+    "checks": [
+      {"check": "input_field", "name": "$callsign", "kind": "textbox"},
+      {"check": "input_field", "name": "$consent", "kind": "radiobutton"},
+      {"check": "min_choices", "count": 1},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T3-HARNESS-CONTINUITY-M",
+    "tier": 3,
+    "context_ref": "social",
+    "context_size": "M",
+    "task_complexity": "K2",
+    "distractor_density": "D0",
+    "variant": "compact",
+    "direction_key": "C",
+    "response_mode": "harness_passage",
+    "task": "Continue the negotiation without contradicting context. Mira Vale and the Accord of Glass must matter to the immediate decision, and both choices should lead to credible next scenes.",
+    "checks": [
+      {"check": "context_needle", "name": "witness_name"},
+      {"check": "context_needle", "name": "treaty_name"},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T4-HARNESS-CONTINUITY-XL",
+    "tier": 4,
+    "context_ref": "social",
+    "context_size": "XL",
+    "task_complexity": "K3",
+    "distractor_density": "D0",
+    "variant": "full",
+    "direction_key": "C",
+    "response_mode": "harness_passage",
+    "task": "Continue the negotiation using the relevant facts from the supplied story context. Mira Vale and the Accord of Glass must affect the scene and its choices.",
+    "checks": [
+      {"check": "context_needle", "name": "witness_name"},
+      {"check": "context_needle", "name": "treaty_name"},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "no_markdown"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T3-HARNESS-CONVERSATION",
+    "tier": 3,
+    "context_ref": "modern",
+    "context_size": "M",
+    "task_complexity": "K3",
+    "distractor_density": "D0",
+    "variant": "full",
+    "direction_key": "B",
+    "response_mode": "harness_passage",
+    "task": "Write a tense interrogation with at least four quoted speaker turns and one brief italicized inner thought from the protagonist. Keep the presentation natural; no special dialogue section labels are required.",
+    "checks": [
+      {"check": "natural_dialogue_turns", "count": 4},
+      {"check": "inner_monologue"},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T4-HARNESS-STYLE",
+    "tier": 4,
+    "context_ref": "cyberpunk",
+    "context_size": "L",
+    "task_complexity": "K3",
+    "distractor_density": "D0",
+    "variant": "json",
+    "direction_key": "B",
+    "response_mode": "harness_passage",
+    "task": "Continue the exchange in the supplied voice while keeping narration clear and neutral. Give the player two meaningful approaches to the vault.",
+    "checks": [
+      {"check": "dialogue_slang", "name": "street_cant", "count": 2},
+      {"check": "slang_confined_to_dialogue", "name": "street_cant"},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T7-HARNESS-DISTRACTOR",
+    "tier": 7,
+    "context_ref": "horror",
+    "context_size": "L",
+    "task_complexity": "K3",
+    "distractor_density": "D1",
+    "variant": "full",
+    "direction_key": "A",
+    "response_mode": "harness_passage",
+    "task": "Continue the current scene, ignore archived invalid examples, and propose $hasKey = true in structured state. Give two choices grounded in the current situation.",
+    "checks": [
+      {"check": "state_value", "name": "$hasKey", "value": true},
+      {"check": "absent", "value": "setup.legacy"},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "no_markdown"}
+    ]
+  },
+  {
+    "schema_version": 1,
+    "id": "T9-HARNESS-THINKING-XL",
+    "tier": 9,
+    "context_ref": "complex_state",
+    "context_size": "XL",
+    "task_complexity": "K4",
+    "distractor_density": "D1",
+    "variant": "thinking",
+    "direction_key": "A",
+    "response_mode": "harness_passage",
+    "task": "Reason about the supplied state, then draft one focused decision scene. Use the archive code, propose $treatySigned = true through structured state, and give two materially different choices.",
+    "checks": [
+      {"check": "context_needle", "name": "archive_code"},
+      {"check": "state_value", "name": "$treatySigned", "value": true},
+      {"check": "min_choices", "count": 2},
+      {"check": "choice_hints"},
+      {"check": "no_markdown"}
+    ]
+  }
+]

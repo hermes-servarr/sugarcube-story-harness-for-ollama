@@ -292,6 +292,7 @@ def _category_to_dict(cat: Any) -> dict[str, Any]:
         "details": cat.details,
         "evidence": list(getattr(cat, "evidence", ())),
         "applicable": bool(getattr(cat, "applicable", True)),
+        "gating": bool(getattr(cat, "gating", True)),
     }
 
 
