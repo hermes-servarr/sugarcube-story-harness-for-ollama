@@ -19,7 +19,11 @@ The current harness asks one model response to perform five jobs at once:
 
 The benchmark indicates that this coupling is the dominant source of failure. Models often produce useful story material but fail the transport or macro contract. Adding more prompt reminders has repeatedly produced variant-specific regressions rather than a stable improvement.
 
-The harness should instead make the model responsible for **story intent** and make deterministic code responsible for **SugarCube syntax, passage structure, state transactions, links, forms, loops, and compilation**.
+The harness should instead make the default model call responsible for
+**narrative and choice copy inside predefined slots**. Deterministic code owns
+**SugarCube syntax, passage structure, state transactions, links, forms, loops,
+and compilation**. When creative mechanic help is requested, it uses a separate
+bounded proposal that cannot grant itself authority.
 
 The proposed production path is:
 
@@ -27,8 +31,10 @@ The proposed production path is:
 GenerationRequest
   -> ContextPack
   -> GenerationStrategy
-  -> PassageDraft (typed JSON)
-  -> Normalization + semantic validation
+  -> PassagePlan (trusted harness skeleton)
+  -> NarrativeFill (model-owned text boxes)
+  -> optional MechanicProposal (separate, untrusted)
+  -> PassageDraft (validated assembly)
   -> SugarCubeCompiler
   -> compile/runtime checks
   -> persisted review draft
@@ -145,6 +151,8 @@ The synchronous benchmark path can retain Ollama token counts and finish reason,
 6. Localize failures to context, generation, normalization, semantics, compilation, or runtime.
 7. Route models and strategies from measured capability profiles.
 8. Keep legacy projects and draft records readable throughout migration.
+9. Keep trusted passage structure separate from untrusted model-authored text
+   and mechanic proposals.
 
 ## Non-Goals
 
@@ -157,38 +165,95 @@ The synchronous benchmark path can retain Ollama token counts and finish reason,
 
 ## Proposed Domain Contract
 
-Introduce a versioned `PassageDraft` as the only production handoff from model generation to the harness.
+Use three trust-layer contracts plus one assembled compiler artifact. The model
+does not directly produce the compiler input.
 
 ```python
-class PassageDraft(BaseModel):
+class PassagePlan(BaseModel):
     schema_version: Literal["1"] = "1"
+    plan_id: str
+    revision: int
+    passage_mode: PassageMode
+    narrative_slots: list[NarrativeSlot]
+    choice_slots: list[ChoiceSlot]
+    allowed_state_reads: list[str] = Field(default_factory=list)
+    allowed_effects: list[AllowedEffect] = Field(default_factory=list)
+    required_components: list[MechanicComponent] = Field(default_factory=list)
+    open_mechanic_slots: list[MechanicSlot] = Field(default_factory=list)
+
+
+class NarrativeFill(BaseModel):
+    plan_id: str
+    plan_revision: int
     narrative: list[NarrativeBlock]
-    choices: list[ChoiceDraft]
-    scene_effects: list[StateEffect] = Field(default_factory=list)
-    mechanic: MechanicSpec | None = None
-    continuity: ContinuityDelta = Field(default_factory=ContinuityDelta)
-    media: list[MediaProposal] = Field(default_factory=list)
+    choices: list[ChoiceCopy]
+    continuity_proposals: ContinuityDelta = Field(default_factory=ContinuityDelta)
+    media_proposals: list[MediaProposal] = Field(default_factory=list)
     summary: str = ""
     beats: list[str] = Field(default_factory=list)
+
+
+class MechanicProposal(BaseModel):
+    plan_id: str
+    plan_revision: int
+    guards: list[GuardProposal] = Field(default_factory=list)
+    effects: list[StateEffectProposal] = Field(default_factory=list)
+    components: list[MechanicComponentProposal] = Field(default_factory=list)
+
+
+class PassageDraft(BaseModel):
+    plan: PassagePlan
+    narrative: NarrativeFill
+    resolved_mechanics: list[MechanicComponent]
 ```
 
-The exact schema should remain smaller than the current full prompt. Optional feature fields should be introduced only when the compiler supports and tests them.
+`PassagePlan` is created by deterministic harness logic, explicit human input,
+or an approved planning step. `NarrativeFill` is the default model output: it
+fills known prose, dialogue, thought, and choice-copy slots. A
+`MechanicProposal` is requested separately only when the plan leaves a bounded
+mechanic decision open. The harness validates and resolves that proposal before
+assembling `PassageDraft`.
+
+Every fill/proposal item carries an existing slot ID. Assembly requires exactly
+one value for every required slot, rejects duplicate or unknown slot IDs, and
+rejects any reference, target, operation, or component outside the plan's
+allowlists. Missing slots remain explicit failures; normalization does not
+invent them.
+
+The exact model-facing schema should remain smaller than the current full
+prompt. Optional fields and union branches should appear only when the plan
+allows them and the compiler supports and tests them.
 
 ### Narrative Blocks
 
-Represent conversation and inner thought as data instead of requiring labels inside a prose string.
+Represent conversation and inner thought as data instead of requiring labels
+inside a prose string. Ordinary slots remain simple text boxes. Slots that must
+display dynamic values use typed inline spans rather than SugarCube syntax.
 
 ```json
 {
   "narrative": [
-    {"kind": "paragraph", "text": "Rain silvered the courtyard."},
-    {"kind": "dialogue", "speaker": "Mara", "text": "You came back."},
-    {"kind": "thought", "speaker": "player", "text": "She sounds afraid."}
+    {"kind": "paragraph", "parts": [
+      {"kind": "text", "text": "You have "},
+      {"kind": "state_ref", "target": "gold"},
+      {"kind": "text", "text": " coins as rain silvers the courtyard."}
+    ]},
+    {"kind": "dialogue", "speaker": "Mara", "parts": [
+      {"kind": "text", "text": "You came back."}
+    ]},
+    {"kind": "thought", "speaker": "player", "parts": [
+      {"kind": "text", "text": "She sounds afraid."}
+    ]}
   ]
 }
 ```
 
-Supported block kinds for the first version should be `paragraph`, `dialogue`, and `thought`. The compiler renders their presentation. This removes the benchmark's private `DIALOGUE:`/`INNER MONOLOGUE:` convention from the product boundary while preserving speaker order and inner-monologue semantics.
+Supported block kinds for the first version should be `paragraph`, `dialogue`,
+and `thought`. Initial inline parts should be `text`, `state_ref`, and
+`entity_ref`. A plan that does not allow dynamic references exposes only plain
+text parts in its generation schema. The compiler renders presentation and
+safe interpolation. This removes both SugarCube variables and the benchmark's
+private `DIALOGUE:`/`INNER MONOLOGUE:` convention from the model boundary.
 
 ### Typed Conditions and Effects
 
@@ -196,10 +261,10 @@ Replace free-form guards and model-authored setters with a constrained state DSL
 
 ```json
 {
-  "guard": {"left": "$gold", "op": "gte", "right": 5},
+  "guard": {"left": "gold", "op": "gte", "right": 5},
   "effects": [
-    {"op": "increment", "target": "$gold", "value": -5},
-    {"op": "set", "target": "$boughtLantern", "value": true}
+    {"op": "add", "target": "gold", "amount": -5},
+    {"op": "set", "target": "bought_lantern", "value": true}
   ]
 }
 ```
@@ -207,24 +272,34 @@ Replace free-form guards and model-authored setters with a constrained state DSL
 Initial operations:
 
 - conditions: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `truthy`, `falsy`, `contains`;
-- effects: `set`, `increment`, `append`, `remove`;
+- effects: `set`, `add`, `append`, `remove`;
 - composition: bounded `all`, `any`, and `not` nodes;
-- targets: declared `$` story variables only for version 1.
+- targets: stable state IDs declared by the plan only for version 1. The legacy
+  adapter/compiler maps those IDs to SugarCube `$` variables.
 
 The compiler escapes literals, verifies target types, and emits the SugarCube expression. Arbitrary expressions remain an expert-mode escape hatch and are never accepted silently from model output.
 
 ### Typed Mechanics
 
-Use a discriminated union for mechanics whose correctness currently depends on macro syntax:
+Do not encode every passage as one optional `MechanicSpec`. Separate the
+primary passage mode from composable mechanic components:
 
-- `ConditionalSpec`
-- `SwitchSpec`
-- `LoopSpec`
-- `FormSpec`
-- `DialogueSpec`
-- `RandomSpec`
+- passage modes: `normal`, `room`, `hub`, `dialogue_loop`, `form`, `loop`,
+  `random`, `event`, `random_event`, and `ending`; `widget` and `include` remain
+  reviewed expert modes during migration;
+- components: `GuardSpec`, `BranchSpec`, `InputSpec`, `IterationSpec`,
+  `WeightedChoiceSpec`, and typed effects attached to scene or choice slots.
 
-The model proposes the mechanic and its semantic inputs. The compiler owns `<<if>>`, `<<switch>>`, `<<for>>`, `<<capture>>`, input macros, setters, and link bodies.
+Compatibility rules define which components may coexist. For example, a form
+may have guarded choices and submit effects, while an ending may not expose an
+unresolved destination. Dialogue blocks are narrative structure;
+`dialogue_loop` is only the passage-navigation mode that keeps non-exit choices
+in the same scene.
+
+The trusted plan supplies required components whenever the user or passage type
+already determines them. A separate mechanic stage may propose only components
+and targets explicitly allowed by the plan. The compiler owns `<<if>>`,
+`<<switch>>`, `<<for>>`, `<<capture>>`, input macros, setters, and link bodies.
 
 ### Separate Domain Data from Diagnostics
 
@@ -232,6 +307,9 @@ Move `parse_warnings` out of the domain model. Return a generation envelope inst
 
 ```python
 class DraftResult(BaseModel):
+    plan: PassagePlan
+    narrative_fill: NarrativeFill | None
+    mechanic_proposal: MechanicProposal | None
     draft: PassageDraft | None
     raw_output: str
     diagnostics: list[GenerationDiagnostic]
@@ -258,30 +336,61 @@ Each block records source, priority, character/token estimate, and whether it is
 
 This makes context failures testable and supports causal-ablation benchmarks.
 
-### 2. Strategy Routing
+### 2. Trusted Plan Construction
+
+Construct `PassagePlan` before model generation from the commit request, parent
+graph, passage type, declared state schema, and explicit human direction. For an
+ordinary continuation, the plan may contain one narrative slot, two choice-copy
+slots, no state effects, and a bounded list of allowed entity references. Forms,
+loops, branches, and state transactions add programmatic slots and components
+before prose is requested.
+
+If the human asks the model to help design mechanics, the plan records explicit
+open mechanic slots plus their allowed targets and operations. It does not trust
+the narrative response to create new mechanical authority implicitly.
+
+### 3. Strategy Routing
 
 Add three explicit strategies:
 
 | Strategy | Use | Calls |
 |---|---|---:|
-| `structured_single` | Default for ordinary passages and models with reliable JSON-schema output | 1 |
-| `structured_staged` | Complex form/loop/switch/state tasks or models that fail semantic planning | 2 |
+| `structured_fill` | Default: fill narrative and choice-copy slots in a trusted plan | 1 |
+| `structured_staged` | A bounded mechanic decision remains open after planning | 2 |
 | `legacy_delimited` | Compatibility and benchmark control only | 1 plus current repair behavior |
 
-`structured_staged` should split authoring from mechanics, not create an open-ended agent conversation:
+`structured_fill` never asks the narrative model to invent state transactions
+or passage structure. The plan fixes slot IDs, allowed references, choice count,
+and required mechanics before generation.
 
-1. **Author stage:** narrative blocks, choice intents, continuity, summary, beats.
-2. **Mechanic stage:** conditions, effects, and typed mechanic spec against the immutable author artifact and current state schema.
+`structured_staged` should split authoring from mechanic proposal, not create
+an open-ended agent conversation:
 
-Use staged generation only when requested mechanics or prior capability measurements justify its latency.
+1. **Author stage:** fill narrative blocks, choice copy, continuity proposals,
+   summary, and beats against an immutable `PassagePlan`.
+2. **Mechanic stage:** propose only the unresolved guards, effects, or
+   components allowed by that same plan and current state schema.
 
-### 3. Schema-Constrained Generation
+The harness validates the mechanic proposal independently and may require human
+approval before assembly. Use staged generation only when the human requested
+model assistance with mechanics or prior capability measurements justify its
+latency.
 
-Send the smallest applicable JSON schema through Ollama's `format` field. Avoid describing delimited sections inside the JSON prompt. A form passage should receive a schema containing form fields; an ordinary scene should not carry every possible optional feature.
+### 4. Schema-Constrained Generation
+
+Send the smallest plan-derived JSON schema through Ollama's `format` field.
+Avoid describing delimited sections inside the JSON prompt. A plain narrative
+slot should expose strings and choice copy only. Dynamic inline spans, form
+copy, or mechanic proposals should appear only when the trusted plan permits
+them.
+
+Every generated schema receives a stable profile ID and content hash. Store
+both in provenance so dynamic schema reduction does not fragment comparisons
+or allow two different contracts to share one benchmark label.
 
 The prompt should describe story and semantic requirements. It should not include a SugarCube cheat sheet unless the model is explicitly being benchmarked on direct markup generation.
 
-### 4. Normalization
+### 5. Normalization
 
 Normalization must be deterministic and non-creative:
 
@@ -289,12 +398,13 @@ Normalization must be deterministic and non-creative:
 - trim and deduplicate IDs, beats, and facts;
 - normalize Markdown emphasis to the supported presentation form;
 - generate a deterministic summary fallback from the first complete sentence;
-- reject unknown state operations and undeclared targets; and
+- reject unknown state operations, undeclared targets, and references not
+  allowed by the plan; and
 - preserve all changes as diagnostics.
 
 Normalization must never invent a missing choice, state effect, or continuity fact.
 
-### 5. Semantic Validation
+### 6. Semantic Validation
 
 Validate the draft before rendering:
 
@@ -310,7 +420,7 @@ Validate the draft before rendering:
 
 Return stable error codes such as `STATE_UNKNOWN_TARGET`, `FORM_MISSING_SUBMIT`, or `CHOICE_DUPLICATE`, not prose-only warnings.
 
-### 6. Deterministic Compilation
+### 7. Deterministic Compilation
 
 Extract rendering responsibilities from `harness/passage.py` into a pure `SugarCubeCompiler`:
 
@@ -328,7 +438,7 @@ CompileArtifact compile_passage(PassageDraft, CompileContext)
 
 For a schema-valid draft, compiler syntax failures are harness defects, not model failures. Unit fixtures should cover every compiler branch.
 
-### 7. Bounded Repair
+### 8. Bounded Repair
 
 Repair policy should depend on failure ownership:
 
@@ -343,7 +453,7 @@ Repair policy should depend on failure ownership:
 
 Do not regenerate the full passage to fix one setter or missing field.
 
-### 8. Draft Persistence and Commit
+### 9. Draft Persistence and Commit
 
 Persist each `PassageDraft` with:
 
@@ -357,7 +467,11 @@ Persist each `PassageDraft` with:
 - validation and compile results; and
 - parent snapshot hash.
 
-Change commit to accept `generation_id`, `revision`, and optional typed edits. The server reloads the stored draft, validates its parent snapshot has not changed, compiles it, and commits graph/file changes atomically. Raw text is never reparsed at commit time.
+Change commit to accept `generation_id`, plan revision, draft revision, and
+optional typed edits. The server reloads the stored plan and assembled draft,
+validates that neither the plan nor parent snapshot has changed, compiles it,
+and commits graph/file changes atomically. Raw text is never reparsed at commit
+time.
 
 ## Model Capability Routing
 
@@ -369,7 +483,7 @@ state_semantic_rate: 0.82
 conversation_rate: 0.88
 context_band: medium
 p95_latency_seconds: 11.4
-preferred_strategy: structured_single
+preferred_strategy: structured_fill
 confirmed_seed_count: 10
 ```
 
@@ -377,8 +491,10 @@ The card informs strategy and budget selection but does not bypass validation.
 
 Initial routing rules:
 
-1. Prefer `structured_single` when schema handoff and requested capability exceed configured thresholds.
-2. Use `structured_staged` for complex mechanics when the mechanic score is below threshold but prose/choice quality is acceptable.
+1. Prefer `structured_fill` for every passage with a complete trusted plan.
+2. Use `structured_staged` only when the plan explicitly leaves a bounded
+   mechanic decision open and the model's measured mechanic capability exceeds
+   the configured threshold.
 3. Reduce optional context before increasing instruction length.
 4. Do not use the production `thinking` prompt. Reasoning models must return the same typed final contract; reasoning behavior remains a benchmark diagnostic.
 5. Keep name/parameter heuristics only as a cold-start profile until a capability card exists.
@@ -388,9 +504,10 @@ Initial routing rules:
 ```text
 harness/
   generation/
-    contracts.py      # PassageDraft and typed submodels
+    contracts.py      # PassagePlan, fills, proposals, draft, typed submodels
     context.py        # ContextPack assembly and token budgets
-    strategies.py     # single, staged, legacy adapters
+    planning.py       # deterministic trusted plan construction
+    strategies.py     # fill, staged proposal, legacy adapters
     pipeline.py       # orchestration and bounded repair
     normalization.py  # deterministic coercion/cleanup
     validation.py     # semantic validators and error codes
@@ -416,8 +533,11 @@ Existing modules change as follows:
 
 ### Phase 0: Freeze a Trustworthy Baseline
 
-1. Run the current `core` profile against the same four model artifacts.
-2. Use at least five fixed seeds for screening.
+1. Define and freeze a semantic `refactor-core` cohort containing only fixed
+   `PassagePlan` cases and architecture-neutral outcomes. Do not use the current
+   mixed `core` aggregate, which also contains the direct A-H matrix.
+2. Run the legacy adapter on `refactor-core` against the same four model
+   artifacts using at least five fixed seeds for screening.
 3. Store model digest, quantization, chat-template hash, rendered prompt, tokens, finish reason, and effective config.
 4. Separate raw contract, structured handoff, semantic observables, latency, and applicable-check coverage.
 5. Do not use the 49/248 Experiment 16 artifact as the control.
@@ -426,7 +546,8 @@ Existing modules change as follows:
 
 ### Phase 1: Introduce Contracts and Compiler Parity
 
-1. Define `PassageDraft`, typed state operations, and `CompileArtifact`.
+1. Define `PassagePlan`, `NarrativeFill`, `MechanicProposal`, assembled
+   `PassageDraft`, typed state operations, and `CompileArtifact`.
 2. Extract current rendering into pure compiler functions without changing emitted Twee.
 3. Add fixture parity tests for all supported passage types.
 4. Add hostile-value escaping tests and exact state read/write tests.
@@ -435,8 +556,9 @@ Existing modules change as follows:
 
 ### Phase 2: Add Structured Shadow Generation
 
-1. Implement `structured_single` using the smallest applicable JSON schema.
-2. Normalize both legacy and structured outputs into `PassageDraft`.
+1. Implement `structured_fill` using the smallest plan-derived JSON schema.
+2. Adapt legacy output into fills/proposals, then assemble both legacy and
+   structured paths into `PassageDraft` through the same validator.
 3. Run legacy and structured paths in benchmark pairs without changing the UI default.
 4. Add compile and browser choice-effect evaluation.
 
@@ -447,13 +569,13 @@ Existing modules change as follows:
 1. Persist immutable drafts and revisions.
 2. Change commit to use draft ID rather than raw reparse.
 3. Show structured diagnostics and compiler output in review.
-4. Make `structured_single` the default for validated model profiles.
+4. Make `structured_fill` the default for validated model profiles.
 
 **Exit gate:** Generate-review-edit-commit uses one typed artifact end to end, with legacy fallback available by configuration.
 
 ### Phase 4: Add Staged Mechanics and Capability Routing
 
-1. Implement author/mechanic staging.
+1. Implement separately persisted author fill/mechanic proposal staging.
 2. Add model capability cards and measured routing.
 3. Add mechanic-only repair.
 4. Add context causal-ablation and multi-passage continuity tests.
@@ -464,7 +586,9 @@ Existing modules change as follows:
 
 1. Freeze delimited/full/thinking prompts as compatibility and research paths.
 2. Remove raw-output reparse from commit.
-3. Keep historical benchmark cases in `full`, but use harness-contract `core` results for architecture decisions.
+3. Keep historical benchmark cases in `full`, retain the mixed `core` for
+   transitional comparisons, and use frozen `refactor-core` results for
+   architecture promotion.
 
 **Exit gate:** No supported production feature requires model-authored SugarCube syntax.
 
@@ -474,10 +598,13 @@ Add an `architecture` axis:
 
 - `legacy_delimited`
 - `legacy_json`
-- `typed_single`
+- `typed_fill`
 - `typed_staged`
 
-Run matching model/case/seed triples. The same semantic case definitions should feed every architecture through adapters.
+Run matching model/case/seed triples against the frozen `refactor-core` plans.
+The same plan IDs, revisions, semantic expectations, model artifacts, and seeds
+must feed every architecture through adapters. Keep the direct A-H matrix as a
+diagnostic cohort rather than mixing it into architecture-promotion aggregates.
 
 ### Headline Metrics
 
@@ -494,17 +621,28 @@ Report these independently:
 9. latency, calls, and token use; and
 10. repair rate and repair-induced regressions.
 
+Every report must include both stage-conditional rates and request-level rates.
+The request-level denominator is every original generation request; repaired,
+rejected, schema-invalid, or uncompiled attempts remain in that denominator.
+Conditional rates such as “browser success among compiled drafts” are diagnostic
+and may not serve as the promotion headline by themselves.
+
 ### Promotion Gates
 
 After a five-seed screen, confirm on ten seeds. Promote the typed path only when:
 
-- accepted typed drafts compile at 100%;
-- normalized handoff reaches at least 90% on the core cohort;
-- browser playability reaches at least 95% for compiled drafts;
-- exact state transaction reaches at least 90% on applicable cases;
+- semantically accepted typed drafts compile at 100% as a compiler invariant;
+- normalized handoff reaches at least 90% of all `refactor-core` requests;
+- final browser-playable output is reported over all original requests and
+  exceeds the legacy path by the predeclared margin beyond the noise floor;
+- browser playability among compiled drafts remains at least 95% as a
+  diagnostic compiler/runtime check;
+- exact state transaction reaches at least 90% of all applicable original
+  requests, including rejected and failed generations;
 - narrative/choice quality does not regress by more than the predeclared margin;
 - same-seed control/treatment comparison shows a credible improvement beyond the measured noise floor; and
-- single-stage p95 latency remains within 25% of the current production path, while staged latency is reported separately.
+- fill-stage p95 latency remains within 25% of the current production path,
+  while staged mechanic-proposal latency is reported separately.
 
 These are initial engineering gates, not permanent benchmark weights. Revise them from the Phase 0 baseline before implementation promotion.
 
@@ -512,8 +650,13 @@ These are initial engineering gates, not permanent benchmark weights. Revise the
 
 ### Deterministic CI
 
-- Pydantic/schema fixtures for every contract variant.
-- Legacy `ModelOutput` to `PassageDraft` adapter parity.
+- Pydantic/schema fixtures for every plan, fill, proposal, and assembled-draft
+  variant.
+- Plan-authority tests proving a fill cannot add slots, state targets,
+  references, effects, or mechanic components that the plan did not allow.
+- Typed inline-span rendering for text, state references, entity references,
+  escaping, and hostile values.
+- Legacy `ModelOutput` plus `PassagePlan` to `PassageDraft` adapter parity.
 - Typed condition/effect rendering and escaping.
 - Compiler fixtures for normal, conditional, switch, loop, form, dialogue, random, hub, and ending passages.
 - State read/write exactness.
@@ -524,7 +667,7 @@ These are initial engineering gates, not permanent benchmark weights. Revise the
 
 ### Model Canary
 
-- ordinary prose and choices;
+- ordinary prose and choices against a fixed plan;
 - one state update;
 - one guarded choice;
 - one form;
@@ -550,7 +693,7 @@ These are initial engineering gates, not permanent benchmark weights. Revise the
 |---|---|
 | Typed output flattens prose | Keep narrative text fields open; constrain structure and mechanics, not vocabulary; retain blinded quality review |
 | Some Ollama models handle JSON schema poorly | Preserve a legacy adapter and capability-based routing; test grammar and tolerant-parser alternatives separately |
-| Staged generation is too slow | Use one call by default; stage only complex mechanics or measured weak capabilities |
+| Staged generation is too slow | Use one fill call by default; request a mechanic stage only when the plan leaves an approved bounded decision open |
 | Compiler bugs affect every model | Make compiler pure, fixture-heavy, and browser-tested; treat compiler failures as release blockers |
 | The state DSL is too narrow | Version the schema and add operations only with compiler/tests; provide an explicit reviewed expert escape hatch |
 | Migration changes emitted Twee | Require byte parity in Phase 1, then make intentional diffs explicit |
@@ -559,17 +702,22 @@ These are initial engineering gates, not permanent benchmark weights. Revise the
 
 ## Decision
 
-Proceed with the refactor, beginning with a fresh `core` baseline and compiler extraction.
+Proceed with the refactor, beginning with a fresh frozen `refactor-core`
+baseline and compiler extraction.
 
 Do **not** spend another optimization cycle adding global or variant-specific format reminders before testing the typed path. The published experiments already show that prompt-only changes trade failures between variants, while the current codebase is capable of owning the syntax deterministically.
 
 The smallest high-value implementation slice is:
 
-1. define `PassageDraft` with narrative blocks, choices, typed conditions, and effects;
-2. adapt `ModelOutput` into it;
-3. extract deterministic rendering into `SugarCubeCompiler`;
-4. add `typed_single` JSON-schema generation in shadow mode; and
-5. compare it with legacy generation on paired `core` runs plus compile/browser checks.
+1. define `PassagePlan`, `NarrativeFill`, bounded `MechanicProposal`, and the
+   assembled `PassageDraft`;
+2. implement deterministic plan construction for ordinary, state, guarded
+   choice, and form cases;
+3. adapt `ModelOutput` into fills/proposals without granting new plan authority;
+4. extract deterministic rendering into `SugarCubeCompiler`;
+5. add `typed_fill` JSON-schema generation in shadow mode; and
+6. compare it with legacy generation on paired `refactor-core` plans plus
+   compile/browser checks.
 
 If this slice improves final playable and semantically correct passages, continue to immutable draft commit and staged mechanics. If it does not, the layered benchmark will identify whether the remaining defect is context, schema adoption, semantic planning, compiler behavior, or runtime execution.
 

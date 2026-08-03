@@ -24,43 +24,54 @@ judged by final handoff quality rather than counted as raw model compliance.
 
 ## Refactor boundary
 
-The model owns:
+The default model call owns:
 
-- scene intent, prose, dialogue, and inner monologue;
-- choice text and destination hints;
-- explicit state-transition proposals;
-- structured input-field proposals;
-- continuity facts, beats, and entity updates.
+- prose, dialogue, and inner-thought text in predefined narrative slots;
+- choice labels and hints in predefined choice slots;
+- summary, beats, and bounded continuity proposals.
+
+An optional, separately scored mechanic call may propose only guards, effects,
+or components explicitly left open by the trusted plan. It cannot add state
+targets, operations, slots, or passage authority.
 
 The harness owns:
 
+- the trusted `PassagePlan`, slot identities, passage mode, allowed state IDs,
+  and required mechanic components;
 - passage IDs, files, graph edges, and link targets;
 - SugarCube setters, links, forms, loops, and type-specific rendering;
 - schema validation, state invariants, compilation, repair policy, and browser
   execution;
 - deciding whether a proposal is committed.
 
-Tests should therefore assert normalized effects such as `$hasKey = true` or a
-`textbox` targeting `$name`, not require the model to spell the SugarCube code
-that deterministic compilation will generate.
+Tests should therefore start from a fixed plan and assert resolved semantic
+effects such as state ID `has_key` becoming true or a textbox component bound
+to state ID `name`. They must not require the model-facing contract to contain
+SugarCube `$` variables or macro syntax.
 
 ## Cohorts
 
 - `canary` samples the current direct-generation matrix and eight
   harness-contract cases.
-- `core` uses a smaller covering array plus all twelve harness-contract cases.
+- `core` uses a smaller covering array plus all twelve transitional
+  harness-contract cases.
 - `full` retains historical direct-SugarCube, strict conversation, style,
   plain-text, and stress probes.
+- `refactor-core` must be frozen before the architecture baseline. It contains
+  only fixed `PassagePlan` cases and architecture-neutral expected outcomes.
 
-Do not compare aggregate rates across these profiles. For refactor decisions,
-compare matching case IDs and seeds, then report raw contract, structured
-handoff, semantic correctness, compilation, browser playability, latency, and
-tokens as separate dimensions.
+Do not compare aggregate rates across these profiles or use the mixed `core`
+aggregate for architecture promotion. For refactor decisions, compare matching
+`refactor-core` plan IDs, revisions, model artifacts, and seeds. Report raw
+contract, structured handoff, semantic correctness, compilation, browser
+playability, latency, and tokens as separate dimensions over every original
+request.
 
 ## Next adapters
 
-New generation architectures should normalize into the existing parsed story
-shape before semantic scoring. Add architecture-specific adapters rather than
-forking case definitions. The next benchmark gates should be deterministic
-compile, exact state transaction, and browser choice execution; those belong
-after structured handoff and must not be approximated with keyword checks.
+New generation architectures should combine the same trusted `PassagePlan`
+with architecture-specific fills/proposals, then normalize into one assembled
+`PassageDraft` before semantic scoring. Add adapters rather than forking case
+definitions. The next benchmark gates should be deterministic compile, exact
+state transaction, and browser choice execution; those belong after structured
+handoff and must not be approximated with keyword checks.
