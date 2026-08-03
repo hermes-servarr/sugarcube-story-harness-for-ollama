@@ -140,7 +140,7 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |
 | `--variants` | `compact full json` | Prompt variants to test |
 | `--directions` | `A B C` | Direction prompts (A: inventory/set flag, B: conditional, C: stats) |
-| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), or `full` (82) |
+| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), `full` (82), `refactor-canary` (10), or `refactor-core` (24) |
 | `--base-url` | `http://localhost:11434` | Ollama server URL |
 | `--timeout` | `120` | Seconds per model call |
 | `--num-predict` | `640` | Max tokens to generate |
@@ -167,13 +167,29 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `canary` | 8-case covering array | 8 harness-contract cases | 16 | Routine prompt iteration |
 | `core` | 16-case covering array | 12 harness-contract cases | 28 | Architecture and refactor comparison |
 | `full` | 4 variants × 8 directions | All 50 built-in cases | 82 | Historical probes, stress, and scorer validation |
+| `refactor-canary` | None | 10 fixed-plan typed-fill cases | 10 | Fast checks of the future ownership boundary |
+| `refactor-core` | None | All 24 fixed-plan typed-fill cases | 24 | Refactor baselines and architecture comparison |
 
-Profiles imply capability tests. `--diagnostic-tests` additionally includes
-validated candidate probes. The context-window ladder remains opt-in for every
-profile. Without `--profile`, `--variants`, `--directions`, and
-`--capability-tests` retain their previous custom behavior.
+Call counts assume `--runs 1`. Refactor profiles repeat every fixed-plan case
+for larger values and increment an explicit base seed for each repetition.
+
+Legacy profiles imply the transitional capability tests. Refactor profiles
+instead run `model_benchmark/refactor_cases.json`: the harness supplies an
+immutable plan and constrained schema, while the model supplies only narrative,
+choice copy, summary, and beats. `--diagnostic-tests` additionally includes
+validated candidate probes when legacy capability tests are enabled. The
+context-window ladder remains opt-in for every profile. Without `--profile`,
+`--variants`, `--directions`, and `--capability-tests` retain their previous
+custom behavior.
 Only compare runs that use the same profile and seed policy; profile changes
 change the benchmark cohort and denominator.
+
+Run the future-contract cohorts directly:
+
+```bash
+uv run python -m model_benchmark.cli run --profile refactor-canary --models MODEL
+uv run python -m model_benchmark.cli run --profile refactor-core --models MODEL
+```
 
 The harness-contract cases score three independent layers: raw transport,
 normalized story handoff, and semantic observables. Raw transport is diagnostic

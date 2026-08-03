@@ -22,6 +22,17 @@ Raw contract is intentionally non-gating. It remains visible as a model and
 prompt diagnostic, but parser recovery or deterministic framing should be
 judged by final handoff quality rather than counted as raw model compliance.
 
+The executable refactor profiles sharpen the middle layer into two gates:
+
+1. **Plan adherence** — the fill preserves the plan ID, revision, slot set,
+   slot kinds, fixed speakers, and allowed typed references.
+2. **Fill completeness** — every trusted narrative and choice slot is filled,
+   with a summary and at least one beat.
+
+They then score architecture-neutral semantic observables. One result record is
+created per original model request; parser or repair attempts must not inflate
+the denominator.
+
 ## Refactor boundary
 
 The default model call owns:
@@ -57,8 +68,9 @@ SugarCube `$` variables or macro syntax.
   harness-contract cases.
 - `full` retains historical direct-SugarCube, strict conversation, style,
   plain-text, and stress probes.
-- `refactor-core` must be frozen before the architecture baseline. It contains
-  only fixed `PassagePlan` cases and architecture-neutral expected outcomes.
+- `refactor-canary` is a ten-case subset for quick future-contract checks.
+- `refactor-core` is the frozen 24-case architecture baseline. It contains only
+  fixed `PassagePlan` cases and architecture-neutral expected outcomes.
 
 Do not compare aggregate rates across these profiles or use the mixed `core`
 aggregate for architecture promotion. For refactor decisions, compare matching
@@ -66,6 +78,11 @@ aggregate for architecture promotion. For refactor decisions, compare matching
 contract, structured handoff, semantic correctness, compilation, browser
 playability, latency, and tokens as separate dimensions over every original
 request.
+
+The current executable adapter is `typed_fill`. It uses a case-specific JSON
+schema whose enums are derived from the trusted plan. The case corpus is shared
+and must remain independent of SugarCube syntax; later AST, staged-generation,
+compiler, and repair adapters should consume the same plan IDs and revisions.
 
 ## Next adapters
 

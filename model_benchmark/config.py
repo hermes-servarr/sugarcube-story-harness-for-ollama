@@ -19,6 +19,8 @@ import argparse
 from dataclasses import dataclass, fields, MISSING
 from typing import TYPE_CHECKING
 
+from model_benchmark.profiles import PROFILE_NAMES
+
 if TYPE_CHECKING:
     # These are Literal["compact","full","json"] / Literal["A","B","C"] in
     # scoring.py / benchmark.py. We keep annotations as strings (PEP 563).
@@ -130,7 +132,7 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Ignore existing checkpoint and recompute every case")
     parser.add_argument("--ingestion-routing", default="",
                         help=argparse.SUPPRESS)
-    parser.add_argument("--profile", choices=["canary", "core", "full"], default="",
+    parser.add_argument("--profile", choices=PROFILE_NAMES, default="",
                         help="Named workload profile (default: custom flags)")
 
     return parser

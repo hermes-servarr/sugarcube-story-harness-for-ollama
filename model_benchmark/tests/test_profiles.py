@@ -4,6 +4,8 @@ from model_benchmark.profiles import (
     CANARY_CAPABILITY_IDS,
     CANARY_MATRIX_CASES,
     CORE_MATRIX_CASES,
+    PROFILE_NAMES,
+    REFACTOR_PROFILE_NAMES,
     resolve_matrix_cases,
 )
 
@@ -38,6 +40,13 @@ def test_custom_workload_preserves_requested_cartesian_product():
         ("json", "A"),
         ("json", "G"),
     )
+
+
+def test_refactor_profiles_run_only_fixed_plan_cases():
+    assert REFACTOR_PROFILE_NAMES == ("refactor-canary", "refactor-core")
+    assert set(REFACTOR_PROFILE_NAMES).issubset(PROFILE_NAMES)
+    assert resolve_matrix_cases("refactor-canary", ALL_VARIANTS, ALL_DIRECTIONS) == ()
+    assert resolve_matrix_cases("refactor-core", ALL_VARIANTS, ALL_DIRECTIONS) == ()
 
 
 def test_canary_capability_set_has_eight_unique_harness_cases():
