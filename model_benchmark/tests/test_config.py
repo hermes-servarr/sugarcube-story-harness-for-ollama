@@ -18,10 +18,10 @@ from model_benchmark.config import BenchmarkConfig, parse_cli_args, _build_parse
 class TestBenchmarkConfigFields:
     """Test the EXTENDED BenchmarkConfig dataclass per P2 §2 and P3 §1.1."""
 
-    def test_benchmark_config_21_fields(self):
-        """21 fields total (8 required + 13 optional)."""
+    def test_benchmark_config_22_fields(self):
+        """22 fields total (8 required + 14 optional)."""
         fields = list(BenchmarkConfig.__dataclass_fields__)
-        assert len(fields) == 21, f"Expected 21 fields, got {len(fields)}"
+        assert len(fields) == 22, f"Expected 22 fields, got {len(fields)}"
 
     def test_benchmark_config_required_fields(self):
         """8 required fields have no defaults."""
@@ -36,7 +36,7 @@ class TestBenchmarkConfigFields:
                     "checkpoint_every", "checkpoint_interval_seconds",
                     "output_dir", "verbose", "quiet", "anonymize",
                     "baseline_dir", "random_seed", "force_rerun",
-                    "ingestion_routing_path"]
+                    "ingestion_routing_path", "benchmark_profile"]
         for name in optional:
             assert name in BenchmarkConfig.__dataclass_fields__
 
@@ -57,6 +57,7 @@ class TestBenchmarkConfigFields:
         assert cfg.random_seed == ""
         assert cfg.force_rerun is False
         assert cfg.ingestion_routing_path == ""
+        assert cfg.benchmark_profile == ""
 
     def test_benchmark_config_frozen(self):
         """Dataclass is frozen (immutable)."""
@@ -147,6 +148,13 @@ class TestParseCliArgs:
         assert cfg.random_seed == "42"
         assert cfg.force_rerun is True
 
+    def test_parse_cli_args_named_profile(self):
+        cfg = parse_cli_args(["--profile", "canary"])
+
+        assert cfg.benchmark_profile == "canary"
+        assert cfg.variants == ("compact", "full", "json", "thinking")
+        assert cfg.directions == tuple("ABCDEFGH")
+
     def test_parse_cli_args_anonymize_boolean_optional_action(self):
         """--anonymize / --no-anonymize toggle the anonymize field (default True)."""
         cfg_default = parse_cli_args([])
@@ -190,6 +198,7 @@ class TestBuildParser:
                     "output_dir", "verbose", "quiet", "anonymize",
                     "baseline", "seed", "force_rerun"}
         expected.add("ingestion_routing")
+        expected.add("profile")
         assert expected.issubset(actions), f"Missing: {expected - actions}"
 
     def test_build_parser_defaults(self):

@@ -174,6 +174,12 @@ About 12 calls per model/seed:
 - one multi-passage transition;
 - one compile-and-browser execution case.
 
+The implemented `--profile canary` is a transitional 20-call version: eight
+covering-array generation cases plus twelve representative capability cases.
+It preserves every current direction and prompt variant while the execution-
+level benchmarks above are still being built. `core` preserves the former
+62-call protected workload, and `full` runs all 70 built-in cases.
+
 Run before a full campaign. Stop early if transport, provenance, or basic
 compilation fails.
 

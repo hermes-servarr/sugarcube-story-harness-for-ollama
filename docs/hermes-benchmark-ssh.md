@@ -96,16 +96,16 @@ uv sync
 Set the real explicit model tags, clone path, `.venv\Scripts\python.exe`, Git
 executable, remote, and branch in the config. Configure non-interactive Git
 pull/push credentials for the dedicated account.
-The example runs all benchmark directions currently defined by the project
-(A–H) and all variants, including `thinking`; reduce those lists only if you
-intentionally want a smaller run.
-It also enables the signed 33-case capability ladder. Those additional calls
-run sequentially for each configured model and cover T0 atomic syntax through
-T9 harness-scale context, including matched S/M/L/XL retrieval probes.
-The ladder includes direct plain-text fallbacks at tiny, short, and medium
-output budgets. Per-case caps can only reduce the configured `num_predict`;
-they measure concise-answer compliance and longer explanations without
-increasing GPU memory requirements.
+The example uses the `canary` workload profile: eight covering-array generation
+cases plus twelve representative capability cases, or 20 calls per model. Use
+`core` for the former 62-call optimization workload and `full` for all 70
+built-in matrix, passage, and retrieval/transport cases. The optional context
+window ladder remains separate because its largest levels can sharply increase
+KV-cache pressure.
+The `full` profile's ladder includes direct plain-text fallbacks at tiny,
+short, and medium output budgets. Per-case caps can only reduce the configured
+`num_predict`; they measure concise-answer compliance and longer explanations
+without increasing GPU memory requirements.
 The T0 floor asks for exactly one plain-text word under the 32-token cap,
 separating basic output-control failure from retrieval or formatting failure.
 Conversation-layout cases cover compact, full, JSON, thinking, and XL-context

@@ -634,6 +634,7 @@ class TestHelp:
         assert "--output-format" in out
         assert "--plan-only" in out
         assert "--select" in out
+        assert "--profile" in out
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -672,6 +673,7 @@ class TestSubcommandParser:
         assert "output_format" in dests
         assert "select" in dests
         assert "exclude" in dests
+        assert "profile" in dests
 
     def test_list_subparser_has_formats(self):
         parser = _build_subcommand_parser()

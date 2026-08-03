@@ -450,6 +450,21 @@ def test_benchmark_args_enable_capability_ladder(tmp_path):
     ]
 
 
+def test_benchmark_args_forward_named_profile(tmp_path):
+    args = publisher._benchmark_args(
+        {"models": ["private-model"], "benchmark_profile": "canary"},
+        tmp_path,
+    )
+
+    assert args[args.index("--profile") + 1] == "canary"
+
+    with pytest.raises(ValueError, match="benchmark_profile"):
+        publisher._benchmark_args(
+            {"models": ["private-model"], "benchmark_profile": "unknown"},
+            tmp_path,
+        )
+
+
 def test_benchmark_args_enable_bounded_context_window_ladder(tmp_path):
     args = publisher._benchmark_args(
         {

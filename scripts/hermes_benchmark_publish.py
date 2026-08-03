@@ -439,6 +439,11 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         "--models",
         *config["models"],
     ]
+    profile = str(config.get("benchmark_profile", "")).strip()
+    if profile:
+        if profile not in {"canary", "core", "full"}:
+            raise ValueError("benchmark_profile must be canary, core, or full")
+        args.extend(["--profile", profile])
     for flag, key in (
         ("--variants", "variants"),
         ("--directions", "directions"),
@@ -462,6 +467,8 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
         candidate_dir = config.get("candidate_test_dir")
         if candidate_dir:
             args.extend(["--candidate-test-dir", str(candidate_dir)])
+    if bool(config.get("diagnostic_tests", False)):
+        args.append("--diagnostic-tests")
     if bool(config.get("context_window_tests", False)):
         from model_benchmark.context_window_tests import validate_context_sizes
         context_sizes = validate_context_sizes(

@@ -140,6 +140,7 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |
 | `--variants` | `compact full json` | Prompt variants to test |
 | `--directions` | `A B C` | Direction prompts (A: inventory/set flag, B: conditional, C: stats) |
+| `--profile` | custom | Named workload: `canary` (20 calls/model), `core` (62), or `full` (70) |
 | `--base-url` | `http://localhost:11434` | Ollama server URL |
 | `--timeout` | `120` | Seconds per model call |
 | `--num-predict` | `640` | Max tokens to generate |
@@ -158,6 +159,21 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--exclude` | (none) | Exclude filter expression (can repeat, subcommand mode only) |
 | `--plan-only` | off | Show selection plan without executing (subcommand mode only) |
 | `--debug` | off | Show resolved config, matrix expansion, and model I/O |
+
+### Workload profiles
+
+| Profile | Matrix | Capability | Calls/model | Use |
+|---------|--------|------------|-------------|-----|
+| `canary` | 8-case covering array | 12 representative passage cases | 20 | Routine prompt iteration |
+| `core` | 4 variants × 8 directions | 30 passage cases | 62 | Broad comparison and promotion checks |
+| `full` | 4 variants × 8 directions | All 38 built-in cases | 70 | Release, scorer, and benchmark validation |
+
+Profiles imply capability tests. `--diagnostic-tests` additionally includes
+validated candidate probes. The context-window ladder remains opt-in for every
+profile. Without `--profile`, `--variants`, `--directions`, and
+`--capability-tests` retain their previous custom behavior.
+Only compare runs that use the same profile and seed policy; profile changes
+change the benchmark cohort and denominator.
 
 ## The 6 Scoring Categories
 

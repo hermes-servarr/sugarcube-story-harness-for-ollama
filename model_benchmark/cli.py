@@ -485,6 +485,15 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help="Directions.",
     )
     p_run.add_argument(
+        "--profile",
+        choices=["canary", "core", "full"],
+        default="",
+        help=(
+            "Named built-in workload: canary=20 calls/model, "
+            "core=62 calls/model, full=70 calls/model."
+        ),
+    )
+    p_run.add_argument(
         "--runs",
         type=int,
         default=1,
@@ -1129,6 +1138,13 @@ def _cmd_run(
             if not quiet:
                 sys.stderr.write("Seed must be a non-negative integer.\n")
             return 2
+    profile = cfg.benchmark_profile
+    if profile and declarative_mode:
+        if not quiet:
+            sys.stderr.write(
+                "--profile cannot be combined with declarative config selection.\n"
+            )
+        return 2
     from harness.ingestion_profiles import (
         IngestionEnvelopeError,
         load_ingestion_envelopes,
@@ -1152,19 +1168,22 @@ def _cmd_run(
             return 2
 
     capability_cases: tuple[Any, ...] = ()
-    if getattr(args, "capability_tests", False) and not cfg.dry_run:
+    run_capability_tests = bool(
+        profile or getattr(args, "capability_tests", False)
+    )
+    if run_capability_tests and not cfg.dry_run:
         from model_benchmark.capability_tests import load_cases, select_capability_suite
 
         include_diagnostics = bool(getattr(args, "diagnostic_tests", False))
+        candidate_dir = (
+            Path(getattr(args, "candidate_test_dir"))
+            if include_diagnostics
+            else None
+        )
         capability_cases = select_capability_suite(
-            load_cases(
-                candidate_dir=(
-                    Path(getattr(args, "candidate_test_dir"))
-                    if include_diagnostics
-                    else None
-                )
-            ),
+            load_cases(candidate_dir=candidate_dir),
             include_diagnostics=include_diagnostics,
+            profile=profile or "core",
         )
 
     context_sizes: tuple[int, ...] = ()
@@ -1183,12 +1202,11 @@ def _cmd_run(
             cfg,
         )
     else:
-        matrix_total = (
-            model_count
-            * len(cfg.variants)
-            * len(cfg.directions)
-            * max(1, cfg.runs)
-        )
+        from model_benchmark.profiles import resolve_matrix_cases
+
+        matrix_total = model_count * len(
+            resolve_matrix_cases(profile, cfg.variants, cfg.directions)
+        ) * max(1, cfg.runs)
     capability_total = model_count * len(capability_cases)
     context_total = model_count * len(context_sizes)
     overall_total = matrix_total + capability_total + context_total
@@ -1298,7 +1316,7 @@ def _cmd_run(
     else:
         results = runner.execute()
 
-    if getattr(args, "capability_tests", False) and not cfg.dry_run:
+    if run_capability_tests and not cfg.dry_run:
         from model_benchmark.capability_tests import (
             execute_capability_cases,
         )
@@ -1524,6 +1542,9 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
     directions = getattr(args, "directions", []) or []
     if directions:
         out += ["--directions", *directions]
+    profile = getattr(args, "profile", "") or ""
+    if profile:
+        out += ["--profile", profile]
     runs = getattr(args, "runs", 1)
     if runs != 1:
         out += ["--runs", str(runs)]
