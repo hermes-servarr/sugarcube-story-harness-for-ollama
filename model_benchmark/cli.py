@@ -122,24 +122,6 @@ def _legacy_main(argv: list[str]) -> int:
         resume = "--resume" in (argv or [])
         results = runner.execute(resume=resume)
 
-    # ── 3. Stats (stats.py §8.2) — when runs > 1 ────────────────────────────
-    stats_map: dict[str, Any] = {}
-    if cfg.runs > 1:
-        from model_benchmark.stats import compute_run_statistics
-        from collections import defaultdict
-        grouped: dict[str, list[float]] = defaultdict(list)
-        grouped_passed: dict[str, list[bool]] = defaultdict(list)
-        for r in results:
-            tid = getattr(r, "test_id", "") or ""
-            score = getattr(r, "normalized_score", getattr(r, "score", 0.0))
-            passed = getattr(r, "status", "FAIL") == "PASS"
-            grouped[tid].append(float(score))
-            grouped_passed[tid].append(bool(passed))
-        for tid, scores in grouped.items():
-            stats_map[tid] = compute_run_statistics(
-                tid, scores, grouped_passed[tid]
-            )
-
     # ── 4. Baseline comparison (comparisons.py §2) — when baseline_dir ─────
     comparison = None
     regressions = None
@@ -175,6 +157,15 @@ def _legacy_main(argv: list[str]) -> int:
         anon_results = anonymize_results(results, mapping)
         anon_manifest = anonymize_metadata(manifest, mapping)
 
+    # Compute statistics from the artifact-facing records so anonymized
+    # reports cannot leak model identity through logical test IDs.
+    from model_benchmark.stats import compute_statistics_for_records
+    stats_map: dict[str, Any] = {
+        stat.test_id: stat
+        for stat in compute_statistics_for_records(anon_results)
+        if stat.n > 1
+    }
+
     # ── 7. Reports (reports.py §4, html_report.py §5) ──────────────────────
     from model_benchmark.reports import (
         generate_text_report, generate_markdown_report,
@@ -187,14 +178,14 @@ def _legacy_main(argv: list[str]) -> int:
     text_report = generate_text_report(
         anon_results,
         manifest=anon_manifest,
-        stats=stats_list[0] if stats_list else None,
+        stats=stats_list,
         comparison=comparison,
         regressions=regressions,
     )
     md_report = generate_markdown_report(
         anon_results,
         manifest=anon_manifest,
-        stats=stats_list[0] if stats_list else None,
+        stats=stats_list,
         comparison=comparison,
         regressions=regressions,
     )
@@ -202,7 +193,7 @@ def _legacy_main(argv: list[str]) -> int:
         anon_results,
         anon_manifest,
         anonymized=cfg.anonymize,
-        stats=stats_list[0] if stats_list else None,
+        stats=stats_list,
         comparison=comparison,
         regressions=regressions,
     )
@@ -1086,7 +1077,11 @@ def _cmd_run(
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> int:
     """Execute selected tests with dry-run, debug, and output-format flags."""
-    from model_benchmark.test_selection import dry_run as ts_dry_run
+    from model_benchmark.test_selection import (
+        dry_run as ts_dry_run,
+        expand_all,
+        select_tests,
+    )
 
     config_dirs = getattr(args, "config_dir", []) or []
     debug = getattr(args, "debug", False)
@@ -1095,6 +1090,16 @@ def _cmd_run(
 
     all_specs = _resolved_specs(config_dirs)
     filters = _build_filters(args)
+    declarative_mode = bool(
+        config_dirs
+        or getattr(args, "select", None)
+        or getattr(args, "exclude", None)
+        or getattr(args, "max_selected", None) is not None
+        or getattr(args, "include_disabled", False)
+    )
+    declarative_instances = (
+        expand_all(select_tests(all_specs, filters)) if declarative_mode else []
+    )
 
     # ── Debug: show resolved config after merge + matrix expansion. ───────
     if debug:
@@ -1170,13 +1175,20 @@ def _cmd_run(
             getattr(args, "context_window_sizes", [])
         )
 
-    model_count = len(cfg.models)
-    matrix_total = (
-        model_count
-        * len(cfg.variants)
-        * len(cfg.directions)
-        * max(1, cfg.runs)
-    )
+    model_count = len(cfg.models) or (1 if cfg.dry_run else 0)
+    if declarative_mode:
+        from model_benchmark.declarative_runner import declarative_case_count
+        matrix_total = model_count * declarative_case_count(
+            declarative_instances,
+            cfg,
+        )
+    else:
+        matrix_total = (
+            model_count
+            * len(cfg.variants)
+            * len(cfg.directions)
+            * max(1, cfg.runs)
+        )
     capability_total = model_count * len(capability_cases)
     context_total = model_count * len(context_sizes)
     overall_total = matrix_total + capability_total + context_total
@@ -1251,7 +1263,35 @@ def _cmd_run(
     )
 
     benchmark_started_at = datetime.now(timezone.utc)
-    if cfg.dry_run:
+    if declarative_mode:
+        from model_benchmark.declarative_runner import execute_declarative_tests
+
+        def report_declarative_progress(
+            completed: int,
+            total: int,
+            current_model: str,
+        ) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "phase": "declarative",
+                    "completed": completed,
+                    "total": total,
+                    "percent": completed / total * 100.0 if total else 100.0,
+                    "current_model": current_model,
+                    **_overall_fields(completed),
+                }
+            )
+
+        results = execute_declarative_tests(
+            declarative_instances,
+            cfg,
+            run_id=getattr(runner, "run_id", ""),
+            dry_run=cfg.dry_run,
+            progress_callback=report_declarative_progress,
+        )
+    elif cfg.dry_run:
         # Fixture dry-run: produces scored records without calling Ollama.
         runner.dry_run()
         results = runner.execute()
@@ -1336,22 +1376,6 @@ def _cmd_run(
     if debug:
         _debug_model_io(results)
 
-    # ── Stats (when runs > 1) ────────────────────────────────────────────
-    from collections import defaultdict
-    stats_map: dict[str, Any] = {}
-    if cfg.runs > 1:
-        from model_benchmark.stats import compute_run_statistics
-        grouped: dict[str, list[float]] = defaultdict(list)
-        grouped_passed: dict[str, list[bool]] = defaultdict(list)
-        for r in results:
-            tid = getattr(r, "test_id", "") or ""
-            score = getattr(r, "normalized_score", getattr(r, "score", 0.0))
-            passed = getattr(r, "status", "FAIL") == "PASS"
-            grouped[tid].append(float(score))
-            grouped_passed[tid].append(bool(passed))
-        for tid, scores in grouped.items():
-            stats_map[tid] = compute_run_statistics(tid, scores, grouped_passed[tid])
-
     # ── Baseline comparison ─────────────────────────────────────────────
     comparison = None
     regressions = None
@@ -1390,6 +1414,15 @@ def _cmd_run(
         anon_results = anonymize_results(results, mapping)
         anon_manifest = anonymize_metadata(manifest, mapping)
 
+    # Compute statistics from artifact-facing records. This both groups
+    # declarative repetitions and keeps anonymized report IDs identity-free.
+    from model_benchmark.stats import compute_statistics_for_records
+    stats_map: dict[str, Any] = {
+        stat.test_id: stat
+        for stat in compute_statistics_for_records(anon_results)
+        if stat.n > 1
+    }
+
     # ── Reports ─────────────────────────────────────────────────────────
     from model_benchmark.reports import (
         generate_text_report, generate_markdown_report,
@@ -1401,7 +1434,7 @@ def _cmd_run(
     md_report = generate_markdown_report(
         anon_results,
         manifest=anon_manifest,
-        stats=stats_list[0] if stats_list else None,
+        stats=stats_list,
         comparison=comparison,
         regressions=regressions,
     )
@@ -1409,7 +1442,7 @@ def _cmd_run(
         anon_results,
         anon_manifest,
         anonymized=cfg.anonymize,
-        stats=stats_list[0] if stats_list else None,
+        stats=stats_list,
         comparison=comparison,
         regressions=regressions,
     )
@@ -1433,7 +1466,7 @@ def _cmd_run(
         text_report = generate_text_report(
             anon_results,
             manifest=anon_manifest,
-            stats=stats_list[0] if stats_list else None,
+            stats=stats_list,
             comparison=comparison,
             regressions=regressions,
         )

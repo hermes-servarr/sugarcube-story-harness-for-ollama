@@ -102,7 +102,7 @@ def _get_int(record: Any, *names: str, default: int = 0) -> int:
 
 
 def load_baseline(path: str) -> list[ResultRecord]:
-    """Load ResultRecords from a previous run's results_internal.json.
+    """Load ResultRecords from a previous run's JSON or JSONL results.
 
     Returns an empty list if the file is absent or corrupt — never raises.
     ``path`` may be a run directory or a direct path to
@@ -110,11 +110,22 @@ def load_baseline(path: str) -> list[ResultRecord]:
     """
     file_path = path
     if os.path.isdir(path):
-        file_path = os.path.join(path, "results_internal.json")
+        jsonl_path = os.path.join(path, "results_internal.jsonl")
+        json_path = os.path.join(path, "results_internal.json")
+        file_path = jsonl_path if os.path.isfile(jsonl_path) else json_path
     if not os.path.isfile(file_path):
         return []
     try:
         with open(file_path, encoding="utf-8") as fh:
+            if str(file_path).lower().endswith(".jsonl"):
+                records = [
+                    json.loads(line)
+                    for line in fh
+                    if line.strip()
+                ]
+                if not all(isinstance(record, dict) for record in records):
+                    return []
+                return records
             data = json.load(fh)
     except (OSError, json.JSONDecodeError, ValueError):
         return []

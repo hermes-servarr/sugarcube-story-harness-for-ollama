@@ -34,7 +34,7 @@ from __future__ import annotations
 import math
 import statistics
 from enum import Enum
-from typing import Sequence
+from typing import Any, Sequence
 
 from model_benchmark.schema import RunStatistics
 
@@ -530,3 +530,42 @@ def compute_run_statistics(
         insufficient_sample=insufficient,
         variance_flags=tuple(flag_strs),
     )
+
+
+def logical_test_id(record: Any) -> str:
+    """Return a repetition-independent identity for a result record.
+
+    Current result IDs end in either ``:<repetition>`` (legacy/capability)
+    or ``::<repetition>`` (declarative).  Strip that suffix only when it
+    agrees with the record's explicit repetition field.
+    """
+    test_id = str(getattr(record, "test_id", "") or "")
+    repetition = getattr(record, "repetition", None)
+    if repetition is None:
+        return test_id
+    suffix = str(repetition)
+    for separator in ("::", ":"):
+        marker = separator + suffix
+        if test_id.endswith(marker):
+            return test_id[: -len(marker)]
+    return test_id
+
+
+def compute_statistics_for_records(records: Sequence[Any]) -> list[RunStatistics]:
+    """Group repeated records by logical case and compute every statistic."""
+    grouped_scores: dict[str, list[float]] = {}
+    grouped_passed: dict[str, list[bool]] = {}
+    for record in records:
+        key = logical_test_id(record)
+        if not key:
+            continue
+        grouped_scores.setdefault(key, []).append(
+            float(getattr(record, "normalized_score", getattr(record, "score", 0.0)))
+        )
+        grouped_passed.setdefault(key, []).append(
+            getattr(record, "status", "FAIL") == "PASS"
+        )
+    return [
+        compute_run_statistics(key, scores, grouped_passed[key])
+        for key, scores in grouped_scores.items()
+    ]

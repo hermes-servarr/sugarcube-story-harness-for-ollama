@@ -473,6 +473,7 @@ def anonymize_result(
     # Scrub all string fields on the ResultRecord itself.
     return dataclasses.replace(
         record,
+        test_id=redact_identity_strings(record.test_id, mapping),
         model_alias=model_alias,
         config_alias=config_alias,
         scored_result=scored_result,

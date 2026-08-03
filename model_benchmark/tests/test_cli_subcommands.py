@@ -9,6 +9,7 @@ fixtures so no real config files are touched.
 """
 from __future__ import annotations
 
+import json
 import io
 import sys
 from pathlib import Path
@@ -432,6 +433,69 @@ class TestRun:
         assert len(data) >= 1
         assert "test_id" in data[0]
         assert "status" in data[0]
+
+    def test_run_executes_selected_declarative_test(self, tmp_path):
+        rc, out, err = run_cli([
+            "run", "--dry-run", "--select", "id:sugarcube_markup_001",
+            "--output-format", "json",
+            "--output-dir", str(tmp_path), "--quiet",
+        ])
+        assert rc == 0
+        data = json.loads(out[out.index("["):])
+        assert data
+        assert all(
+            row["test_id"].startswith("sugarcube_markup_001::")
+            for row in data
+        )
+
+    def test_declarative_repetitions_are_reported_together(self, tmp_path):
+        rc, out, err = run_cli([
+            "run", "--dry-run", "--select", "id:sugarcube_markup_001",
+            "--output-format", "markdown",
+            "--output-dir", str(tmp_path), "--quiet",
+        ])
+        assert rc == 0
+        assert "Variance & Confidence Intervals" in out
+        assert "n=3" in out.lower() or "| 3 |" in out
+
+    def test_declarative_dataset_rows_execute_with_repetitions(self, tmp_path):
+        configs = tmp_path / "configs"
+        configs.mkdir()
+        (configs / "dataset_case.yaml").write_text(
+            """
+schema_version: "1.0.0"
+kind: test
+id: dataset_case
+input: "Answer: {question}"
+category: general_qa
+repetitions: 2
+expected:
+  answer_type: exact
+evaluation:
+  name: exact_match
+dataset:
+  name: inline_qa
+  format: inline
+  inline_data:
+    - {question: "Capital of France?", answer: "Paris"}
+    - {question: "Two plus two?", answer: "4"}
+""".strip(),
+            encoding="utf-8",
+        )
+
+        rc, out, err = run_cli([
+            "run", "--dry-run", "--config-dir", str(configs),
+            "--select", "id:dataset_case", "--output-format", "json",
+            "--output-dir", str(tmp_path / "out"), "--quiet",
+        ])
+
+        assert rc == 0
+        data = json.loads(out[out.index("["):])
+        assert len(data) == 4
+        assert all(row["status"] == "PASS" for row in data)
+        assert {row["test_id"].split("::")[1] for row in data} == {
+            "row-1", "row-2"
+        }
 
     def test_run_output_format_markdown(self, tmp_path):
         rc, out, err = run_cli([

@@ -20,6 +20,7 @@ Acceptance criteria covered:
 from __future__ import annotations
 
 import csv
+import dataclasses
 import io
 import json
 import os
@@ -500,6 +501,22 @@ class TestAnonymizeResults:
                     assert name not in sr.error, f"model {name!r} in scored_result.error"
                 for s in (PROVIDER_HOST, PROVIDER_HOST_2, BASE_URL, REPO_PATH):
                     assert s not in sr.error, f"identity {s!r} in scored_result.error"
+
+    def test_model_identity_is_scrubbed_from_test_id(self):
+        records = _sample_results()
+        records[0] = dataclasses.replace(
+            records[0],
+            test_id=f"{MODEL_NAMES[0]}:compact:A:1",
+        )
+        mapping = anonymization.build_anonymization_mapping(
+            records,
+            config=_make_benchmark_config(),
+        )
+
+        result = anonymization.anonymize_results(records, mapping)[0]
+
+        assert MODEL_NAMES[0] not in result.test_id
+        assert "Model_" in result.test_id
 
     def test_non_identity_fields_preserved(self):
         """INV-A1: scores, status, runtime, tokens must be unchanged."""

@@ -83,6 +83,27 @@ class TestThresholdConstants:
 # ── load_baseline (INV-CMP2, INV-CMP3) ─────────────────────────────────────
 
 class TestLoadBaseline:
+    def test_load_run_directory_jsonl(self, tmp_path):
+        records = [
+            {"test_id": "t1", "status": "PASS"},
+            {"test_id": "t2", "status": "FAIL"},
+        ]
+        path = tmp_path / "results_internal.jsonl"
+        path.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n",
+            encoding="utf-8",
+        )
+
+        assert load_baseline(str(tmp_path)) == records
+
+    def test_corrupt_jsonl_returns_empty(self, tmp_path):
+        (tmp_path / "results_internal.jsonl").write_text(
+            '{"test_id": "ok"}\nnot-json\n',
+            encoding="utf-8",
+        )
+
+        assert load_baseline(str(tmp_path)) == []
+
     def test_load_valid_json(self, tmp_path):
         records = [{"test_id": "t1", "status": "PASS", "normalized_score": 0.9}]
         f = tmp_path / "results_internal.json"
