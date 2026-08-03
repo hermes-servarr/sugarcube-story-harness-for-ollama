@@ -12,6 +12,7 @@ import pytest
 
 from model_benchmark.runner import (
     BenchmarkRunner,
+    build_iteration_plan,
     result_record_from_model_run,
     register_signal_handler,
     unregister_signal_handler,
@@ -25,6 +26,7 @@ from model_benchmark.scoring import (
 )
 from model_benchmark.schema import CheckpointState
 from harness.models import ModelOutput
+from harness.ollama_client import OllamaGenerationResult
 
 
 def _make_config(dry_run: bool = True) -> BenchmarkConfig:
@@ -40,6 +42,45 @@ def _make_config(dry_run: bool = True) -> BenchmarkConfig:
         runs=1,
         dry_run=dry_run,
     )
+
+
+def test_build_iteration_plan_accepts_explicit_covering_cases():
+    plan = build_iteration_plan(
+        models=("m1", "m2"),
+        variants=("compact",),
+        directions=("A",),
+        repetitions=2,
+        matrix_cases=(("compact", "A"), ("json", "G")),
+    )
+
+    assert plan.total_cases == 8
+    assert plan.variants == ("compact", "json")
+    assert plan.directions == ("A", "G")
+    assert [item.test_id for item in plan.items[:4]] == [
+        "m1:compact:A:1",
+        "m1:compact:A:2",
+        "m1:json:G:1",
+        "m1:json:G:2",
+    ]
+
+
+def test_runner_dry_run_uses_canary_profile_matrix():
+    cfg = _make_config(dry_run=True)
+    object.__setattr__(cfg, "benchmark_profile", "canary")
+
+    plan = BenchmarkRunner(cfg, quiet=True).dry_run()
+
+    assert plan.total_cases == 8
+    assert {(item.variant, item.direction) for item in plan.items} == {
+        ("compact", "A"),
+        ("full", "B"),
+        ("json", "C"),
+        ("thinking", "D"),
+        ("compact", "E"),
+        ("full", "F"),
+        ("json", "G"),
+        ("thinking", "H"),
+    }
 
 
 def test_result_record_excludes_na_categories_from_denominator():
@@ -76,12 +117,20 @@ def test_core_run_passes_and_records_configured_seed(monkeypatch):
 
     def fake_call(*args, **kwargs):
         captured["seed"] = kwargs["seed"]
-        return (
-            "PROSE:\n$gold is visible. <<set $seen to true>>\n"
-            "CHOICES:\n- Continue | Move on\nSUMMARY:\nThe flag changed."
+        return OllamaGenerationResult(
+            response=(
+                "PROSE:\n$gold is visible. <<set $seen to true>>\n"
+                "CHOICES:\n- Continue | Move on\nSUMMARY:\nThe flag changed."
+            ),
+            prompt_eval_count=120,
+            eval_count=30,
+            done_reason="stop",
         )
 
-    monkeypatch.setattr("model_benchmark.scoring.call_ollama_sync", fake_call)
+    monkeypatch.setattr(
+        "model_benchmark.scoring.call_ollama_sync_detailed",
+        fake_call,
+    )
     cfg = _make_config(dry_run=False)
     object.__setattr__(cfg, "random_seed", "42")
 
@@ -89,7 +138,12 @@ def test_core_run_passes_and_records_configured_seed(monkeypatch):
 
     assert captured["seed"] == 42
     assert run.random_seed == "42"
-    assert result_record_from_model_run(run).random_seed == "42"
+    record = result_record_from_model_run(run)
+    assert record.random_seed == "42"
+    assert record.input_tokens == 120
+    assert record.output_tokens == 30
+    assert record.total_tokens == 150
+    assert record.finish_reason == "stop"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

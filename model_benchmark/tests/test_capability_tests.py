@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from harness.ollama_client import OllamaGenerationResult
 from model_benchmark.capability_tests import (
     _STYLE_GUIDES,
     CapabilityCaseError,
@@ -48,6 +49,20 @@ def test_default_capability_suite_is_passage_only():
     assert all(case.source == "core" for case in core)
     assert all(case.response_mode == "passage" for case in core)
     assert select_capability_suite(all_cases, include_diagnostics=True) == tuple(all_cases)
+
+
+def test_named_capability_profiles_have_stable_sizes():
+    cases = load_cases(candidate_dir=None)
+
+    canary = select_capability_suite(cases, profile="canary")
+    core = select_capability_suite(cases, profile="core")
+    full = select_capability_suite(cases, profile="full")
+
+    assert len(canary) == 12
+    assert len(core) == 30
+    assert len(full) == 38
+    assert all(case.response_mode == "passage" for case in core)
+    assert any(case.response_mode == "plain_text" for case in full)
 
 
 def test_core_ladder_has_paired_context_sizes_and_large_harness_case():
@@ -179,8 +194,13 @@ SUMMARY:
 The player used the key.
 """
     monkeypatch.setattr(
-        "model_benchmark.capability_tests.call_ollama_sync",
-        lambda *args, **kwargs: response,
+        "model_benchmark.capability_tests.call_ollama_sync_detailed",
+        lambda *args, **kwargs: OllamaGenerationResult(
+            response=response,
+            prompt_eval_count=80,
+            eval_count=20,
+            done_reason="stop",
+        ),
     )
     cfg = BenchmarkConfig(
         models=("private-model",),
@@ -209,6 +229,9 @@ The player used the key.
     assert records[0].scored_result.category_results[-1].name == (
         "capability_observables"
     )
+    assert records[0].input_tokens == 80
+    assert records[0].output_tokens == 20
+    assert records[0].finish_reason == "stop"
 
 
 def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
@@ -224,10 +247,15 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
         captured["config_num_predict"] = config.num_predict
         captured["call_num_predict"] = kwargs["num_predict"]
         captured["seed"] = kwargs["seed"]
-        return "7319"
+        return OllamaGenerationResult(
+            response="7319",
+            prompt_eval_count=200,
+            eval_count=3,
+            done_reason="stop",
+        )
 
     monkeypatch.setattr(
-        "model_benchmark.capability_tests.call_ollama_sync",
+        "model_benchmark.capability_tests.call_ollama_sync_detailed",
         fake_call,
     )
     cfg = BenchmarkConfig(
@@ -253,6 +281,9 @@ def test_plain_text_case_uses_direct_prompt_and_lower_output_cap(monkeypatch):
     assert record.subcategory == "plain_text"
     assert record.dataset == "capability_retrieval_transport"
     assert record.random_seed == "7319"
+    assert record.input_tokens == 200
+    assert record.output_tokens == 3
+    assert record.finish_reason == "stop"
     assert len(record.scored_result.category_results) == 1
 
 

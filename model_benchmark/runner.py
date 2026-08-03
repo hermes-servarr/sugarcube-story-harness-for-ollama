@@ -384,6 +384,7 @@ def build_iteration_plan(
     variants: Sequence[str],
     directions: Sequence[str],
     repetitions: int = 1,
+    matrix_cases: Sequence[tuple[str, str]] | None = None,
 ) -> IterationPlan:
     """Compute the ordered list of cases for a run without calling models.
 
@@ -391,26 +392,36 @@ def build_iteration_plan(
     for each model, for each variant, for each direction, for each repetition
     (1-based).  This is the core of dry-run mode.
     """
+    pairs = (
+        tuple(matrix_cases)
+        if matrix_cases is not None
+        else tuple(
+            (variant, direction)
+            for variant in variants
+            for direction in directions
+        )
+    )
+    plan_variants = tuple(dict.fromkeys(variant for variant, _ in pairs))
+    plan_directions = tuple(dict.fromkeys(direction for _, direction in pairs))
     items: list[PlanItem] = []
     for model in models:
-        for variant in variants:
-            for direction in directions:
-                for rep in range(1, repetitions + 1):
-                    items.append(
-                        PlanItem(
-                            test_id=make_test_id(model, variant, direction, rep),
-                            model=model,
-                            variant=variant,
-                            direction=direction,
-                            repetition=rep,
-                        )
+        for variant, direction in pairs:
+            for rep in range(1, repetitions + 1):
+                items.append(
+                    PlanItem(
+                        test_id=make_test_id(model, variant, direction, rep),
+                        model=model,
+                        variant=variant,
+                        direction=direction,
+                        repetition=rep,
                     )
+                )
     return IterationPlan(
         items=tuple(items),
         total_cases=len(items),
         models=tuple(models),
-        variants=tuple(variants),
-        directions=tuple(directions),
+        variants=plan_variants,
+        directions=plan_directions,
         repetitions=repetitions,
     )
 
@@ -494,9 +505,9 @@ def result_record_from_model_run(
         evaluator_reasoning="applicable scorers from scoring.py (INV-2/9/10)",
         evaluator_confidence=1.0,
         runtime_seconds=run.elapsed_seconds,
-        input_tokens=0,
-        output_tokens=0,
-        total_tokens=0,
+        input_tokens=run.input_tokens,
+        output_tokens=run.output_tokens,
+        total_tokens=run.input_tokens + run.output_tokens,
         cost=0.0,
         retry_count=0,
         error_details=run.error,
@@ -512,6 +523,7 @@ def result_record_from_model_run(
         comparison_result_id="",
         provenance=provenance,
         scored_result=run,
+        finish_reason=run.finish_reason,
     )
 
 
@@ -749,6 +761,7 @@ class BenchmarkRunner:
             variants=tuple(self.config.variants),
             directions=tuple(self.config.directions),
             repetitions=max(1, self.config.runs),
+            matrix_cases=self._matrix_cases(),
         )
         if not self.quiet:
             self._print_run_summary(plan, models, dry_run=True)
@@ -782,6 +795,7 @@ class BenchmarkRunner:
             variants=tuple(self.config.variants),
             directions=tuple(self.config.directions),
             repetitions=max(1, self.config.runs),
+            matrix_cases=self._matrix_cases(),
         )
         total = plan.total_cases
 
@@ -927,6 +941,15 @@ class BenchmarkRunner:
                 "(use --models to specify, or --dry-run)\n"
             )
         return models
+
+    def _matrix_cases(self) -> tuple[tuple[str, str], ...]:
+        from model_benchmark.profiles import resolve_matrix_cases
+
+        return resolve_matrix_cases(
+            getattr(self.config, "benchmark_profile", ""),
+            self.config.variants,
+            self.config.directions,
+        )
 
     def _run_one_case(self, item: PlanItem) -> ResultRecord:
         """Run a single model call + parse + score and build a ResultRecord.

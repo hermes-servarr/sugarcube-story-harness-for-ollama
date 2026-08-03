@@ -65,13 +65,12 @@ def test_applies_thinking_variant_fragment(tmp_path):
 def test_repository_overlay_uses_parser_section_contract():
     path = Path(__file__).parents[1] / "prompt_overrides.json"
     overlay = load_prompt_overlay(path)
-    fragments = [
-        overlay["global_suffix"],
-        overlay["variants"]["thinking"],
-        overlay["directions"]["H"],
-    ]
+    assert overlay["global_suffix"] == ""
+    assert overlay["variants"]["json"] == ""
+    assert overlay["directions"]["H"] == ""
 
-    for fragment in fragments:
+    for variant in ("compact", "full", "thinking"):
+        fragment = overlay["variants"][variant]
         assert not re.search(r"===(?:PROSE|CHOICES|SUMMARY)===", fragment)
         headers = re.findall(r"(?m)^(PROSE|CHOICES|SUMMARY):$", fragment)
         assert headers == ["PROSE", "CHOICES", "SUMMARY"]
@@ -83,6 +82,13 @@ def test_repository_overlay_uses_parser_section_contract():
             warning.startswith("Required section")
             for warning in parsed.parse_warnings
         )
+
+    assert apply_prompt_overlay(
+        "BASE",
+        variant="json",
+        direction="H",
+        path=path,
+    ) == "BASE"
 
 
 def test_rejects_unknown_fields(tmp_path):

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from harness.models import HarnessConfig
-from harness.ollama_client import call_ollama_sync
+from harness.ollama_client import call_ollama_sync_detailed
 from harness.parsers import parse_model_output, parse_model_output_json
 from harness.prompts import (
     build_compact_passage_prompt,
@@ -638,7 +638,7 @@ def execute_capability_cases(
                 kwargs: dict[str, Any] = {}
                 if case.variant == "json" and case.response_mode == "passage":
                     kwargs["format_spec"] = "json"
-                raw = call_ollama_sync(
+                generated = call_ollama_sync_detailed(
                     harness_cfg,
                     prompt,
                     timeout=cfg.timeout,
@@ -649,6 +649,7 @@ def execute_capability_cases(
                     seed=sampling_seed,
                     **kwargs,
                 )
+                raw = generated.response
                 parsed = (
                     parse_model_output_json(raw)
                     if case.variant == "json" and case.response_mode == "passage"
@@ -705,6 +706,9 @@ def execute_capability_cases(
                 elapsed_seconds=time.monotonic() - started,
                 error=error,
                 random_seed=str(sampling_seed) if sampling_seed is not None else "",
+                input_tokens=generated.prompt_eval_count if not error else 0,
+                output_tokens=generated.eval_count if not error else 0,
+                finish_reason=generated.done_reason if not error else "",
             )
             record = result_record_from_model_run(run)
             dataset = (
@@ -750,11 +754,26 @@ def select_capability_suite(
     cases: Iterable[CapabilityCase],
     *,
     include_diagnostics: bool = False,
+    profile: str = "core",
 ) -> tuple[CapabilityCase, ...]:
     """Select the passage core, optionally retaining diagnostic case families."""
     case_list = tuple(cases)
     if include_diagnostics:
         return case_list
+    if profile == "canary":
+        from model_benchmark.profiles import CANARY_CAPABILITY_IDS
+
+        by_id = {case.id: case for case in case_list if case.source == "core"}
+        missing = [
+            case_id for case_id in CANARY_CAPABILITY_IDS if case_id not in by_id
+        ]
+        if missing:
+            raise CapabilityCaseError(
+                f"canary profile references missing cases: {', '.join(missing)}"
+            )
+        return tuple(by_id[case_id] for case_id in CANARY_CAPABILITY_IDS)
+    if profile == "full":
+        return tuple(case for case in case_list if case.source == "core")
     return tuple(
         case
         for case in case_list

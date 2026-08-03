@@ -76,6 +76,7 @@ def test_context_probe_records_acceptance_retrieval_tokens_and_progress(monkeypa
     assert record.split == "num_ctx_2048"
     assert record.input_tokens == 1990
     assert record.output_tokens == 9
+    assert record.finish_reason == "stop"
     assert record.total_tokens == 1999
 
 

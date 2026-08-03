@@ -593,6 +593,7 @@ def collect_reproducibility_metadata(
         "dry_run": str(g("dry_run", False)),
         "variants": ",".join(str(v) for v in (g("variants", ()) or ())),
         "directions": ",".join(str(d) for d in (g("directions", ()) or ())),
+        "benchmark_profile": str(g("benchmark_profile", "") or "custom"),
     }
 
     # ── Environment / system collectors ─────────────────────────────────

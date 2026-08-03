@@ -73,7 +73,7 @@ from typing import TYPE_CHECKING, Literal
 
 # P4 import sites — activated from TODO comments (P5/P7 implementation)
 from harness.models import HarnessConfig, ModelOutput
-from harness.ollama_client import call_ollama_sync, model_profile
+from harness.ollama_client import call_ollama_sync_detailed, model_profile
 from harness.parsers import (
     REQUIRED_SECTIONS,
     needs_repair,
@@ -177,6 +177,9 @@ class ModelRunResult:
     elapsed_seconds: float = 0.0
     error: str = ""
     random_seed: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    finish_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -798,6 +801,13 @@ def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant,
             applicable=False,
         )
 
+    passage_structure = score_passage_structure(format_raw, parsed)
+    if extraction.has_thinking and raw.strip() and not format_raw.strip():
+        passage_structure = replace(
+            passage_structure,
+            details="No final passage after extracted thinking.",
+        )
+
     # INV-9: exactly 7 results in canonical category order.
     results = [
         score_markup_compliance(format_raw),
@@ -805,7 +815,7 @@ def score_response(raw: str, parsed: ModelOutput, variant: PromptVariant,
             score_variable_scoping(format_raw),
             requires_state_write or emits_state_write,
         ),
-        score_passage_structure(format_raw, parsed),
+        passage_structure,
         conditional(score_macro_usage(format_raw), requires_macro or emits_macro),
         conditional(
             score_naked_interpolation(parsed.prose or format_raw),
@@ -859,20 +869,22 @@ def run_single_model(
     t0 = time.monotonic()
     try:
         if variant == "json":
-            raw = call_ollama_sync(
+            generated = call_ollama_sync_detailed(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 format_spec="json", label=f"benchmark-{model}-{variant}-{direction}",
                 seed=sampling_seed,
             )
+            raw = generated.response
             parsed = parse_model_output_json(raw)
         else:
-            raw = call_ollama_sync(
+            generated = call_ollama_sync_detailed(
                 harness_cfg, prompt, timeout=cfg.timeout,
                 temperature=cfg.temperature, num_predict=cfg.num_predict,
                 label=f"benchmark-{model}-{variant}-{direction}",
                 seed=sampling_seed,
             )
+            raw = generated.response
             parsed = parse_model_output(raw)
         elapsed = time.monotonic() - t0
 
@@ -890,6 +902,9 @@ def run_single_model(
             overall_pass=overall,
             elapsed_seconds=elapsed,
             random_seed=configured_seed,
+            input_tokens=generated.prompt_eval_count,
+            output_tokens=generated.eval_count,
+            finish_reason=generated.done_reason,
         )
     except Exception as e:
         elapsed = time.monotonic() - t0

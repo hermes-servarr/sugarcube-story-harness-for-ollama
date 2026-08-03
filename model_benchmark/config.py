@@ -10,7 +10,7 @@ the ``benchmark.py`` compatibility shim re-exports from here (P2 §5 migration
 plan).  All 9 new fields are defaulted so existing code constructing the
 config with only the original 11 fields continues to work.
 
-Phase 7 — production implementation conforming to P2 (20 fields), P3 (the
+Phase 7 — production implementation conforming to P2, P3 (the
 ``parse_cli_args`` signature), and P6 invariants (INV-CFG1..INV-CFG7).
 """
 from __future__ import annotations
@@ -79,9 +79,12 @@ class BenchmarkConfig:
     ingestion_routing_path: str = ""
     """PC-private model-to-profile routing JSON (empty = legacy behavior)."""
 
+    benchmark_profile: str = ""
+    """Named built-in workload profile; empty keeps custom matrix flags."""
+
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Construct the argparse parser with all 11 legacy + 9 new flags (returns the parser, does not parse)."""
+    """Construct the argparse parser for legacy and operational run flags."""
     parser = argparse.ArgumentParser(
         description="SugarCube Direction-Following Benchmark",
     )
@@ -127,19 +130,29 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Ignore existing checkpoint and recompute every case")
     parser.add_argument("--ingestion-routing", default="",
                         help=argparse.SUPPRESS)
+    parser.add_argument("--profile", choices=["canary", "core", "full"], default="",
+                        help="Named workload profile (default: custom flags)")
 
     return parser
 
 
 def parse_cli_args(argv: list[str] | None = None) -> BenchmarkConfig:
-    """Parse CLI arguments (11 legacy + 9 new flags) into an extended BenchmarkConfig."""
+    """Parse CLI arguments into an extended BenchmarkConfig."""
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.profile:
+        from model_benchmark.profiles import ALL_DIRECTIONS, ALL_VARIANTS
+
+        variants = ALL_VARIANTS
+        directions = ALL_DIRECTIONS
+    else:
+        variants = tuple(args.variants)
+        directions = tuple(args.directions)
 
     return BenchmarkConfig(
         models=tuple(args.models),
-        variants=tuple(args.variants),
-        directions=tuple(args.directions),
+        variants=variants,
+        directions=directions,
         base_url=args.base_url,
         timeout=args.timeout,
         num_predict=args.num_predict,
@@ -158,4 +171,5 @@ def parse_cli_args(argv: list[str] | None = None) -> BenchmarkConfig:
         random_seed=args.seed,
         force_rerun=args.force_rerun,
         ingestion_routing_path=args.ingestion_routing,
+        benchmark_profile=args.profile,
     )

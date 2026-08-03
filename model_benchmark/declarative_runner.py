@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from harness.models import HarnessConfig, ModelOutput
-from harness.ollama_client import call_ollama_sync
+from harness.ollama_client import call_ollama_sync_detailed
 from harness.parsers import parse_model_output, parse_model_output_json
 from model_benchmark.config import BenchmarkConfig
 from model_benchmark.evaluators import evaluate_response
@@ -217,6 +217,9 @@ def _record(
     run_id: str,
     error: str = "",
     retry_count: int = 0,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    finish_reason: str = "",
     dataset_row: dict[str, Any] | None = None,
     dataset_index: int | None = None,
 ) -> ResultRecord:
@@ -274,9 +277,9 @@ def _record(
         evaluator_reasoning=reasoning,
         evaluator_confidence=1.0,
         runtime_seconds=elapsed,
-        input_tokens=0,
-        output_tokens=0,
-        total_tokens=0,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
         cost=0.0,
         retry_count=retry_count,
         error_details=error,
@@ -296,6 +299,7 @@ def _record(
             category_results=categories,
             error=error,
         ),
+        finish_reason=finish_reason,
     )
 
 
@@ -344,6 +348,9 @@ def execute_declarative_tests(
         elapsed = 0.0
         error = ""
         retry_count = 0
+        input_tokens = 0
+        output_tokens = 0
+        finish_reason = ""
         if dry_run and dataset_row is not None and "answer" in dataset_row:
             response = str(dataset_row["answer"])
         elif dry_run and cfg.expected is not None and cfg.expected.answer:
@@ -362,7 +369,7 @@ def execute_declarative_tests(
             started = time.monotonic()
             while True:
                 try:
-                    response = call_ollama_sync(
+                    generated = call_ollama_sync_detailed(
                         harness_cfg,
                         build_declarative_prompt(instance, dataset_row),
                         timeout=timeout,
@@ -372,6 +379,10 @@ def execute_declarative_tests(
                         seed=seed,
                         label=f"declarative-{instance.instance_id}",
                     )
+                    response = generated.response
+                    input_tokens = generated.prompt_eval_count
+                    output_tokens = generated.eval_count
+                    finish_reason = generated.done_reason
                     break
                 except Exception as exc:
                     error = str(exc)
@@ -390,6 +401,9 @@ def execute_declarative_tests(
                 run_id=run_id,
                 error=error,
                 retry_count=retry_count,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                finish_reason=finish_reason,
                 dataset_row=dataset_row,
                 dataset_index=dataset_index,
             )

@@ -216,6 +216,18 @@ class TestScoreMacroUsage:
 
 
 class TestApplicability:
+    def test_thinking_only_response_reports_missing_final_passage(self):
+        from model_benchmark.scoring import score_response as score_with_applicability
+
+        raw = "Planning:\n1. Analyze the state.\n2. Draft the passage."
+        result = next(
+            item
+            for item in score_with_applicability(raw, _parse(raw), "thinking", "A")
+            if item.name == "passage_structure"
+        )
+
+        assert result.details == "No final passage after extracted thinking."
+
     def test_non_thinking_and_absent_setter_checks_are_na(self):
         from model_benchmark.scoring import score_response as score_with_applicability
 

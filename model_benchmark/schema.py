@@ -267,6 +267,7 @@ class ResultRecord:
     # raw_response, parsed_output, category_results, overall_pass,
     # elapsed_seconds, error) for traceability to the scoring core.
     scored_result: ModelRunResult | None = None
+    finish_reason: str = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════

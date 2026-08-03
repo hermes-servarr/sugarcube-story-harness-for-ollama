@@ -127,6 +127,7 @@ def execute_context_window_tests(
             error = ""
             prompt_tokens = 0
             output_tokens = 0
+            finish_reason = ""
             raw = ""
             try:
                 generated = call_ollama_sync_detailed(
@@ -142,6 +143,7 @@ def execute_context_window_tests(
                 raw = generated.response
                 prompt_tokens = generated.prompt_eval_count
                 output_tokens = generated.eval_count
+                finish_reason = generated.done_reason
                 categories = _marker_categories(raw)
             except Exception as exc:
                 error = str(exc)
@@ -166,6 +168,9 @@ def execute_context_window_tests(
                 overall_pass=not error and all(item.passed for item in categories),
                 elapsed_seconds=time.monotonic() - started,
                 error=error,
+                input_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                finish_reason=finish_reason,
             )
             base_record = result_record_from_model_run(run)
             records.append(
