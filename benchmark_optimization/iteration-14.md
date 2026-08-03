@@ -98,3 +98,96 @@ Revert variants.thinking to empty string if:
 - Aggregate objective pass rate declines below 0.2056, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~61 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 248     | 248     | 0     |
+| Passed    | 51      | 53      | +2    |
+| Pass rate | 0.2056  | 0.2137  | +0.81pp |
+| Mean score| 0.6268  | 0.6298  | +0.003 |
+
+### By Variant
+
+| Variant  | Before pass | After pass | Before rate | After rate | Delta |
+|----------|-------------|------------|-------------|------------|-------|
+| compact  | 19/60       | 19/60      | 0.3167      | 0.3167     | 0     |
+| full     | 6/96        | 6/96       | 0.0625      | 0.0625     | 0     |
+| json     | 21/40       | 21/40      | 0.525       | 0.525      | 0     |
+| thinking | 5/52        | 7/52       | 0.0962      | 0.1346     | +2    |
+
+### By Model Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 10          | 11         | +1    |
+| Model_B | 18          | 19         | +1    |
+| Model_C | 13          | 12         | -1    |
+| Model_D | 10          | 11         | +1    |
+
+### Thinking Variant Detail
+
+| Metric                     | Before | After | Delta |
+|----------------------------|--------|-------|-------|
+| Passed                     | 5/52   | 7/52  | +2    |
+| thinking_quality failures  | 27     | 26    | -1    |
+| passage_structure failures | 28     | 33    | +5    |
+| markup_compliance failures | 28     | 20    | -8    |
+| macro_usage failures       | 20     | 22    | +2    |
+| capability_observables      | 17     | 19    | +2    |
+
+### Conversation, Writing Style
+
+- Conversation layout: 3/44 → 2/44 (-1, within noise)
+- Writing style: 1/20 (unchanged), dialogue_slang 15→17
+
+### Suspected Output-Budget Exhaustion
+
+One representative failure (Model_A:thinking:G) shows "Empty raw response" -
+the model produced no output at all. This is a thinking case omitting the final
+passage entirely. Per the thinking variant rules, this is recorded as suspected
+output-budget exhaustion. The anonymized summary cannot prove the cause; token
+counters and finish reasons are not available in the summary.
+
+The passage_structure failures increased from 28 to 33 despite the thinking
+pass rate improving, which is consistent with models spending budget on
+planning content but running out before completing the final passage. The
+markup_compliance failures dropped sharply (28→20), suggesting the suffix did
+help models that produce content use SugarCube markup.
+
+The overlay is retained because the aggregate improved (+2) and no variant
+regressed. However, the empty-response observation and increased
+passage_structure failures in the thinking variant warrant operator review
+of the private run and GPU-safe token budget before further thinking-variant
+experiments.
+
+## Conclusion
+
+Experiment 14 improved the aggregate by +2 passes (51 to 53, 20.56% to 21.37%).
+The thinking variant improved from 5/52 (9.62%) to 7/52 (13.46%), with
+markup_compliance dropping sharply (28→20). No variant regressed.
+
+However, one thinking case produced an empty raw response (suspected
+output-budget exhaustion), and thinking passage_structure failures increased
+(28→33). Per the thinking variant rules and campaign stop condition 7, this
+requires operator review before further thinking-variant experiments.
+
+Campaign progress: 18.95% baseline to 21.37% best (+2.42pp).
+
+## Stop Condition
+
+Campaign stop condition 7: A thinking result suggests output-budget
+exhaustion or truncation requiring operator review. The empty raw response
+in Model_A:thinking:G and the increase in passage_structure failures (28→33)
+in the thinking variant indicate that the thinking suffix may be causing
+models to exhaust their output budget during the planning phase, leaving
+insufficient tokens for the final passage.
+
+Operator action required: review the private run for thinking-variant token
+counts, finish reasons, and the GPU-safe token budget before continuing
+thinking-variant optimization.
