@@ -1,7 +1,10 @@
 import json
+import re
+from pathlib import Path
 
 import pytest
 
+from harness.parsers import parse_model_output
 from model_benchmark.prompt_overlay import (
     PromptOverlayError,
     apply_prompt_overlay,
@@ -57,6 +60,29 @@ def test_applies_thinking_variant_fragment(tmp_path):
     )
 
     assert "Finish planning, then emit a complete passage." in result
+
+
+def test_repository_overlay_uses_parser_section_contract():
+    path = Path(__file__).parents[1] / "prompt_overrides.json"
+    overlay = load_prompt_overlay(path)
+    fragments = [
+        overlay["global_suffix"],
+        overlay["variants"]["thinking"],
+        overlay["directions"]["H"],
+    ]
+
+    for fragment in fragments:
+        assert not re.search(r"===(?:PROSE|CHOICES|SUMMARY)===", fragment)
+        headers = re.findall(r"(?m)^(PROSE|CHOICES|SUMMARY):$", fragment)
+        assert headers == ["PROSE", "CHOICES", "SUMMARY"]
+
+        parsed = parse_model_output(
+            "\n".join(f"{header}:\nplaceholder" for header in headers)
+        )
+        assert not any(
+            warning.startswith("Required section")
+            for warning in parsed.parse_warnings
+        )
 
 
 def test_rejects_unknown_fields(tmp_path):
