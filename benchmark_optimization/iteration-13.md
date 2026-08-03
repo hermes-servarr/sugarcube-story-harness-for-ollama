@@ -116,3 +116,72 @@ Revert variants.full to empty string if:
 - Aggregate objective pass rate declines below 0.1895, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~61 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 248     | 248     | 0     |
+| Passed    | 47      | 51      | +4    |
+| Pass rate | 0.1895  | 0.2056  | +1.61pp |
+| Mean score| 0.6279  | 0.6268  | -0.0011 |
+
+### By Variant
+
+| Variant  | Before pass | After pass | Before rate | After rate | Delta |
+|----------|-------------|------------|-------------|------------|-------|
+| compact  | 19/60       | 19/60      | 0.3167      | 0.3167     | 0     |
+| full     | 2/96        | 6/96       | 0.0208      | 0.0625     | +4    |
+| json     | 21/40       | 21/40      | 0.525       | 0.525      | 0     |
+| thinking | 5/52        | 5/52       | 0.0962      | 0.0962     | 0     |
+
+### By Model Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 7           | 10         | +3    |
+| Model_B | 18          | 18         | 0     |
+| Model_C | 12          | 13         | +1    |
+| Model_D | 10          | 10         | 0     |
+
+### Conversation, Writing Style, Thinking
+
+- Conversation layout: 3/44 (unchanged), mc_inner_monologue 38→37
+- Writing style: 1/20 (unchanged), dialogue_slang 17→15
+- Thinking: 5/52 (unchanged), failure profile identical
+
+### Direction Deltas (nonzero)
+
+| Direction | Before | After | Delta |
+|-----------|--------|-------|-------|
+| B         | 4      | 5     | +1    |
+| D         | 6      | 7     | +1    |
+| E         | 5      | 5     | 0     |
+| H         | 4      | 6     | +2    |
+
+## Conclusion
+
+Experiment 13 improved the aggregate by +4 passes (47 to 51, 18.95% to 20.56%).
+The full variant tripled its pass rate from 2/96 (2.08%) to 6/96 (6.25%),
+matching the improvement seen in Exp09's condensed global_suffix but without
+any compact regression. No variant regressed. Model_A gained +3, Model_C +1.
+
+The concise full-variant suffix emphasizing SugarCube markup syntax helped
+models avoid Markdown emphasis in the full variant's long-context prompts.
+This confirms the hypothesis: variant-specific suffixes can target the full
+variant without disturbing compact's dependence on verbose global_suffix.
+
+The overlay is retained as the new best. Campaign progress: 18.95% baseline
+to 20.56% best (+1.61pp).
+
+## Next Decision
+
+The full variant improved but remains the weakest at 6.25%. The thinking
+variant is also weak at 9.62% with 27 thinking_quality failures (no thinking
+content produced). Next experiment should target the thinking variant with
+a suffix that reinforces the plan-then-render boundary, since thinking
+cases fail at both thinking_quality and final passage_structure.
