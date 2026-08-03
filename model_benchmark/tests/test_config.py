@@ -152,6 +152,11 @@ class TestParseCliArgs:
         cfg = parse_cli_args(["--profile", "canary"])
 
         assert cfg.benchmark_profile == "canary"
+
+    def test_parse_cli_args_refactor_profile(self):
+        cfg = parse_cli_args(["--profile", "refactor-core"])
+
+        assert cfg.benchmark_profile == "refactor-core"
         assert cfg.variants == ("compact", "full", "json", "thinking")
         assert cfg.directions == tuple("ABCDEFGH")
 

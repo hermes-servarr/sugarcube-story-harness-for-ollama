@@ -7,8 +7,9 @@ This review covers three different things that currently share the word
 
 1. Python unit and integration tests under `tests/` and
    `model_benchmark/tests/`;
-2. model capability cases in `model_benchmark/capability_cases.json` and the
-   declarative YAML cases;
+2. model capability cases in `model_benchmark/capability_cases.json`, fixed-plan
+   cases in `model_benchmark/refactor_cases.json`, and the declarative YAML
+   cases;
 3. manual browser scripts under `scripts/` and `test_stories/`.
 
 A static scan finds about 1,295 Python test functions across roughly 19,400
@@ -22,6 +23,14 @@ on source inspection and the recorded benchmark evidence. Run collection,
 coverage, and mutation testing before deleting non-trivial coverage.
 
 ## Executive recommendation
+
+The refactor benchmark should make mechanics programmatic and model text
+bounded. Use `refactor-canary` (10 requests/model) during implementation and
+`refactor-core` (24 requests/model) for matched architecture baselines. Each
+case supplies a trusted plan with fixed slots, state/entity reference allowlists,
+and required components; the model fills only narrative and choice-copy fields.
+Keep the direct-SugarCube suites as historical diagnostics, not as promotion
+gates for the new harness.
 
 Add tests that answer these questions:
 

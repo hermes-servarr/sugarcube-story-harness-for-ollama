@@ -67,6 +67,35 @@ class TestLegacyCompat:
         assert rc == 0
         assert "Initialized" in out
 
+    def test_refactor_profile_routes_only_fixed_plan_cases(
+        self, monkeypatch, tmp_path
+    ):
+        captured = {}
+
+        def fake_execute(cfg, cases, *, progress_callback=None):
+            captured["profile"] = cfg.benchmark_profile
+            captured["case_ids"] = [case.id for case in cases]
+            return []
+
+        monkeypatch.setattr(
+            "model_benchmark.refactor_benchmark.execute_refactor_cases",
+            fake_execute,
+        )
+
+        rc, out, err = run_cli([
+            "run",
+            "--profile", "refactor-canary",
+            "--models", "fixture-model",
+            "--quiet",
+            "--no-anonymize",
+            "--output-dir", str(tmp_path),
+        ])
+
+        assert rc == 0
+        assert captured["profile"] == "refactor-canary"
+        assert len(captured["case_ids"]) == 10
+        assert captured["case_ids"][0] == "R0-ORDINARY-FANTASY"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # §2: init — scaffold a new test config directory

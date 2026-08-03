@@ -441,8 +441,17 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
     ]
     profile = str(config.get("benchmark_profile", "")).strip()
     if profile:
-        if profile not in {"canary", "core", "full"}:
-            raise ValueError("benchmark_profile must be canary, core, or full")
+        if profile not in {
+            "canary",
+            "core",
+            "full",
+            "refactor-canary",
+            "refactor-core",
+        }:
+            raise ValueError(
+                "benchmark_profile must be canary, core, full, "
+                "refactor-canary, or refactor-core"
+            )
         args.extend(["--profile", profile])
     for flag, key in (
         ("--variants", "variants"),

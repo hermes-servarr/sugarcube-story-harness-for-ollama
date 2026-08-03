@@ -132,6 +132,9 @@ CategoryName = Literal[
     "link_setter_syntax",
     "thinking_quality",
     "capability_observables",
+    "plan_adherence",
+    "fill_completeness",
+    "semantic_observables",
 ]
 
 # Canonical category order (INV-9). Used by score_response, build_model_report,

@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
 from model_benchmark.config import BenchmarkConfig, parse_cli_args
+from model_benchmark.profiles import PROFILE_NAMES, REFACTOR_PROFILE_NAMES
 
 logger = logging.getLogger("model_benchmark.cli")
 
@@ -486,11 +487,12 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument(
         "--profile",
-        choices=["canary", "core", "full"],
+        choices=PROFILE_NAMES,
         default="",
         help=(
             "Named built-in workload: canary=16 calls/model, "
-            "core=28 calls/model, full=82 calls/model."
+            "core=28 calls/model, full=82 calls/model, "
+            "refactor-canary=10 calls/model, refactor-core=24 calls/model."
         ),
     )
     p_run.add_argument(
@@ -1167,9 +1169,11 @@ def _cmd_run(
                 sys.stderr.write(f"Invalid private ingestion routing: {exc}\n")
             return 2
 
+    refactor_profile = profile in REFACTOR_PROFILE_NAMES
     capability_cases: tuple[Any, ...] = ()
     run_capability_tests = bool(
-        profile or getattr(args, "capability_tests", False)
+        (profile and not refactor_profile)
+        or getattr(args, "capability_tests", False)
     )
     if run_capability_tests and not cfg.dry_run:
         from model_benchmark.capability_tests import load_cases, select_capability_suite
@@ -1184,6 +1188,18 @@ def _cmd_run(
             load_cases(candidate_dir=candidate_dir),
             include_diagnostics=include_diagnostics,
             profile=profile or "core",
+        )
+
+    refactor_cases: tuple[Any, ...] = ()
+    if refactor_profile and not cfg.dry_run:
+        from model_benchmark.refactor_benchmark import (
+            load_refactor_cases,
+            select_refactor_cases,
+        )
+
+        refactor_cases = select_refactor_cases(
+            load_refactor_cases(),
+            profile,
         )
 
     context_sizes: tuple[int, ...] = ()
@@ -1207,7 +1223,11 @@ def _cmd_run(
         matrix_total = model_count * len(
             resolve_matrix_cases(profile, cfg.variants, cfg.directions)
         ) * max(1, cfg.runs)
-    capability_total = model_count * len(capability_cases)
+    legacy_capability_total = model_count * len(capability_cases)
+    refactor_total = (
+        model_count * len(refactor_cases) * max(1, cfg.runs)
+    )
+    capability_total = legacy_capability_total + refactor_total
     context_total = model_count * len(context_sizes)
     overall_total = matrix_total + capability_total + context_total
     benchmark_started_clock = time.monotonic()
@@ -1313,6 +1333,8 @@ def _cmd_run(
         # Fixture dry-run: produces scored records without calling Ollama.
         runner.dry_run()
         results = runner.execute()
+    elif refactor_profile:
+        results = []
     else:
         results = runner.execute()
 
@@ -1348,6 +1370,43 @@ def _cmd_run(
                 cfg,
                 capability_cases,
                 progress_callback=report_capability_progress,
+            )
+        )
+
+    if refactor_profile and not cfg.dry_run:
+        from model_benchmark.refactor_benchmark import execute_refactor_cases
+
+        def report_refactor_progress(
+            completed: int,
+            total: int,
+            current_model: str,
+        ) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "phase": "refactor",
+                    "completed": int(completed),
+                    "total": int(total),
+                    "percent": (
+                        float(completed / total * 100.0)
+                        if total
+                        else 100.0
+                    ),
+                    "current_model": current_model,
+                    **_overall_fields(
+                        matrix_total
+                        + legacy_capability_total
+                        + int(completed)
+                    ),
+                }
+            )
+
+        results.extend(
+            execute_refactor_cases(
+                cfg,
+                refactor_cases,
+                progress_callback=report_refactor_progress,
             )
         )
 
