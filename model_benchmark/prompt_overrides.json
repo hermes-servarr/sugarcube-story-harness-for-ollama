@@ -2,7 +2,7 @@
   "schema_version": 1,
   "global_suffix": "Format your output using SugarCube markup, not Markdown.\n\nRequired passage sections in this exact order:\n===CHOICES===\n===PROSE===\n===SUMMARY===\n\nSugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.\n\nWhen the task involves dialogue or conversation between characters, use this layout inside the PROSE section:\nDIALOGUE:\nSpeaker: \"Spoken words.\"\nSpeaker: \"Reply words.\"\nINNER MONOLOGUE:\nMC: //Private thoughts.//",
   "variants": {
-    "compact": "Use SugarCube ''double single quotes'' for bold and //double slashes// for italic. Never use Markdown for emphasis.",
+    "compact": "",
     "full": "Use ''double single quotes'' for bold and //double slashes// for italic. Never use Markdown ** or * or _ for emphasis. All emphasis must use SugarCube markup.",
     "json": "",
     "thinking": "First plan your approach: identify relevant variables, SugarCube macros, and direction constraints. Then produce a complete passage with all required sections: ===CHOICES===, ===PROSE===, ===SUMMARY===. Use SugarCube markup, not Markdown."
