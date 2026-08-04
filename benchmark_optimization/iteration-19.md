@@ -107,3 +107,42 @@ Remove the planning emphasis suffix from variants.thinking if:
 - Aggregate objective pass rate declines below 0.3984, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+### SSH Disconnect at 20.5% Progress
+
+The benchmark process exited with code 255 (SSH error). The output shows
+"Connection reset by peer" and "client_loop: send disconnect: Broken pipe"
+at 36/176 (~20.5% progress, ~1m 45s elapsed).
+
+No anonymized result was published. The experiment did not complete.
+
+## Conclusion
+
+Experiment 19 was aborted due to an SSH disconnect. The benchmark process
+exited with code 255 after approximately 1m 45s, at 20.5% progress. The
+remote host connection was reset mid-run.
+
+Per the goal's stop conditions:
+- Stop condition 3: SSH disconnect is a campaign stop condition.
+- Stop condition 10: A disconnected trigger may still have started a GPU
+  run. It is unclear whether another GPU run is already active.
+
+The experiment does not count as a completed experiment. No result was
+produced or compared. The thinking-variant planning emphasis suffix was
+never verified.
+
+## Rollback
+
+Reverted variants.thinking to the Exp18 baseline (removed the planning
+emphasis suffix). The last verified best overlay (Exp18: 51/128, 39.84%)
+is preserved. Validated with json.tool and pytest (54 passed). Committed
+and pushed.
+
+## Campaign Stop
+
+The campaign is stopped per stop condition 3 (SSH disconnect) and stop
+condition 10 (unclear whether another GPU run is active). The PC-side
+benchmark may still be running with the Exp19 overlay. Operator action
+is required to verify PC-side state before any further campaigns.
