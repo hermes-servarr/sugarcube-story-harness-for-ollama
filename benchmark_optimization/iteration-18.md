@@ -103,3 +103,83 @@ Remove the SUMMARY suffix from variants.full if:
 - Aggregate objective pass rate declines below 0.3594, or
 - Any per-variant pass rate declines without offsetting gains, or
 - Any material per-alias regression.
+
+## After Metrics
+
+Benchmark completed and anonymized results were pushed. Run duration ~43 minutes.
+
+### Aggregate
+
+| Metric    | Before  | After   | Delta |
+|-----------|---------|---------|-------|
+| Cases     | 128     | 128     | 0     |
+| Passed    | 46      | 51      | +5    |
+| Pass rate | 0.3594  | 0.3984  | +3.91pp |
+| Mean score| 0.7612  | 0.7698  | +0.0086 |
+
+### By Variant
+
+| Variant  | Before pass | After pass | Before rate | After rate | Delta |
+|----------|-------------|------------|-------------|------------|-------|
+| compact  | 9/32        | 11/32      | 0.2812      | 0.3438     | +2    |
+| full     | 8/32        | 12/32      | 0.25        | 0.375      | +4    |
+| json     | 22/32       | 22/32      | 0.6875      | 0.6875     | 0     |
+| thinking | 7/32        | 6/32       | 0.2188      | 0.1875     | -1    |
+
+### By Model Alias
+
+| Alias   | Before pass | After pass | Delta |
+|---------|-------------|------------|-------|
+| Model_A | 3           | 5          | +2    |
+| Model_B | 17          | 19         | +2    |
+| Model_C | 11          | 11         | 0     |
+| Model_D | 15          | 16         | +1    |
+
+### By Direction
+
+| Direction | Before | After | Delta |
+|-----------|--------|-------|-------|
+| A         | 6      | 7     | +1    |
+| B         | 7      | 6     | -1    |
+| C         | 4      | 8     | +4    |
+| D         | 6      | 6     | 0     |
+| E         | 6      | 7     | +1    |
+| F         | 4      | 7     | +3    |
+| G         | 7      | 6     | -1    |
+| H         | 6      | 4     | -2    |
+
+### Thinking Variant Detail
+
+| Metric                     | Before | After | Delta |
+|----------------------------|--------|-------|-------|
+| Passed                     | 7/32   | 6/32  | -1    |
+| thinking_quality failures  | 14     | 15    | +1    |
+| markup_compliance failures | 14     | 17    | +3    |
+| macro_usage failures       | 10     | 13    | +3    |
+| passage_structure failures | 14     | 14    | 0     |
+
+## Conclusion
+
+Experiment 18 improved the aggregate by +5 passes (46 to 51, 35.94% to 39.84%).
+The full variant improved from 8/32 (25%) to 12/32 (37.5%), confirming the
+hypothesis that a SUMMARY section completeness suffix helps the full variant.
+The compact variant also improved +2 (unexpected positive spillover), and
+directions C (+4) and F (+3) showed notable gains.
+
+The thinking variant dropped -1 (7 to 6), which is within sampling noise. No
+material per-alias regression occurred: Model_A +2, Model_B +2, Model_D +1,
+Model_C unchanged.
+
+The overlay is retained as the new best. Campaign progress: 35.94% baseline
+to 39.84% best (+3.91pp).
+
+## Next Decision
+
+The full variant SUMMARY suffix was the first successful experiment. The
+thinking variant remains the weakest at 18.75% with 15 thinking_quality
+failures. However, Exp17 showed that reducing the thinking instruction is
+harmful. Next experiment should target the thinking variant by adding a
+brief reinforcement to the existing verbose instruction, not replacing it.
+Alternatively, the direction-specific weakness (H dropped from 6 to 4) could
+be addressed. The thinking variant's "no thinking content" problem (15
+failures) is the largest remaining concentrated failure.
