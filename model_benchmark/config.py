@@ -84,6 +84,9 @@ class BenchmarkConfig:
     benchmark_profile: str = ""
     """Named built-in workload profile; empty keeps custom matrix flags."""
 
+    refactor_architectures: tuple[str, ...] = ("typed_fill",)
+    """Harness structures compared by the fixed-plan refactor profiles."""
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argparse parser for legacy and operational run flags."""
@@ -134,6 +137,13 @@ def _build_parser() -> argparse.ArgumentParser:
                         help=argparse.SUPPRESS)
     parser.add_argument("--profile", choices=PROFILE_NAMES, default="",
                         help="Named workload profile (default: custom flags)")
+    parser.add_argument(
+        "--architectures",
+        nargs="+",
+        choices=["typed_fill", "flat_fill"],
+        default=["typed_fill", "flat_fill"],
+        help="Harness structures for refactor profiles",
+    )
 
     return parser
 
@@ -174,4 +184,5 @@ def parse_cli_args(argv: list[str] | None = None) -> BenchmarkConfig:
         force_rerun=args.force_rerun,
         ingestion_routing_path=args.ingestion_routing,
         benchmark_profile=args.profile,
+        refactor_architectures=tuple(args.architectures),
     )

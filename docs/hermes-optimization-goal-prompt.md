@@ -1,5 +1,11 @@
 # Hermes SugarCube Optimization Goal Prompt
 
+This document covers prompt/envelope experiments. To let Hermes revise existing
+fixed-plan harness tests, add proposed tests, and benchmark the complete revised
+suite across all harness architectures, use
+`docs/hermes-harness-architecture-goal-prompt.md` instead. Never combine the two
+experiment modes in one benchmark run.
+
 Use this prompt only after:
 
 1. The benchmark PC trusts the latest signed repository commit.

@@ -1,6 +1,6 @@
 ---
 name: optimize-sugarcube-prompts
-description: Run a bounded goal-loop that analyzes anonymized SugarCube benchmark failures, records model behavior, adjusts either the declarative prompt overlay or one bounded ingestion envelope, pushes a candidate, triggers one protected benchmark, and compares results. Use when the user asks Hermes to iteratively improve benchmark prompt or shared template-envelope performance without learning Ollama model identities.
+description: Run a bounded Hermes goal-loop that improves SugarCube prompts, safe template envelopes, or fixed-plan harness architecture tests; it may revise existing refactor cases, propose and add better cases, run the complete revised suite across configured harness structures, and analyze anonymized results without learning Ollama model identities. Use for prompt optimization, harness-test evolution, or architecture comparison campaigns.
 ---
 
 # Optimize SugarCube Prompts
@@ -23,7 +23,17 @@ Perform one complete experiment per goal turn. Use this skill with Hermes
   configuration, or existing result data.
 - Stop when: five experiments complete, target pass rate is reached, two
   consecutive experiments fail to improve, any protected command fails, or
-  results/model privacy becomes uncertain.
+results/model privacy becomes uncertain.
+
+Choose exactly one experiment mode per goal turn:
+
+- `prompt`: change one prompt overlay or one bounded ingestion envelope;
+- `harness-suite`: revise `model_benchmark/refactor_cases.json`, then benchmark
+  the complete corpus across every configured architecture.
+
+Never combine prompt/envelope changes with harness-suite changes. A changed
+test denominator creates a new suite baseline; never report its pass-rate delta
+as a model or architecture improvement over the previous suite.
 
 The user may set a lower iteration limit or a specific target. Never exceed
 five experiments without a new explicit user instruction.
@@ -107,6 +117,41 @@ experiments only.
     number, hypothesis, before/after metrics, regressions, and next decision.
 
 On the next goal turn, continue only if a stop condition has not fired.
+
+## Harness Suite Experiment
+
+Use this mode when the operator asks Hermes to improve potential harness tests
+or compare harness structures. Before starting, require the protected PC to be
+configured with `benchmark_profile: refactor-core` and every approved value in
+`architectures`. Do not inspect the private PC configuration; rely on the
+operator's statement.
+
+1. Read the anonymized architecture summary, `model_benchmark/refactor_cases.json`,
+   `model_benchmark/docs/refactor-contract.md`, and
+   [references/harness-tests.md](references/harness-tests.md).
+2. Identify one bounded coverage or discrimination problem. Propose exact edits
+   to existing cases and any new cases that would measure the suspected better
+   harness structure. Record them in `benchmark_optimization/test-proposals.md`.
+3. Edit only `model_benchmark/refactor_cases.json` plus the proposal and one new
+   iteration note. Preserve every existing case ID. Increment a changed case's
+   plan revision. Add no more than four new cases in one experiment.
+4. Validate the entire corpus and architecture runner using the commands in the
+   harness-test reference. Reject changes that weaken authority boundaries,
+   remove coverage, encode expected prose, or privilege one architecture's
+   transport syntax.
+5. Commit and push the data-only suite change. Invoke
+   `/run-sugarcube-benchmark` exactly once. The `refactor-core` profile runs all
+   cases, including every newly added case, against every configured architecture.
+6. Pull the published anonymized result and summarize `harness_architectures`:
+   request-level pass rate, plan adherence, completeness, semantics, latency,
+   tokens, per-case discrimination, per-tier behavior, and per-alias regressions.
+7. Treat the result as the first baseline for the new suite revision. Evaluate
+   test usefulness by validity, coverage, stability, and whether it distinguishes
+   structures for a stated reason—not by preferring a lower or higher pass rate.
+8. Append exact results and a keep/revise/revert decision to the iteration note.
+   Revert cases that are invalid, redundant, architecture-specific, or fail to
+   measure their declared observable. Do not spend another GPU run for a
+   byte-for-byte restoration.
 
 ## Selection Rules
 
@@ -232,6 +277,20 @@ reasoning.
 - A newly added probe has no before result. Record its first result as a
   baseline observation, not an improvement or regression.
 
+## Fixed-Plan Harness Test Rules
+
+- Follow [references/harness-tests.md](references/harness-tests.md) for the
+  signed data schema, revision rules, validations, and proposal template.
+- Existing fixed-plan cases may be changed but not deleted, renamed, disabled,
+  or silently repurposed. Preserve their original proposal history.
+- New cases must express architecture-neutral outcomes and run through every
+  configured architecture. Never put SugarCube syntax or a particular JSON
+  transport shape into expected behavior.
+- Run `refactor-core`, not `refactor-canary`, after any corpus change; the core
+  selector includes the entire validated corpus.
+- Keep same-seed pairing across architectures. Never compare unmatched model,
+  case, plan revision, or seed tuples.
+
 ## Safety Rules
 
 - Never inspect Git history, deleted files, private logs, mappings, checkpoints,
@@ -264,4 +323,10 @@ Recommend this command to the user:
 
 ```text
 /goal Use /optimize-sugarcube-prompts to run at most five sequential experiments. Stop at the first of: target pass rate reached, two non-improving experiments, any regression that is not reverted, or any safety/verification failure.
+```
+
+For harness-suite work, recommend:
+
+```text
+/goal Use /optimize-sugarcube-prompts in harness-suite mode. Revise existing fixed-plan tests where evidence shows ambiguity, add up to four justified architecture-neutral tests, validate the complete corpus, then invoke /run-sugarcube-benchmark once to run every case against every configured harness architecture. Treat the result as a new suite baseline, not a pass-rate improvement over the old suite.
 ```

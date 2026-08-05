@@ -21,12 +21,14 @@
   "candidate_paths": [
     "model_benchmark/prompt_overrides.json",
     "model_benchmark/ingestion_overrides.json",
+    "model_benchmark/refactor_cases.json",
     "benchmark_anon/results_anonymized.json",
     "benchmark_optimization/**"
   ],
   "commit_message": "Publish anonymized benchmark results",
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
-  "benchmark_profile": "canary",
+  "benchmark_profile": "refactor-core",
+  "architectures": ["typed_fill", "flat_fill"],
   "context_window_tests": false,
   "context_window_sizes": [2048, 4096, 8192, 16384, 32768, 65536, 131072],
   "runs": 1,

@@ -7,12 +7,15 @@ from harness.ollama_client import OllamaGenerationResult
 from model_benchmark.config import BenchmarkConfig
 from model_benchmark.refactor_benchmark import (
     REFACTOR_CANARY_IDS,
+    build_flat_fill_prompt,
+    build_flat_fill_schema,
     RefactorCaseError,
     build_refactor_fill_prompt,
     build_refactor_fill_schema,
     execute_refactor_cases,
     load_refactor_cases,
     parse_refactor_fill,
+    parse_flat_fill,
     score_refactor_fill,
     select_refactor_cases,
     validate_refactor_case,
@@ -64,6 +67,33 @@ def _passing_response(case) -> str:
                 "hint": "Keep searching the market.",
             },
         ],
+        "summary": "The merchant offers medicine at a price.",
+        "beats": ["The offer is made.", "The player weighs the purchase."],
+    })
+
+
+def _passing_flat_response(case) -> str:
+    return json.dumps({
+        "plan_id": case.plan.plan_id,
+        "plan_revision": case.plan.revision,
+        "narrative": {
+            "merchant_scene": (
+                "The patient merchant opens a cedar case of remedies and "
+                "names a fair price. You quietly count {{state:gold}} before "
+                "deciding whether the medicine is worth the cost while rain "
+                "taps against the canvas roof."
+            ),
+        },
+        "choices": {
+            "choice_buy": {
+                "text": "Buy the medicine",
+                "hint": "Accept the merchant's offer.",
+            },
+            "choice_leave": {
+                "text": "Leave the stall",
+                "hint": "Keep searching the market.",
+            },
+        },
         "summary": "The merchant offers medicine at a price.",
         "beats": ["The offer is made.", "The player weighs the purchase."],
     })
@@ -202,6 +232,70 @@ def test_parser_rejects_fields_outside_the_fill_contract():
     data["mechanics"] = [{"operation": "set", "target": "gold"}]
 
     assert parse_refactor_fill(json.dumps(data)) is None
+
+
+def test_flat_fill_uses_fixed_object_keys_and_normalizes_reference_markers():
+    case = _state_case()
+    schema = build_flat_fill_schema(case)
+    prompt = build_flat_fill_prompt(case)
+    fill = parse_flat_fill(case, _passing_flat_response(case))
+
+    assert schema["properties"]["narrative"]["required"] == ["merchant_scene"]
+    assert schema["properties"]["choices"]["required"] == [
+        "choice_buy", "choice_leave",
+    ]
+    assert "{{state:ID}}" in prompt
+    assert fill is not None
+    assert any(
+        part.kind == "state_ref" and part.target == "gold"
+        for part in fill.narrative[0].parts
+    )
+    assert all(result.passed for result in score_refactor_fill(
+        case, _passing_flat_response(case), fill
+    ))
+
+
+def test_execution_compares_architectures_with_same_seed(monkeypatch):
+    case = _state_case()
+    calls = []
+
+    def fake_call(config, prompt, **kwargs):
+        calls.append((kwargs["label"], kwargs["seed"]))
+        response = (
+            _passing_flat_response(case)
+            if "flat_fill" in kwargs["label"]
+            else _passing_response(case)
+        )
+        return OllamaGenerationResult(response=response)
+
+    monkeypatch.setattr(
+        "model_benchmark.refactor_benchmark.call_ollama_sync_detailed",
+        fake_call,
+    )
+    cfg = BenchmarkConfig(
+        models=("private-model",),
+        variants=("json",),
+        directions=("A",),
+        base_url="http://127.0.0.1:11434",
+        timeout=30,
+        num_predict=640,
+        temperature=0.2,
+        runs=1,
+        random_seed="42",
+    )
+
+    records = execute_refactor_cases(
+        cfg, [case], architectures=("typed_fill", "flat_fill")
+    )
+
+    assert [seed for _, seed in calls] == [42, 42]
+    assert [record.subcategory for record in records] == [
+        "typed_fill", "flat_fill",
+    ]
+    assert [record.category for record in records] == [
+        "harness_structure_typed_fill", "harness_structure_flat_fill",
+    ]
+    assert all(record.status == "PASS" for record in records)
 
 
 def test_execution_uses_json_schema_and_request_level_record(monkeypatch):

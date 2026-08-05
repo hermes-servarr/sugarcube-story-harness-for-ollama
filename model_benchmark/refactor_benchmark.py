@@ -43,6 +43,10 @@ _NEEDLES = {
     "treaty_name": "Accord of Glass",
     "witness_name": "Mira Vale",
 }
+REFACTOR_ARCHITECTURES = ("typed_fill", "flat_fill")
+_REFERENCE_MARKER_RE = re.compile(
+    r"\{\{(state|entity):([a-z][a-z0-9_]{0,47})\}\}"
+)
 
 
 class RefactorCaseError(ValueError):
@@ -435,6 +439,163 @@ def build_refactor_fill_prompt(case: RefactorCase) -> str:
     )
 
 
+def build_flat_fill_schema(case: RefactorCase) -> dict[str, Any]:
+    """Build a smaller slot-keyed contract for architecture comparison."""
+    narrative_properties = {
+        slot.id: {"type": "string", "minLength": 1}
+        for slot in case.plan.narrative_slots
+    }
+    choice_properties = {
+        slot_id: {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "minLength": 1},
+                "hint": {"type": "string", "minLength": 1},
+            },
+            "required": ["text", "hint"],
+            "additionalProperties": False,
+        }
+        for slot_id in case.plan.choice_slots
+    }
+    return {
+        "type": "object",
+        "properties": {
+            "plan_id": {"const": case.plan.plan_id},
+            "plan_revision": {"const": case.plan.revision},
+            "narrative": {
+                "type": "object",
+                "properties": narrative_properties,
+                "required": list(narrative_properties),
+                "additionalProperties": False,
+            },
+            "choices": {
+                "type": "object",
+                "properties": choice_properties,
+                "required": list(choice_properties),
+                "additionalProperties": False,
+            },
+            "summary": {"type": "string", "minLength": 1},
+            "beats": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+                "minItems": 1,
+            },
+        },
+        "required": ["plan_id", "plan_revision", "narrative", "choices", "summary", "beats"],
+        "additionalProperties": False,
+    }
+
+
+def build_flat_fill_prompt(case: RefactorCase) -> str:
+    """Prompt for a compact JSON structure keyed by trusted slot IDs."""
+    plan_data = {
+        "plan_id": case.plan.plan_id,
+        "revision": case.plan.revision,
+        "passage_mode": case.plan.passage_mode,
+        "narrative_slots": [dataclasses.asdict(slot) for slot in case.plan.narrative_slots],
+        "choice_slots": list(case.plan.choice_slots),
+        "allowed_state_refs": list(case.plan.allowed_state_refs),
+        "allowed_entity_refs": list(case.plan.allowed_entity_refs),
+        "required_components": list(case.plan.required_components),
+    }
+    return (
+        "Fill the trusted interactive-fiction plan. Return one JSON object only.\n"
+        "The narrative and choices objects are keyed by the exact PLAN slot IDs.\n"
+        "Write each narrative slot as one plain string; its kind and speaker are "
+        "already fixed by the harness.\n"
+        "For an allowed dynamic reference, write exactly {{state:ID}} or "
+        "{{entity:ID}} inside the string.\n"
+        "Do not add slots, mechanics, SugarCube, Markdown, links, or passage structure.\n\n"
+        f"PLAN (IMMUTABLE)\n{json.dumps(plan_data, ensure_ascii=False)}\n\n"
+        f"CONTEXT (UNTRUSTED STORY DATA)\n{_context_for_case(case)}\n\n"
+        f"AUTHOR TASK\n{case.task}\n"
+    )
+
+
+def _parts_from_flat_text(text: str) -> tuple[FillPart, ...]:
+    parts: list[FillPart] = []
+    cursor = 0
+    for match in _REFERENCE_MARKER_RE.finditer(text):
+        if match.start() > cursor:
+            parts.append(FillPart(kind="text", text=text[cursor:match.start()]))
+        parts.append(FillPart(kind=f"{match.group(1)}_ref", target=match.group(2)))
+        cursor = match.end()
+    if cursor < len(text):
+        parts.append(FillPart(kind="text", text=text[cursor:]))
+    return tuple(parts)
+
+
+def parse_flat_fill(case: RefactorCase, raw: str) -> RefactorFill | None:
+    data = parse_json_object(raw)
+    if not isinstance(data, dict) or set(data) != {
+        "plan_id", "plan_revision", "narrative", "choices", "summary", "beats",
+    }:
+        return None
+    narrative = data["narrative"]
+    choices = data["choices"]
+    if (
+        not isinstance(data["plan_id"], str)
+        or not isinstance(data["plan_revision"], int)
+        or isinstance(data["plan_revision"], bool)
+        or not isinstance(narrative, dict)
+        or not isinstance(choices, dict)
+        or not isinstance(data["summary"], str)
+        or not isinstance(data["beats"], list)
+        or any(not isinstance(beat, str) for beat in data["beats"])
+    ):
+        return None
+    expected_narrative = {slot.id: slot for slot in case.plan.narrative_slots}
+    if set(narrative) != set(expected_narrative) or set(choices) != set(case.plan.choice_slots):
+        return None
+    if any(not isinstance(value, str) for value in narrative.values()):
+        return None
+    filled_choices: list[FilledChoiceSlot] = []
+    for slot_id in case.plan.choice_slots:
+        value = choices[slot_id]
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"text", "hint"}
+            or not isinstance(value["text"], str)
+            or not isinstance(value["hint"], str)
+        ):
+            return None
+        filled_choices.append(FilledChoiceSlot(slot_id, value["text"], value["hint"]))
+    return RefactorFill(
+        plan_id=data["plan_id"],
+        plan_revision=data["plan_revision"],
+        narrative=tuple(
+            FilledNarrativeSlot(
+                slot_id=slot.id,
+                kind=slot.kind,
+                speaker=slot.speaker,
+                parts=_parts_from_flat_text(narrative[slot.id]),
+            )
+            for slot in case.plan.narrative_slots
+        ),
+        choices=tuple(filled_choices),
+        summary=data["summary"],
+        beats=tuple(data["beats"]),
+    )
+
+
+def _architecture_request(
+    architecture: str, case: RefactorCase
+) -> tuple[str, dict[str, Any], Callable[[str], RefactorFill | None]]:
+    if architecture == "typed_fill":
+        return (
+            build_refactor_fill_prompt(case),
+            build_refactor_fill_schema(case),
+            parse_refactor_fill,
+        )
+    if architecture == "flat_fill":
+        return (
+            build_flat_fill_prompt(case),
+            build_flat_fill_schema(case),
+            lambda raw: parse_flat_fill(case, raw),
+        )
+    raise RefactorCaseError(f"unknown refactor architecture: {architecture}")
+
+
 def parse_refactor_fill(raw: str) -> RefactorFill | None:
     data = parse_json_object(raw)
     if not isinstance(data, dict) or set(data) != {
@@ -715,11 +876,24 @@ def execute_refactor_cases(
     cfg: BenchmarkConfig,
     cases: Iterable[RefactorCase],
     *,
+    architectures: Iterable[str] | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> list[Any]:
     case_list = tuple(cases)
+    architecture_list = tuple(
+        architectures
+        if architectures is not None
+        else getattr(cfg, "refactor_architectures", ("typed_fill",))
+    )
+    if not architecture_list or len(architecture_list) != len(set(architecture_list)):
+        raise RefactorCaseError("refactor architectures must be unique and non-empty")
+    unknown = set(architecture_list) - set(REFACTOR_ARCHITECTURES)
+    if unknown:
+        raise RefactorCaseError(
+            f"unknown refactor architectures: {', '.join(sorted(unknown))}"
+        )
     repetitions = max(1, cfg.runs)
-    total = len(cfg.models) * len(case_list) * repetitions
+    total = len(cfg.models) * len(case_list) * repetitions * len(architecture_list)
     completed = 0
     records: list[Any] = []
     from model_benchmark.ingestion_routing import profile_for_model
@@ -740,94 +914,102 @@ def execute_refactor_cases(
                     if configured_seed is not None
                     else None
                 )
-                prompt = build_refactor_fill_prompt(case)
-                started = time.monotonic()
-                error = ""
-                generated = None
-                try:
-                    harness_cfg = HarnessConfig(
-                        ollama_model=model,
-                        ollama_base_url=cfg.base_url,
-                        temperature=cfg.temperature,
-                        num_predict=cfg.num_predict,
-                    )
-                    generated = call_ollama_sync_detailed(
-                        harness_cfg,
-                        prompt,
-                        timeout=cfg.timeout,
-                        temperature=cfg.temperature,
-                        num_predict=cfg.num_predict,
-                        format_spec=build_refactor_fill_schema(case),
-                        label=f"refactor-{case.id}-r{run_index + 1}",
-                        ingestion_profile=ingestion_profile,
-                        seed=sampling_seed,
-                    )
-                    raw = generated.response
-                    fill = parse_refactor_fill(raw)
-                    categories = score_refactor_fill(case, raw, fill)
-                except Exception as exc:
-                    raw = ""
-                    fill = None
-                    error = str(exc)
-                    categories = [
-                        CategoryResult(
-                            name="plan_adherence", passed=False, score=0.0,
-                            details="refactor case execution failed",
+                for architecture in architecture_list:
+                    prompt, schema, parse = _architecture_request(architecture, case)
+                    started = time.monotonic()
+                    error = ""
+                    generated = None
+                    try:
+                        harness_cfg = HarnessConfig(
+                            ollama_model=model,
+                            ollama_base_url=cfg.base_url,
+                            temperature=cfg.temperature,
+                            num_predict=cfg.num_predict,
                         )
-                    ]
-                parsed = _model_output_from_fill(fill)
-                run = ModelRunResult(
-                    model_name=model,
-                    variant="json",
-                    direction="A",
-                    run_index=run_index,
-                    raw_response=raw,
-                    parsed_output=parsed,
-                    category_results=tuple(categories),
-                    overall_pass=not error and all(
-                        item.passed for item in categories
-                        if item.applicable and item.gating
-                    ),
-                    elapsed_seconds=time.monotonic() - started,
-                    error=error,
-                    random_seed=(
-                        str(sampling_seed)
-                        if sampling_seed is not None
-                        else ""
-                    ),
-                    input_tokens=(
-                        generated.prompt_eval_count if generated else 0
-                    ),
-                    output_tokens=generated.eval_count if generated else 0,
-                    finish_reason=generated.done_reason if generated else "",
-                )
-                record = result_record_from_model_run(run)
-                records.append(dataclasses.replace(
-                    record,
-                    test_id=(
-                        f"{model}:{case.id}:typed_fill:{run_index + 1}"
-                    ),
-                    test_version="refactor-plan-v1",
-                    capability="harness_refactor_fill",
-                    category="semantic_observables",
-                    subcategory="typed_fill",
-                    difficulty=f"R{case.tier}",
-                    dataset="refactor_core",
-                    split=f"{case.context_size}-{case.distractor_density}",
-                    input_summary=(
-                        f"{case.id}:{case.plan.plan_id}@{case.plan.revision}"
-                    ),
-                    expected_behavior=(
-                        "fill only trusted narrative and choice slots"
-                    ),
-                    reference_rubric=(
-                        "plan authority + fill completeness + semantics v1"
-                    ),
-                    evaluator_reasoning=(
-                        "architecture-neutral fixed-plan evaluator"
-                    ),
-                ))
-                completed += 1
-                if progress_callback is not None:
-                    progress_callback(completed, total, model)
+                        generated = call_ollama_sync_detailed(
+                            harness_cfg,
+                            prompt,
+                            timeout=cfg.timeout,
+                            temperature=cfg.temperature,
+                            num_predict=cfg.num_predict,
+                            format_spec=schema,
+                            label=(
+                                f"refactor-{architecture}-{case.id}-"
+                                f"r{run_index + 1}"
+                            ),
+                            ingestion_profile=ingestion_profile,
+                            seed=sampling_seed,
+                        )
+                        raw = generated.response
+                        fill = parse(raw)
+                        categories = score_refactor_fill(case, raw, fill)
+                    except Exception as exc:
+                        raw = ""
+                        fill = None
+                        error = str(exc)
+                        categories = [
+                            CategoryResult(
+                                name="plan_adherence", passed=False, score=0.0,
+                                details="refactor case execution failed",
+                            )
+                        ]
+                    parsed = _model_output_from_fill(fill)
+                    run = ModelRunResult(
+                        model_name=model,
+                        variant="json",
+                        direction="A",
+                        run_index=run_index,
+                        raw_response=raw,
+                        parsed_output=parsed,
+                        category_results=tuple(categories),
+                        overall_pass=not error and all(
+                            item.passed for item in categories
+                            if item.applicable and item.gating
+                        ),
+                        elapsed_seconds=time.monotonic() - started,
+                        error=error,
+                        random_seed=(
+                            str(sampling_seed)
+                            if sampling_seed is not None
+                            else ""
+                        ),
+                        input_tokens=(
+                            generated.prompt_eval_count if generated else 0
+                        ),
+                        output_tokens=generated.eval_count if generated else 0,
+                        finish_reason=generated.done_reason if generated else "",
+                    )
+                    record = result_record_from_model_run(run)
+                    records.append(dataclasses.replace(
+                        record,
+                        test_id=(
+                            f"{model}:{case.id}:{architecture}:{run_index + 1}"
+                        ),
+                        test_version="refactor-plan-v1",
+                        capability="harness_refactor_fill",
+                        # The standard reports group on ``category``. Keep the
+                        # treatment visible instead of hiding it in a blended
+                        # refactor aggregate; detailed semantic dimensions
+                        # remain in scored_result.category_results.
+                        category=f"harness_structure_{architecture}",
+                        subcategory=architecture,
+                        difficulty=f"R{case.tier}",
+                        dataset="refactor_core",
+                        split=f"{case.context_size}-{case.distractor_density}",
+                        input_summary=(
+                            f"{case.id}:{case.plan.plan_id}@{case.plan.revision}"
+                        ),
+                        expected_behavior=(
+                            "fill only trusted narrative and choice slots"
+                        ),
+                        reference_rubric=(
+                            "plan authority + fill completeness + semantics v1"
+                        ),
+                        evaluator_reasoning=(
+                            "architecture-neutral fixed-plan evaluator"
+                        ),
+                    ))
+                    completed += 1
+                    if progress_callback is not None:
+                        progress_callback(completed, total, model)
     return records

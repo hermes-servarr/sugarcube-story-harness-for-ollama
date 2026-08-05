@@ -153,6 +153,7 @@ def _progress_message(progress: dict[str, Any]) -> str | None:
         "starting",
         "matrix",
         "capability",
+        "refactor",
         "context_window",
         "finalizing",
     }:

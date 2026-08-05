@@ -182,6 +182,27 @@ def _context_window_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _architecture_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    selected = [row for row in records if row.get("dataset") == "refactor_core"]
+    failures_by_architecture: dict[str, dict[str, int]] = {}
+    architectures = sorted({str(row.get("subcategory", "")) for row in selected})
+    for architecture in architectures:
+        architecture_rows = [
+            row for row in selected
+            if str(row.get("subcategory", "")) == architecture
+        ]
+        failures_by_architecture[architecture] = dict(
+            _failed_evaluator_categories(architecture_rows).most_common()
+        )
+    return {
+        "cases": len(selected),
+        "by_architecture": _group(selected, "subcategory"),
+        "by_test": _group(selected, "input_summary"),
+        "by_tier": _group(selected, "difficulty"),
+        "failed_evaluator_categories": failures_by_architecture,
+    }
+
+
 def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
@@ -273,6 +294,7 @@ def summarize(path: Path) -> dict[str, Any]:
         },
         "conversation_layout": _conversation_summary(passage_records),
         "writing_style": _style_summary(passage_records),
+        "harness_architectures": _architecture_summary(records),
         "candidate_tests": {
             "diagnostic_only": True,
             **(

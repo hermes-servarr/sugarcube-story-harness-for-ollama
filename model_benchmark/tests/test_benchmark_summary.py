@@ -252,6 +252,54 @@ def test_plain_text_does_not_inflate_passage_headline(tmp_path):
     assert summary["plain_text"]["pass_rate"] == 1.0
 
 
+def test_refactor_results_are_grouped_by_harness_architecture(tmp_path):
+    path = tmp_path / "results.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "test_id": "Model_A:R1-STATE-REFERENCE:typed_fill:1",
+                    "model_alias": "Model_A",
+                    "dataset": "refactor_core",
+                    "subcategory": "typed_fill",
+                    "difficulty": "R1",
+                    "input_summary": "R1-STATE-REFERENCE:plan_state_reference@1",
+                    "normalized_score": 1.0,
+                    "status": "PASS",
+                },
+                {
+                    "test_id": "Model_A:R1-STATE-REFERENCE:flat_fill:1",
+                    "model_alias": "Model_A",
+                    "dataset": "refactor_core",
+                    "subcategory": "flat_fill",
+                    "difficulty": "R1",
+                    "input_summary": "R1-STATE-REFERENCE:plan_state_reference@1",
+                    "normalized_score": 0.5,
+                    "status": "FAIL",
+                    "scored_result": {
+                        "category_results": [
+                            {
+                                "name": "semantic_observables",
+                                "passed": False,
+                            }
+                        ]
+                    },
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = MODULE.summarize(path)["harness_architectures"]
+
+    assert summary["cases"] == 2
+    assert summary["by_architecture"]["typed_fill"]["passed"] == 1
+    assert summary["by_architecture"]["flat_fill"]["passed"] == 0
+    assert summary["failed_evaluator_categories"]["flat_fill"] == {
+        "semantic_observables": 1,
+    }
+
+
 def test_conversation_layout_reports_failed_signed_checks(tmp_path):
     path = tmp_path / "results.json"
     path.write_text(

@@ -79,10 +79,16 @@ contract, structured handoff, semantic correctness, compilation, browser
 playability, latency, and tokens as separate dimensions over every original
 request.
 
-The current executable adapter is `typed_fill`. It uses a case-specific JSON
-schema whose enums are derived from the trusted plan. The case corpus is shared
-and must remain independent of SugarCube syntax; later AST, staged-generation,
-compiler, and repair adapters should consume the same plan IDs and revisions.
+The executable architecture treatments are:
+
+- `typed_fill`: an explicit narrative-block/inline-part AST;
+- `flat_fill`: smaller slot-keyed JSON strings with deterministic typed-reference
+  markers.
+
+Both use case-specific schemas derived from the trusted plan and normalize to
+the same `RefactorFill` before scoring. The case corpus is shared and remains
+independent of SugarCube syntax; later staged-generation, compiler, and repair
+architectures should consume the same plan IDs and revisions.
 
 ## Next adapters
 

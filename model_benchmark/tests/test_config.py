@@ -18,10 +18,10 @@ from model_benchmark.config import BenchmarkConfig, parse_cli_args, _build_parse
 class TestBenchmarkConfigFields:
     """Test the EXTENDED BenchmarkConfig dataclass per P2 §2 and P3 §1.1."""
 
-    def test_benchmark_config_22_fields(self):
-        """22 fields total (8 required + 14 optional)."""
+    def test_benchmark_config_23_fields(self):
+        """23 fields total (8 required + 15 optional)."""
         fields = list(BenchmarkConfig.__dataclass_fields__)
-        assert len(fields) == 22, f"Expected 22 fields, got {len(fields)}"
+        assert len(fields) == 23, f"Expected 23 fields, got {len(fields)}"
 
     def test_benchmark_config_required_fields(self):
         """8 required fields have no defaults."""
@@ -36,7 +36,8 @@ class TestBenchmarkConfigFields:
                     "checkpoint_every", "checkpoint_interval_seconds",
                     "output_dir", "verbose", "quiet", "anonymize",
                     "baseline_dir", "random_seed", "force_rerun",
-                    "ingestion_routing_path", "benchmark_profile"]
+                    "ingestion_routing_path", "benchmark_profile",
+                    "refactor_architectures"]
         for name in optional:
             assert name in BenchmarkConfig.__dataclass_fields__
 

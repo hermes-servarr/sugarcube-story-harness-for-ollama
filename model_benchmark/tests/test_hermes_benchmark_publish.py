@@ -377,6 +377,7 @@ def test_candidate_mode_rejects_python_change(monkeypatch, tmp_path):
     [
         ("model_benchmark/prompt_overrides.json", True),
         ("model_benchmark/ingestion_overrides.json", True),
+        ("model_benchmark/refactor_cases.json", True),
         ("benchmark_optimization/iteration-01.md", True),
         ("benchmark_optimization", True),
         ("model_benchmark/scoring.py", False),
@@ -387,6 +388,7 @@ def test_candidate_path_matching(path, expected):
     patterns = [
         "model_benchmark/prompt_overrides.json",
         "model_benchmark/ingestion_overrides.json",
+        "model_benchmark/refactor_cases.json",
         "benchmark_optimization/**",
     ]
 
@@ -433,6 +435,21 @@ def test_candidate_test_files_must_be_bounded_json(tmp_path):
         )
 
 
+def test_refactor_cases_require_bounded_unique_json_array(tmp_path):
+    candidate = tmp_path / "model_benchmark" / "refactor_cases.json"
+    candidate.parent.mkdir()
+    candidate.write_text(
+        '[{"id":"R1-DUPLICATE"},{"id":"R1-DUPLICATE"}]',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(publisher.PublishError, match="unique"):
+        publisher._validate_candidate_files(
+            tmp_path,
+            ["model_benchmark/refactor_cases.json"],
+        )
+
+
 def test_benchmark_args_enable_capability_ladder(tmp_path):
     args = publisher._benchmark_args(
         {
@@ -461,6 +478,29 @@ def test_benchmark_args_forward_named_profile(tmp_path):
     with pytest.raises(ValueError, match="benchmark_profile"):
         publisher._benchmark_args(
             {"models": ["private-model"], "benchmark_profile": "unknown"},
+            tmp_path,
+        )
+
+
+def test_benchmark_args_forward_harness_architectures(tmp_path):
+    args = publisher._benchmark_args(
+        {
+            "models": ["private-model"],
+            "benchmark_profile": "refactor-core",
+            "architectures": ["typed_fill", "flat_fill"],
+        },
+        tmp_path,
+    )
+
+    start = args.index("--architectures")
+    assert args[start + 1:start + 3] == ["typed_fill", "flat_fill"]
+
+    with pytest.raises(ValueError, match="architectures"):
+        publisher._benchmark_args(
+            {
+                "models": ["private-model"],
+                "architectures": ["unknown"],
+            },
             tmp_path,
         )
 

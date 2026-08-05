@@ -140,7 +140,8 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |
 | `--variants` | `compact full json` | Prompt variants to test |
 | `--directions` | `A B C` | Direction prompts (A: inventory/set flag, B: conditional, C: stats) |
-| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), `full` (82), `refactor-canary` (10), or `refactor-core` (24) |
+| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), `full` (82), `refactor-canary` (10 cases), or `refactor-core` (24 cases) |
+| `--architectures` | `typed_fill flat_fill` | Harness structures compared by refactor profiles |
 | `--base-url` | `http://localhost:11434` | Ollama server URL |
 | `--timeout` | `120` | Seconds per model call |
 | `--num-predict` | `640` | Max tokens to generate |
@@ -167,8 +168,8 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `canary` | 8-case covering array | 8 harness-contract cases | 16 | Routine prompt iteration |
 | `core` | 16-case covering array | 12 harness-contract cases | 28 | Architecture and refactor comparison |
 | `full` | 4 variants × 8 directions | All 50 built-in cases | 82 | Historical probes, stress, and scorer validation |
-| `refactor-canary` | None | 10 fixed-plan typed-fill cases | 10 | Fast checks of the future ownership boundary |
-| `refactor-core` | None | All 24 fixed-plan typed-fill cases | 24 | Refactor baselines and architecture comparison |
+| `refactor-canary` | None | 10 fixed-plan cases × selected architectures | 20 | Fast paired checks of potential harness structures |
+| `refactor-core` | None | 24 fixed-plan cases × selected architectures | 48 | Paired harness-architecture comparison |
 
 Call counts assume `--runs 1`. Refactor profiles repeat every fixed-plan case
 for larger values and increment an explicit base seed for each repetition.
@@ -189,6 +190,19 @@ Run the future-contract cohorts directly:
 ```bash
 uv run python -m model_benchmark.cli run --profile refactor-canary --models MODEL
 uv run python -m model_benchmark.cli run --profile refactor-core --models MODEL
+```
+
+Refactor profiles compare `typed_fill` (an explicit narrative AST) with
+`flat_fill` (smaller JSON objects keyed by trusted slot IDs). Both normalize to
+the same fill type and use identical plans, seeds, semantic checks, and request
+budgets. Select one or add future structures without changing the case corpus:
+
+```bash
+uv run python -m model_benchmark.cli run \
+  --profile refactor-core \
+  --architectures typed_fill flat_fill \
+  --models MODEL \
+  --runs 5 --seed 42
 ```
 
 The harness-contract cases score three independent layers: raw transport,

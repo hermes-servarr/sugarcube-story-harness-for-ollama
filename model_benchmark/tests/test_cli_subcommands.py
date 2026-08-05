@@ -72,9 +72,12 @@ class TestLegacyCompat:
     ):
         captured = {}
 
-        def fake_execute(cfg, cases, *, progress_callback=None):
+        def fake_execute(
+            cfg, cases, *, architectures=None, progress_callback=None
+        ):
             captured["profile"] = cfg.benchmark_profile
             captured["case_ids"] = [case.id for case in cases]
+            captured["architectures"] = tuple(architectures or ())
             return []
 
         monkeypatch.setattr(
@@ -93,6 +96,7 @@ class TestLegacyCompat:
 
         assert rc == 0
         assert captured["profile"] == "refactor-canary"
+        assert captured["architectures"] == ("typed_fill", "flat_fill")
         assert len(captured["case_ids"]) == 10
         assert captured["case_ids"][0] == "R0-ORDINARY-FANTASY"
 

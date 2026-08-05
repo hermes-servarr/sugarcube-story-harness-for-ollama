@@ -299,6 +299,7 @@ def _update_checkout(
             [
                 "model_benchmark/prompt_overrides.json",
                 "model_benchmark/ingestion_overrides.json",
+                "model_benchmark/refactor_cases.json",
                 "benchmark_anon/results_anonymized.json",
                 "benchmark_optimization/**",
             ],
@@ -362,6 +363,22 @@ def _validate_candidate_files(repo: Path, changed_paths: list[str]) -> None:
             limit = 40_000
         if normalized == "model_benchmark/ingestion_overrides.json":
             limit = 40_000
+        if normalized == "model_benchmark/refactor_cases.json":
+            limit = 262_144
+            try:
+                cases = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise PublishError("refactor cases must be valid JSON") from exc
+            if not isinstance(cases, list) or not 1 <= len(cases) <= 128:
+                raise PublishError("refactor cases must contain 1 to 128 cases")
+            case_ids = [
+                item.get("id") if isinstance(item, dict) else None
+                for item in cases
+            ]
+            if any(not isinstance(case_id, str) for case_id in case_ids):
+                raise PublishError("refactor cases must contain object IDs")
+            if len(case_ids) != len(set(case_ids)):
+                raise PublishError("refactor case IDs must be unique")
         if normalized.startswith("benchmark_optimization/candidate_tests/"):
             if path.suffix.casefold() != ".json":
                 raise PublishError("candidate tests must be JSON files")
@@ -453,6 +470,22 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
                 "refactor-canary, or refactor-core"
             )
         args.extend(["--profile", profile])
+    architectures = config.get("architectures")
+    if architectures is not None:
+        if (
+            not isinstance(architectures, list)
+            or not architectures
+            or len(architectures) != len(set(map(str, architectures)))
+            or any(
+                architecture not in {"typed_fill", "flat_fill"}
+                for architecture in architectures
+            )
+        ):
+            raise ValueError(
+                "architectures must be a unique non-empty subset of "
+                "typed_fill and flat_fill"
+            )
+        args.extend(["--architectures", *map(str, architectures)])
     for flag, key in (
         ("--variants", "variants"),
         ("--directions", "directions"),
@@ -513,7 +546,7 @@ def _write_private_progress(
     """Atomically persist identity-free progress for PC-side inspection."""
     phase = str(payload.get("phase", "unknown"))
     if phase not in {
-        "starting", "matrix", "capability", "context_window", "finalizing"
+        "starting", "matrix", "capability", "refactor", "context_window", "finalizing"
     }:
         phase = "unknown"
     progress: dict[str, Any] = {
@@ -699,10 +732,7 @@ def _write_public_progress(path: Path, payload: dict[str, Any]) -> None:
     """Publish only aggregate, identity-free counters for the SSH trigger."""
     phase = payload.get("phase")
     if phase not in {
-        "starting",
-        "matrix",
-        "capability",
-        "context_window",
+        "starting", "matrix", "capability", "refactor", "context_window",
         "finalizing",
     }:
         return

@@ -9,6 +9,13 @@ original hypothesis. A reviewed proposal may later become one data-only JSON
 probe under `benchmark_optimization/candidate_tests/`; promotion into the
 signed capability suite requires an operator-approved signed code commit.
 
+Fixed-plan harness architecture proposals use `HPROP-NNNN` IDs and may revise
+existing entries or add new entries in `model_benchmark/refactor_cases.json`.
+They are governed by
+`skills/optimize-sugarcube-prompts/references/harness-tests.md`. A changed
+corpus creates a new suite baseline; its aggregate pass rate must not be
+compared with the old denominator as an improvement claim.
+
 ## Status Values
 
 - `proposed`: idea recorded but not yet implemented.
@@ -49,6 +56,27 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 ```
 
 ## Proposals
+
+## Harness Proposal Template
+
+```markdown
+## HPROP-0001 — Short title
+
+- Status: proposed
+- Proposed in iteration: iteration-NN
+- Action: revise CASE-ID | add NEW-CASE-ID
+- Coverage gap: Missing or ambiguous behavior.
+- Competing structures: Harness approaches this test may distinguish.
+- Hypothesis: One falsifiable architecture-level claim.
+- Controlled inputs: Context, plan authority, seed, budget, and model pairing.
+- Observable outcomes: Architecture-neutral request-level behaviors.
+- Existing-case changes: Exact fields and revision increment, or `none`.
+- New cases: IDs and purpose, or `none`.
+- Why current corpus is insufficient: Concrete ambiguity or missing coverage.
+- Resource estimate: cases × architectures × models × seeds.
+- Rejection conditions: Invalid, redundant, unstable, biased, or non-discriminating.
+- First suite baseline: pending
+```
 
 ## PROP-0001 — K1 conversation-layout baseline (full variant)
 

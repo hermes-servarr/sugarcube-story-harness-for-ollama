@@ -594,6 +594,10 @@ def collect_reproducibility_metadata(
         "variants": ",".join(str(v) for v in (g("variants", ()) or ())),
         "directions": ",".join(str(d) for d in (g("directions", ()) or ())),
         "benchmark_profile": str(g("benchmark_profile", "") or "custom"),
+        "refactor_architectures": ",".join(
+            str(value)
+            for value in (g("refactor_architectures", ()) or ())
+        ),
     }
 
     # ── Environment / system collectors ─────────────────────────────────

@@ -492,7 +492,18 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
         help=(
             "Named built-in workload: canary=16 calls/model, "
             "core=28 calls/model, full=82 calls/model, "
-            "refactor-canary=10 calls/model, refactor-core=24 calls/model."
+            "refactor-canary=10 cases/architecture, "
+            "refactor-core=24 cases/architecture."
+        ),
+    )
+    p_run.add_argument(
+        "--architectures",
+        nargs="+",
+        choices=["typed_fill", "flat_fill"],
+        default=["typed_fill", "flat_fill"],
+        help=(
+            "Harness structures compared by refactor profiles "
+            "(default: typed_fill flat_fill)."
         ),
     )
     p_run.add_argument(
@@ -1225,7 +1236,10 @@ def _cmd_run(
         ) * max(1, cfg.runs)
     legacy_capability_total = model_count * len(capability_cases)
     refactor_total = (
-        model_count * len(refactor_cases) * max(1, cfg.runs)
+        model_count
+        * len(refactor_cases)
+        * max(1, cfg.runs)
+        * len(cfg.refactor_architectures)
     )
     capability_total = legacy_capability_total + refactor_total
     context_total = model_count * len(context_sizes)
@@ -1406,6 +1420,7 @@ def _cmd_run(
             execute_refactor_cases(
                 cfg,
                 refactor_cases,
+                architectures=cfg.refactor_architectures,
                 progress_callback=report_refactor_progress,
             )
         )
@@ -1604,6 +1619,9 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
     profile = getattr(args, "profile", "") or ""
     if profile:
         out += ["--profile", profile]
+    architectures = getattr(args, "architectures", []) or []
+    if architectures:
+        out += ["--architectures", *architectures]
     runs = getattr(args, "runs", 1)
     if runs != 1:
         out += ["--runs", str(runs)]

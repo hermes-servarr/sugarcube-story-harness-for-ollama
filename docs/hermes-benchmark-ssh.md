@@ -63,6 +63,7 @@ For the autonomous optimization skill, configure:
   "candidate_paths": [
     "model_benchmark/prompt_overrides.json",
     "model_benchmark/ingestion_overrides.json",
+    "model_benchmark/refactor_cases.json",
     "benchmark_anon/results_anonymized.json",
     "benchmark_optimization/**"
   ]
@@ -75,6 +76,13 @@ unsigned only when the trusted commit is their ancestor and every accumulated
 change is confined to those data/result/note paths. Any Python, scoring, test,
 fixture, skill, SSH, or configuration change blocks the run before Ollama is
 contacted.
+
+For a harness-suite campaign, configure `benchmark_profile` as
+`refactor-core`, set `architectures` to every approved harness structure, and
+allow the data-only `model_benchmark/refactor_cases.json` corpus shown above.
+The signed loader validates the complete corpus, and `refactor-core` runs every
+case across every selected architecture. Editing Python tests, fixtures,
+evaluators, or scoring remains forbidden.
 
 ## Install on a Windows benchmark PC
 

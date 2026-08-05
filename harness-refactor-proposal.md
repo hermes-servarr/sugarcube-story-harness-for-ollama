@@ -599,6 +599,7 @@ Add an `architecture` axis:
 - `legacy_delimited`
 - `legacy_json`
 - `typed_fill`
+- `flat_fill`
 - `typed_staged`
 
 Run matching model/case/seed triples against the frozen `refactor-core` plans.
@@ -715,8 +716,10 @@ The smallest high-value implementation slice is:
    choice, and form cases;
 3. adapt `ModelOutput` into fills/proposals without granting new plan authority;
 4. extract deterministic rendering into `SugarCubeCompiler`;
-5. add `typed_fill` JSON-schema generation in shadow mode; and
-6. compare it with legacy generation on paired `refactor-core` plans plus
+5. add `typed_fill` and smaller slot-keyed `flat_fill` JSON-schema generation
+   in shadow mode; and
+6. compare the candidate structures with legacy generation on paired
+   `refactor-core` plans plus
    compile/browser checks.
 
 If this slice improves final playable and semantically correct passages, continue to immutable draft commit and staged mechanics. If it does not, the layered benchmark will identify whether the remaining defect is context, schema adoption, semantic planning, compiler behavior, or runtime execution.
