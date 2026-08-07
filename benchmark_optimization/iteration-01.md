@@ -121,4 +121,15 @@ architectures with no per-case variance).
 
 ## Result
 
-Pending benchmark execution.
+The protected benchmark could not be completed. The SSH connection to the
+benchmark PC failed with a network-level error (host not reachable). The
+managed process exited with a nonzero status.
+
+Per the goal's stop conditions, this is a terminal stop condition. The
+benchmark was not retried. The PC administrator must inspect the private
+local log and verify network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+The corpus revision (3 case revisions, no new cases) is committed and pushed
+but the architecture benchmark has not produced a result. The revised suite
+baseline is pending a successful benchmark run.
