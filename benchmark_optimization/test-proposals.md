@@ -189,6 +189,108 @@ Copy this section for each new proposal. Use the next unused sequential ID.
   for the provisioning caveat.
 - Operator decision: pending
 
+## HPROP-0001 — Fix R2-MULTI-DIALOGUE thought-slot forbidden_terms consistency
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: revise R2-MULTI-DIALOGUE
+- Coverage gap: Inconsistent forbidden_terms across thought-slot cases.
+- Competing structures: All architectures — this is a test-validity fix, not architecture-discriminating.
+- Hypothesis: Adding "INNER MONOLOGUE:" to R2-MULTI-DIALOGUE forbidden_terms will close the consistency gap with R2-DIALOGUE-THOUGHT and R9-LONG-DIALOGUE, preventing false passes where a model emits the literal thought label.
+- Controlled inputs: Same context (L), plan, seed, budget, and model pairing; only forbidden_terms changed.
+- Observable outcomes: Architecture-neutral request-level semantic check: the literal string "INNER MONOLOGUE:" must not appear in the fill text.
+- Existing-case changes: R2-MULTI-DIALOGUE forbidden_terms: add "INNER MONOLOGUE:"; plan revision 1 to 2.
+- New cases: none
+- Why current corpus is insufficient: R2-MULTI-DIALOGUE has a player_thought slot but only forbids "DIALOGUE:", while the two other thought-slot cases forbid both "DIALOGUE:" and "INNER MONOLOGUE:". A model emitting the literal label would pass R2-MULTI-DIALOGUE but fail the others, creating an inconsistent signal.
+- Resource estimate: no additional model calls (revision of existing case).
+- Rejection conditions: If the revision causes a validation failure or breaks plan-adherence pairing.
+- First suite baseline: pending
+
+## HPROP-0005 — Fix R3-HUB-COPY task-vs-check overclaim
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: revise R3-HUB-COPY
+- Coverage gap: Task overclaims what the distinct_choices check enforces.
+- Competing structures: All architectures — this is a test-validity fix.
+- Hypothesis: Changing the task from "three clearly distinct" to "three distinct" will accurately reflect what the distinct_choices semantic check enforces (casefolded string distinctness of choice texts), preventing suite consumers from over-interpreting the check as enforcing semantic or hint-level distinctness.
+- Controlled inputs: Same context, plan, seed, budget, and model pairing; only task text changed.
+- Observable outcomes: Same as before — distinct_choices check on choice texts.
+- Existing-case changes: R3-HUB-COPY task: "three clearly distinct" to "three distinct"; plan revision 1 to 2.
+- New cases: none
+- Why current corpus is insufficient: The task said "clearly distinct" which implies a stronger semantic requirement than the check enforces.
+- Resource estimate: no additional model calls.
+- Rejection conditions: If the revision causes a validation failure.
+- First suite baseline: pending
+
+## HPROP-0006 — Fix R8-CHOICE-DISTINCTION task-vs-check overclaim
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: revise R8-CHOICE-DISTINCTION
+- Coverage gap: Task overclaims what the distinct_choices check enforces.
+- Competing structures: All architectures — this is a test-validity fix.
+- Hypothesis: Changing the task from "Their labels and hints must be meaningfully distinct" to "with distinct labels" will accurately reflect what the distinct_choices semantic check enforces (casefolded string distinctness of choice texts only), preventing suite consumers from expecting hint-level or semantic-meaning distinctness that is not checked.
+- Controlled inputs: Same context, plan, seed, budget, and model pairing; only task text changed.
+- Observable outcomes: Same as before — distinct_choices check on choice texts.
+- Existing-case changes: R8-CHOICE-DISTINCTION task: remove "Their labels and hints must be meaningfully distinct"; plan revision 1 to 2.
+- New cases: none
+- Why current corpus is insufficient: The task claimed labels AND hints must be "meaningfully" distinct, but the check only verifies choice texts are distinct (casefolded). Hint distinctness and semantic meaning are not checked.
+- Resource estimate: no additional model calls.
+- Rejection conditions: If the revision causes a validation failure.
+- First suite baseline: pending
+
+## HPROP-0002 — S-context room-mode architecture discrimination test
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: add R3-S-ROOM
+- Coverage gap: No S-context structured passage mode test exists. All five T3 cases (form, loop, hub, room, random) use M context.
+- Competing structures: typed_fill (explicit narrative-block AST) vs flat_fill (slot-keyed JSON strings). At S context the model has minimal surrounding guidance, so the architecture's representation of room structure (fixed exits + local choices) is the primary signal the model receives.
+- Hypothesis: At S context with room mode, typed_fill and flat_fill will show different plan-adherence rates because the structured AST representation conveys exit and slot constraints more explicitly than flat slot-keyed strings when context is minimal.
+- Controlled inputs: S context, horror fixture, D0 distractors, room passage mode, seed 42 with 5 runs, same model pairing across architectures.
+- Observable outcomes: Plan adherence (slot IDs, slot kinds, exit components), fill completeness (narrative + choices + summary + beats), semantic observables (required term "room", forbidden SugarCube link syntax, min_words, distinct_choices).
+- Existing-case changes: none
+- New cases: R3-S-ROOM (T3, S, horror, D0, room mode, revision 1)
+- Why current corpus is insufficient: All structured-passage-mode tests (T3: form, loop, hub, room, random) use M context. No test measures architecture behavior at S context where schema guidance is minimal.
+- Resource estimate: 1 case x 2 architectures x 4 models x 5 runs = 40 additional model calls at S context.
+- Rejection conditions: If the test produces identical pass rates and scores across both architectures with zero per-case variance, it does not discriminate and should be reverted.
+- First suite baseline: pending
+
+## HPROP-0003 — Mid-tier D1 distractor-resistance test
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: add R4-M-DISTRACTOR
+- Coverage gap: D1 distractor density only appears at T7 (L, XL) and T9 (XL). No mid-tier (T3-T6) distractor test exists.
+- Competing structures: typed_fill vs flat_fill under distractor pressure at moderate complexity. Distractor injection attempts to add a slot and emit SugarCube syntax; architecture representation determines how clearly the trusted plan boundary is conveyed.
+- Hypothesis: At M context with D1 distractors and moderate task complexity, architecture pass rates will differ because the trusted plan's slot boundary is conveyed differently by the AST (typed_fill) vs slot-keyed strings (flat_fill). This isolates distractor resistance from large-context compounding.
+- Controlled inputs: M context, social fixture, D1 distractors, normal passage mode, treaty_name context needle, seed 42 with 5 runs, same model pairing.
+- Observable outcomes: Plan adherence (no extra slots from distractor), semantic observables (treaty_name needle present, distractor terms absent, min_words, distinct_choices).
+- Existing-case changes: none
+- New cases: R4-M-DISTRACTOR (T4, M, social, D1, normal mode, revision 1)
+- Why current corpus is insufficient: Distractor tests only exist at T7+ with L/XL context. No test isolates distractor resistance at moderate complexity without the confound of large context.
+- Resource estimate: 1 case x 2 architectures x 4 models x 5 runs = 40 additional model calls at M context.
+- Rejection conditions: If the test does not distinguish architectures (identical results) or if the distractor injection is trivially rejected by both architectures with zero variance.
+- First suite baseline: pending
+
+## HPROP-0004 — S-context multi-kind narrative architecture test
+
+- Status: proposed
+- Proposed in iteration: iteration-01
+- Action: add R6-S-MIXED-KIND
+- Coverage gap: No S-context case tests mixed narrative kinds (paragraph + dialogue + thought) at a high tier. Existing multi-kind cases are at T2 (M, L) and T9 (XL).
+- Competing structures: typed_fill (explicit narrative-block AST with kind discrimination) vs flat_fill (slot-keyed JSON strings). Mixed narrative kinds stress the architecture's ability to convey slot kind and speaker assignments. At S context this is the primary structural signal.
+- Hypothesis: At S context with mixed narrative kinds (paragraph, dialogue with speaker, thought), typed_fill and flat_fill will show different plan-adherence rates because the AST explicitly encodes kind and speaker per block while flat slot-keyed strings may lose this structure at minimal context.
+- Controlled inputs: S context, modern fixture, D0 distractors, normal passage mode with paragraph + dialogue + thought slots, seed 42 with 5 runs, same model pairing.
+- Observable outcomes: Plan adherence (slot IDs, slot kinds, speaker assignment), fill completeness (all slots filled + summary + beats), semantic observables (required term, forbidden literal labels, min_words, distinct_choices, no_markup_code).
+- Existing-case changes: none
+- New cases: R6-S-MIXED-KIND (T6, S, modern, D0, normal mode, revision 1)
+- Why current corpus is insufficient: Multi-kind narrative tests (dialogue + thought) only exist at T2 (M, L context) and T9 (XL context). No high-tier S-context test isolates architecture handling of mixed kinds at minimal context.
+- Resource estimate: 1 case x 2 architectures x 4 models x 5 runs = 40 additional model calls at S context.
+- Rejection conditions: If the test produces identical results across both architectures or if slot-kind or speaker plan-adherence is trivially perfect in both, it does not discriminate.
+- First suite baseline: pending
+
 ## Operator Notes
 
 Added by the operator, not by Hermes. These notes record run provenance and
