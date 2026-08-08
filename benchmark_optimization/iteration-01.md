@@ -121,6 +121,8 @@ architectures with no per-case variance).
 
 ## Result
 
+### Attempt 1 (2026-08-07)
+
 The protected benchmark could not be completed. The SSH connection to the
 benchmark PC failed with a network-level error (host not reachable). The
 managed process exited with a nonzero status.
@@ -130,6 +132,26 @@ benchmark was not retried. The PC administrator must inspect the private
 local log and verify network connectivity to the benchmark PC before
 re-running the harness-suite benchmark.
 
+### Attempt 2 (2026-08-08, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_2db070f4e9e1). The process exited with a nonzero status
+(SSH disconnect). The PC was not reachable at the network level.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+### Current status
+
 The corpus revision (3 case revisions, no new cases) is committed and pushed
 but the architecture benchmark has not produced a result. The revised suite
-baseline is pending a successful benchmark run.
+baseline is pending a successful benchmark run. The last verified suite
+is preserved. Operator review is required to restore network connectivity
+to the benchmark PC.
