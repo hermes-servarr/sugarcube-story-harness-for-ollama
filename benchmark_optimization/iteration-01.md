@@ -1,107 +1,246 @@
-# Iteration 01: Add SugarCube formatting and structure guidance to global_suffix
+# Iteration 01 — Harness-Suite Architecture Benchmark Baseline
 
-## Baseline Metrics (before)
+## Mode
 
-- Total cases: 108
-- Passed: 6
-- Pass rate: 0.0556 (5.56%)
-- Mean score: 0.8164
-- Failure category: instruction_following (102/102 failures)
+harness-suite (refactor-core profile, typed_fill + flat_fill architectures)
 
-### By Variant
-| Variant | Cases | Passed | Pass Rate | Mean Score |
-|---------|-------|--------|-----------|-----------|
-| compact | 36    | 3      | 0.0833    | 0.8009    |
-| full    | 36    | 0      | 0.0000    | 0.8102    |
-| json    | 36    | 3      | 0.0833    | 0.8380    |
+## Baseline (pre-revision)
 
-### By Direction
-| Direction | Cases | Passed | Pass Rate | Mean Score |
-|-----------|-------|--------|-----------|-----------|
-| A         | 36    | 1      | 0.0278    | 0.8102    |
-| B         | 36    | 2      | 0.0556    | 0.8102    |
-| C         | 36    | 3      | 0.0833    | 0.8287    |
+Published anonymized result summary (before this experiment):
 
-### By Model Alias (selected)
-- Model_E: 3/9 passed (0.3333), best performer
-- Model_G: 2/9 passed (0.2222)
-- Model_11: 1/9 passed (0.1111)
-- All others: 0/9 passed
+- harness_architectures: 0 cases (architecture benchmark had not yet run)
+- Overall capability: 128 cases, 51 passed (39.84%), mean score 0.7698
+- No per-architecture breakdown available
 
-## Failure Pattern
+This is the first architecture benchmark run. The 24-case `refactor-core` corpus
+existed but had not been executed against the architecture runner prior to the
+signed trust commit.
 
-All 102 failures are instruction_following. Every representative failure shows two co-occurring sub-categories:
+## Failure Pattern and Coverage Analysis
 
-1. **markup_compliance**: Models produce Markdown bold (`**text**`) and italic (`*text*`) instead of SugarCube markup. SugarCube bold=0, italic=0, strike=0, highlight=0 in every case. Markdown bold ranges 3-14, italic 2-17 per case.
+Examined all 24 existing refactor cases for coverage gaps, ambiguous checks,
+redundant cases, and missing harness structures.
 
-2. **passage_structure**: Models miss all three required sections: CHOICES, PROSE, SUMMARY. Six warnings per case, zero links_in_choices, zero macros_in_choices.
+### Ambiguity found
 
-These failures are universal across all variants (compact, full, json), all directions (A, B, C), and all model aliases. The overlay is currently completely empty.
+**R2-MULTI-DIALOGUE** (T2, L, D0): Has a `player_thought` narrative slot
+(kind: thought) but `forbidden_terms` only includes `"DIALOGUE:"`. The two
+other thought-slot cases — R2-DIALOGUE-THOUGHT (T2, M, D0) and R9-LONG-DIALOGUE
+(T9, XL, D0) — both forbid `"INNER MONOLOGUE:"` in addition to `"DIALOGUE:"`.
+R2-MULTI-DIALOGUE is the outlier: a model could emit the literal label
+`"INNER MONOLOGUE:"` and still pass this case, which would indicate it is
+echoing format instructions rather than producing natural inner monologue.
+This is a consistency gap across thought-slot cases.
 
-## Behavior
+### Coverage gaps found
 
-Models generate well-formed prose content (mean_score 0.8164 is close to passing) but format it with Markdown conventions instead of SugarCube markup, and do not organize output into the required passage sections. This suggests the base prompt does not adequately communicate SugarCube-specific formatting requirements, or models default to Markdown habits without explicit correction.
+1. **No S-context structured passage mode.** All five T3 cases (form, loop,
+   hub, room, random) use M context. No test measures whether architectures
+   differ at minimal (S) context for structured passage modes. At S context
+   the model has the least surrounding guidance, so schema structure and
+   architecture representation matter most.
+
+2. **No mid-tier D1 distractor test.** D1 distractor density only appears at
+   T7 (R7-DISTRACTOR L, R7-INJECTION-SOCIAL XL) and T9 (R9-XL-CONTEXT XL).
+   No distractor-resistance test exists in the mid-tiers (T3-T6). The
+   distractor leg from M to L to XL with D1 is missing, so we cannot
+   localize where context size begins compounding distractor vulnerability.
+
+3. **No S-context multi-kind narrative at high tier.** The only cases
+   mixing dialogue and thought slots (R2-DIALOGUE-THOUGHT M, R2-MULTI-DIALOGUE
+   L, R9-LONG-DIALOGUE XL) are all at T2 or T9. No high-tier S-context case
+   tests whether architectures handle mixed narrative kinds (paragraph +
+   dialogue + thought) at minimal context. typed_fill uses explicit
+   narrative-block AST while flat_fill uses slot-keyed strings; this
+   representation difference is most stressed at small context with mixed
+   kinds.
 
 ## Hypothesis
 
-Adding a global_suffix that explicitly specifies:
-1. The three required passage sections (===CHOICES===, ===PROSE===, ===SUMMARY===) and their order
-2. SugarCube markup conventions: `''double single quotes''` for bold, `//double slashes//` for italic
-3. That Markdown formatting must not be used
+Adding one S-context structured passage mode test, one mid-tier D1 distractor
+test, and one S-context multi-kind narrative test, plus fixing the
+R2-MULTI-DIALOGUE forbidden_terms inconsistency, will produce a more
+informative architecture-neutral suite without weakening authority
+boundaries. The new tests should discriminate between typed_fill and
+flat_fill where representation differences are most stressed: minimal
+context with structured modes, distractor pressure at moderate complexity,
+and mixed narrative kinds at small context.
 
-will reduce both markup_compliance and passage_structure failures across all variants and directions.
+## Exact Changes
 
-## Exact Overlay Change
+### Revised cases (3)
 
-Changed `global_suffix` from empty string to:
+- **R2-MULTI-DIALOGUE** (plan_id: plan_multi_dialogue, revision 1 to 2):
+  Add `"INNER MONOLOGUE:"` to `forbidden_terms`. No other fields changed.
+  Matches the forbidden_terms pattern of R2-DIALOGUE-THOUGHT and
+  R9-LONG-DIALOGUE, which both have thought slots and forbid both literal
+  labels.
 
-```
-Format your output using SugarCube markup, not Markdown.
+- **R3-HUB-COPY** (plan_id: plan_hub_copy, revision 1 to 2):
+  Change task from "three clearly distinct destination choice labels and
+  hints" to "three distinct destination choice labels and hints." The
+  `distinct_choices` semantic check verifies choice texts are distinct
+  (casefolded), not that they are "clearly" or "meaningfully" distinct.
+  The old task overclaimed what the check enforces.
 
-Use these required passage sections in this order:
-===CHOICES===
-===PROSE===
-===SUMMARY===
+- **R8-CHOICE-DISTINCTION** (plan_id: plan_choice_distinction, revision 1
+  to 2): Change task from "Their labels and hints must be meaningfully
+  distinct" to "with distinct labels." The `distinct_choices` semantic
+  check only verifies choice texts are distinct (casefolded); it does not
+  check hint distinctness or semantic meaning. The old task overclaimed
+  what the check enforces.
 
-For text emphasis, use SugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.
-```
+### New cases
 
-No variant-specific or direction-specific changes. All other overlay fields remain empty.
+None. The local validation test
+`test_refactor_corpus_has_fixed_core_and_canary_sizes` enforces
+`len(cases) == 24`. Adding new cases would fail this canonical test, which
+is outside the permitted edit set. The three proposed new cases
+(R3-S-ROOM, R4-M-DISTRACTOR, R6-S-MIXED-KIND) are recorded as HPROP
+proposals for future operator-approved corpus expansion. The existing
+24-case corpus was improved through revision of ambiguous cases instead.
+
+### Proposals recorded but not implemented
+
+Three HPROP proposals for new cases were recorded in
+`benchmark_optimization/test-proposals.md`:
+- HPROP-0002: S-context room-mode test (R3-S-ROOM)
+- HPROP-0003: Mid-tier D1 distractor test (R4-M-DISTRACTOR)
+- HPROP-0004: S-context multi-kind narrative test (R6-S-MIXED-KIND)
+
+These require an operator-approved signed code commit to expand the
+frozen 24-case corpus, as the canonical test guard is a protected file.
 
 ## Rollback Condition
 
-Revert global_suffix to empty string if aggregate pass rate declines below 0.0556, or if any per-variant or per-alias regression is observed without offsetting gains elsewhere.
+Revert all changes if any new case fails schema validation, if any
+validation command fails, if the published result shows architecture-pairing
+violation (unmatched model/case/plan/seed tuples), or if the new tests
+prove non-discriminating (identical pass rates and scores across both
+architectures with no per-case variance).
 
-## After Metrics
+## Result
 
-Benchmark did not run. The protected SSH command failed:
+### Attempt 1 (2026-08-07)
 
-    ssh: Could not resolve hostname sugarcube-benchmark: Temporary failure in name resolution
+The protected benchmark could not be completed. The SSH connection to the
+benchmark PC failed with a network-level error (host not reachable). The
+managed process exited with a nonzero status.
 
-The SSH config at ~/.ssh/config defines `Host windows-pc` (192.168.0.123) but
-no `sugarcube-benchmark` host entry. Per skill safety rules, the SSH hostname
-and remote command must not be altered.
+Per the goal's stop conditions, this is a terminal stop condition. The
+benchmark was not retried. The PC administrator must inspect the private
+local log and verify network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
 
-## Stop Condition
+### Attempt 2 (2026-08-08, scheduled cron job)
 
-**Protected command failed** (DNS resolution failure for `sugarcube-benchmark`).
-Per the goal constraints: "a protected command fails, times out, disconnects,
-reports already-running, or has ambiguous status" triggers an immediate stop.
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed).
 
-The overlay change was reverted to the empty baseline and pushed. No experiment
-completed; no benchmark data was produced.
+The SSH command was invoked exactly once as a managed background process
+(session proc_2db070f4e9e1). The process exited with a nonzero status
+(SSH disconnect). The PC was not reachable at the network level.
 
-## Conclusion
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
 
-Experiment 01 was aborted at step 10 (benchmark invocation). The overlay
-hypothesis (SugarCube formatting + passage structure guidance in global_suffix)
-was never validated. Operator must configure the `sugarcube-benchmark` SSH host
-entry (or correct the hostname) before the campaign can proceed.
+### Attempt 3 (2026-08-09, scheduled cron job)
 
-## Operator Action Required
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
 
-1. Add a `sugarcube-benchmark` Host entry to `~/.ssh/config` pointing to the
-   correct benchmark PC address and credentials.
-2. Ensure the benchmark PC is reachable and the forced-command publisher is
-   operational.
-3. Re-issue the `/goal` command to resume the campaign.
+The SSH command was invoked exactly once as a managed background process
+(session proc_d931cde73129). The process exited with a nonzero status
+(SSH error, exit code 255). The benchmark PC was not reachable at the
+network level — the same network-unreachable condition as attempts 1 and 2.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+### Attempt 4 (2026-08-10, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_d9a48d3d2f6d). The process exited with a nonzero status
+(SSH error, exit code 255). The benchmark PC was not reachable at the
+network level — the same network-unreachable condition as attempts 1, 2,
+and 3.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+### Attempt 5 (2026-08-11, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_a36004425b5b). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the
+same network-unreachable condition as attempts 1 through 4.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+### Current status
+
+The corpus revision (3 case revisions, no new cases) is committed and pushed
+but the architecture benchmark has not produced a result across six
+attempts over six consecutive days (2026-08-07 through 2026-08-12),
+all failing with the same network-unreachable error. The revised suite
+baseline is pending a successful benchmark run. The last verified suite
+is preserved. Operator review is required to restore network connectivity
+to the benchmark PC — this appears to be a persistent network outage rather
+than a transient failure.
+
+### Attempt 6 (2026-08-12, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_58f24445b184). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the
+same network-unreachable condition as attempts 1 through 5.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
+
+### Attempt 7 (2026-08-13, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_c1d81e6d57e5). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the
+same network-unreachable condition as attempts 1 through 6.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
