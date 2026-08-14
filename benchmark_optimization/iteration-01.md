@@ -244,3 +244,20 @@ same network-unreachable condition as attempts 1 through 6.
 This is a stop condition. The benchmark was not retried. The PC
 administrator must inspect network connectivity to the benchmark PC before
 re-running the harness-suite benchmark.
+
+### Attempt 8 (2026-08-14, scheduled cron job)
+
+The benchmark was re-triggered from a scheduled cron job. Pre-flight checks
+confirmed: no active managed processes, HEAD descends from signed trust
+commit 897fc29, SSH config has the sugarcube-benchmark host entry. The
+corpus (24 cases, 3 at revision 2) passed all validation (JSON valid,
+loader OK, 109 tests passed, working tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_d029e40c33ca). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the
+same network-unreachable condition as attempts 1 through 7.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark.
