@@ -6,7 +6,8 @@ from typing import Sequence
 
 
 REFACTOR_PROFILE_NAMES = ("refactor-canary", "refactor-core")
-PROFILE_NAMES = ("canary", "core", "full", *REFACTOR_PROFILE_NAMES)
+SANDBOX_PROFILE_NAMES = ("sandbox-canary", "sandbox-core")
+PROFILE_NAMES = ("canary", "core", "full", *REFACTOR_PROFILE_NAMES, *SANDBOX_PROFILE_NAMES)
 ALL_VARIANTS = ("compact", "full", "json", "thinking")
 ALL_DIRECTIONS = tuple("ABCDEFGH")
 
@@ -64,6 +65,6 @@ def resolve_matrix_cases(
         return CORE_MATRIX_CASES
     if profile == "full":
         return tuple(product(ALL_VARIANTS, ALL_DIRECTIONS))
-    if profile in REFACTOR_PROFILE_NAMES:
+    if profile in (*REFACTOR_PROFILE_NAMES, *SANDBOX_PROFILE_NAMES):
         return ()
     return tuple(product(variants, directions))

@@ -190,3 +190,20 @@ Include toggle near map "Topology | Visit history | Systems".
 Style: same restrained deep navy shell, slate panels, warm neutral location/opportunity cards, teal active/valid, amber danger/time, coral current selection. Practical simulation-authoring UI, not a quest-log clone.
 Constraints: emphasize player agency, reusable locations, systemic state, cycles, and emergent opportunities. No linear act lanes, no ending funnel, no decorative fantasy art, no gradients, no glassmorphism, no browser frame, no people, no watermark. Render specified labels verbatim.
 ```
+
+## Sandbox experience settings
+
+```text
+Use case: ui-mockup
+Asset type: high-fidelity desktop configuration screen for the Storyweaver interactive-fiction authoring application
+Input images: Image 1 is the visual-system and sandbox-workspace reference only; create a dedicated Sandbox experience configuration screen while preserving its shell, typography, palette, spacing, and implementable quality.
+Primary request: Design "Sandbox experience" settings that clearly let an author make the project much less story-driven and configure persistent character simulation.
+Composition: 16:10 desktop viewport. Settings selected in left navigation. Secondary settings navigation lists Experience selected, World simulation, Characters, Encounters, Saves.
+Main heading "Sandbox experience" with preset selector cards Story-driven, Hybrid, Sandbox; Sandbox selected. Under it a prominent section "Story guidance" with four radio cards Off selected, Light, Anchors, Directed. Off description verbatim: "No required main plot, beats, climax, or ending. Player actions and world state drive opportunities."
+Section "Player agency" with controls Goal model "Player-directed", Endings "Optional", Failure "Persists in the world", Encounter reuse "Enabled".
+Section "Character simulation" with depth cards Relationships, Persistent stats selected, Full agendas. Show toggles under selected depth: Location, Health & conditions, Inventory, Knowledge, Relationships, Needs all enabled; Schedules and Autonomous agendas shown optional/off. Note "Character state persists across travel, encounters, time, save/load, and revisits."
+Right inspector heading "Effective behavior". Green checks: Cycles and revisits expected; Arcs optional reference only; Ending coverage disabled; Persistent consequences enabled; Character stats deterministic. Below "Migration impact" showing 0 files rewritten, 3 validation rules changed, 2 authoring views enabled. Buttons "Preview migration" and prominent "Save experience".
+Bottom expandable "Advanced tuning" with Narrative pressure 0%, World reactivity 85%, Opportunity frequency High.
+Style: same deep navy/slate shell and warm neutral settings panel, teal selected/valid, amber migration note, coral primary action. Accessible forms, strong hierarchy.
+Constraints: no gradients, no glassmorphism, no browser frame, no people, no fantasy art, no tiny unreadable text, no watermark. Render all specified labels verbatim.
+```

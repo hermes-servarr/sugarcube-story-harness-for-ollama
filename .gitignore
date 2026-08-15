@@ -8,6 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+node_modules/
 
 # Keep example story outputs
 !examples/
@@ -18,3 +19,4 @@ wheels/
 
 # Benchmark run outputs (ephemeral, dry-run results)
 benchmark_outputs/
+.harness/cache/

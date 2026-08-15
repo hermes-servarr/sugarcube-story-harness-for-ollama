@@ -73,11 +73,13 @@ class TestLegacyCompat:
         captured = {}
 
         def fake_execute(
-            cfg, cases, *, architectures=None, progress_callback=None
+            cfg, cases, *, architectures=None, progress_callback=None,
+            browser_evaluator=None,
         ):
             captured["profile"] = cfg.benchmark_profile
             captured["case_ids"] = [case.id for case in cases]
             captured["architectures"] = tuple(architectures or ())
+            captured["browser_evaluator"] = browser_evaluator
             return []
 
         monkeypatch.setattr(
@@ -97,8 +99,44 @@ class TestLegacyCompat:
         assert rc == 0
         assert captured["profile"] == "refactor-canary"
         assert captured["architectures"] == ("typed_fill", "flat_fill")
+        assert captured["browser_evaluator"] is None
         assert len(captured["case_ids"]) == 10
         assert captured["case_ids"][0] == "R0-ORDINARY-FANTASY"
+
+    def test_browser_gate_requires_runtime_paths(self, tmp_path):
+        rc, _out, err = run_cli([
+            "run",
+            "--profile", "refactor-canary",
+            "--models", "fixture-model",
+            "--browser-gate",
+            "--output-dir", str(tmp_path),
+        ])
+
+        assert rc == 2
+        assert "requires --tweego-bin and --tweego-formats" in err
+
+    def test_sandbox_profile_combines_fill_and_runtime_cases(self, monkeypatch, tmp_path):
+        captured = {}
+
+        def fake_refactor(cfg, cases, **kwargs):
+            captured["fill"] = [case.id for case in cases]
+            return []
+
+        def fake_sandbox(cfg, cases):
+            captured["runtime"] = [case.id for case in cases]
+            return []
+
+        monkeypatch.setattr("model_benchmark.refactor_benchmark.execute_refactor_cases", fake_refactor)
+        monkeypatch.setattr("model_benchmark.sandbox_benchmark.execute_sandbox_cases", fake_sandbox)
+
+        rc, _out, _err = run_cli([
+            "run", "--profile", "sandbox-canary", "--models", "fixture-model",
+            "--quiet", "--no-anonymize", "--output-dir", str(tmp_path),
+        ])
+
+        assert rc == 0
+        assert len(captured["fill"]) == 10
+        assert captured["runtime"] == ["S0-CYCLIC-REVISIT", "S1-RESOURCE-BOUND"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════

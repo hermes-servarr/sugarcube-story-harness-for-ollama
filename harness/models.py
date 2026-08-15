@@ -1,6 +1,6 @@
 """Pydantic models for story.json and related data structures."""
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -413,6 +413,16 @@ class HarnessConfig(BaseModel):
     model_mode: str = "compact"   # auto | standard | compact
     # delimited = legacy PROSE:/CHOICES:/... text; json = strict JSON via Ollama format param
     output_format: str = "delimited"   # delimited | json
+    # Passage-generation architecture. Existing projects remain on the
+    # delimited legacy path unless an explicit migration changes this value.
+    generation_strategy: Literal[
+        "legacy_delimited", "legacy_json", "typed_fill", "flat_fill"
+    ] = "legacy_delimited"
+    typed_shadow_generation: bool = False
+    # Reversible frontend cutover. Existing projects continue to open the
+    # legacy page until an author explicitly selects the greenfield shell.
+    authoring_ui: Literal["legacy", "next"] = "legacy"
+    experience_mode: Literal["story_driven", "hybrid", "sandbox"] = "story_driven"
     # Signed request-framing profile. The default preserves the existing
     # /api/generate behavior; family-specific optimized/story profiles are
     # explicit operator choices.

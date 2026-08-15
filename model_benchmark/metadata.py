@@ -57,6 +57,8 @@ import re
 import subprocess
 import sys
 import uuid
+import json
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -83,9 +85,40 @@ __all__ = [
     "collect_env_vars_redacted",
     "collect_cli_args",
     "collect_reproducibility_metadata",
+    "collect_ollama_metadata",
     "write_manifest_atomic",
     "manifest_to_dict",
 ]
+
+
+def collect_ollama_metadata(
+    base_url: str, model_names: Sequence[str], *, timeout: float = 5.0
+) -> tuple[tuple[dict[str, str], ...], str]:
+    """Resolve exact local model artifacts and Ollama version, or mark unknown."""
+    fallback = tuple({"model": str(name), "digest": "unknown"} for name in model_names)
+    if not base_url:
+        return fallback, "unknown"
+    try:
+        with urllib.request.urlopen(f"{base_url.rstrip('/')}/api/tags", timeout=timeout) as response:
+            tags = json.loads(response.read().decode("utf-8"))
+        by_name = {item.get("name"): item for item in tags.get("models", [])}
+        configs = []
+        for name in model_names:
+            item = by_name.get(name, {})
+            details = item.get("details", {}) if isinstance(item.get("details"), dict) else {}
+            configs.append({
+                "model": str(name),
+                "digest": str(item.get("digest", "unknown")),
+                "quantization": str(details.get("quantization_level", "unknown")),
+                "family": str(details.get("family", "unknown")),
+                "parameter_size": str(details.get("parameter_size", "unknown")),
+                "context_length": str(details.get("context_length", "unknown")),
+            })
+        with urllib.request.urlopen(f"{base_url.rstrip('/')}/api/version", timeout=timeout) as response:
+            version = str(json.loads(response.read().decode("utf-8")).get("version", "unknown"))
+        return tuple(configs), version
+    except Exception:
+        return fallback, "unknown"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Constants
@@ -569,10 +602,8 @@ def collect_reproducibility_metadata(
         return getattr(config, attr, default)
 
     model_names: tuple[str, ...] = tuple(g("models", ()) or ())
-    model_configs: tuple[dict[str, str], ...] = tuple(
-        {"model": str(m)} for m in model_names
-    )
     base_url = str(g("base_url", ""))
+    model_configs, ollama_version = collect_ollama_metadata(base_url, model_names)
 
     generation_params: dict[str, str] = {
         "temperature": str(g("temperature", 0.0)),
@@ -598,6 +629,7 @@ def collect_reproducibility_metadata(
             str(value)
             for value in (g("refactor_architectures", ()) or ())
         ),
+        "ollama_version": ollama_version,
     }
 
     # ── Environment / system collectors ─────────────────────────────────

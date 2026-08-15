@@ -1,19 +1,24 @@
 """FastAPI application — single-page story harness UI."""
 from __future__ import annotations
 import json
+import hashlib
 import re
 import os
+import threading
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..compile import compile_story, find_tweego
 from ..media import (
+    MEDIA_EXTS,
     delete_slot,
     import_media_file,
     list_all_slots,
@@ -38,6 +43,8 @@ from ..planning import (
     set_arc_plan,
     set_open_questions,
     set_passage_beats,
+    StoryPlanConflict,
+    story_fingerprint,
     update_beat,
     update_scene,
 )
@@ -58,6 +65,40 @@ from ..generators import (
     generate_world,
     summarize_inspiration,
 )
+from ..generation import (
+    BrowserChoiceExpectation,
+    BrowserScenario,
+    CapabilityCard,
+    CompileArtifact,
+    ContextPack,
+    DraftConflict,
+    DraftLifecycle,
+    DraftNotFound,
+    DraftRecord,
+    DraftStore,
+    ExperienceProfile,
+    ExperienceProfileConflict,
+    ExperienceProfileStore,
+    GenerationProvenance,
+    NarrativeFill,
+    PassagePlan,
+    PassagePlanStore,
+    PlanConflict,
+    PlanNotFound,
+    assemble_passage_draft,
+    build_legacy_passage_plan,
+    compile_passage_draft,
+    commit_typed_draft,
+    evidence_hashes_match,
+    evaluate_compile_artifact,
+    generate_typed_draft,
+    load_capability_cards,
+    parent_fingerprint,
+    preset_for_mode,
+    preview_experience_migration,
+    source_hashes_match,
+)
+from ..generation.contracts import ContinuityProposal
 from ..ollama_client import call_ollama, clear_call_log, get_call_log
 from ..audit import list_generations, read_generation, record_generation
 from ..parsers import parse_json_object, parse_model_output
@@ -80,12 +121,14 @@ from ..rag import (
 )
 from ..passage import create_passage, delete_passage, rebuild_and_save, sync_manifest
 from ..project import (
+    _atomic_write_text,
     ProjectPaths,
     delete_character,
     delete_note,
     list_characters,
     list_lore,
     list_notes,
+    init_project,
     load_character,
     load_config,
     load_lore_entity,
@@ -106,6 +149,32 @@ from ..project import (
 )
 from ..validation import run_validation
 from ..snapshot_delta import reconstruct_passage_snapshot
+from ..simulation import (
+    AuthoredAnchor,
+    CharacterRuntimeState,
+    CharacterStatDefinition,
+    FactionState,
+    LocationNode,
+    EncounterCatalog,
+    EncounterTemplate,
+    Route,
+    RuntimeSessionStore,
+    SimulationError,
+    SimulationFixture,
+    SimulationFixtureCatalog,
+    SimulationRecord,
+    SimulationStoreError,
+    TopologyStore,
+    SystemCatalog,
+    SystemRule,
+    WorldTopology,
+    apply_local_action,
+    available_opportunities,
+    complete_authored_anchor,
+    create_runtime_session,
+    reachable_locations,
+    travel,
+)
 
 # Project root is resolved at startup — either from env var or cwd
 _PROJECT_ROOT = Path(os.environ.get("HARNESS_PROJECT", ".")).resolve()
@@ -122,6 +191,11 @@ if not _static_dir.exists():
     _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
+_next_ui_dir = _HERE / "ui"
+if not _next_ui_dir.exists():
+    _next_ui_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/next-static", StaticFiles(directory=str(_next_ui_dir)), name="next-static")
+
 
 # ── Error handling ─────────────────────────────────────────────────────────────
 # Shared response shape so the UI can render any non-2xx uniformly:
@@ -136,12 +210,17 @@ def _error_response(status: int, code: str, detail: str) -> JSONResponse:
 
 @app.exception_handler(HTTPException)
 async def _http_exc(_: Request, exc: HTTPException) -> JSONResponse:
-    detail = exc.detail if isinstance(exc.detail, str) else json.dumps(exc.detail)
     code_map = {400: "bad_request", 401: "unauthorized", 403: "forbidden",
                 404: "not_found", 409: "conflict", 422: "unprocessable",
                 429: "rate_limited", 500: "internal_error", 502: "upstream_error",
                 503: "unavailable", 504: "timeout"}
-    return _error_response(exc.status_code, code_map.get(exc.status_code, "http_error"), detail)
+    if isinstance(exc.detail, dict):
+        code = str(exc.detail.get("code") or code_map.get(exc.status_code, "http_error"))
+        detail = str(exc.detail.get("message") or json.dumps(exc.detail))
+    else:
+        code = code_map.get(exc.status_code, "http_error")
+        detail = str(exc.detail)
+    return _error_response(exc.status_code, code, detail)
 
 
 @app.exception_handler(RequestValidationError)
@@ -481,16 +560,694 @@ async def compile_endpoint():
 
 @app.get("/api/config")
 async def get_config():
-    return load_config(_p()).model_dump()
+    p = _p()
+    cfg = load_config(p)
+    profile, _ = _current_experience_profile(p)
+    return cfg.model_copy(update={"experience_mode": profile.mode.value}).model_dump()
 
 
 @app.post("/api/config")
 async def update_config(body: dict):
     p = _p()
     cfg = load_config(p)
+    profile, _ = _current_experience_profile(p)
+    if (
+        "experience_mode" in body
+        and body["experience_mode"] != profile.mode.value
+    ):
+        raise HTTPException(409, detail={
+            "code": "experience_profile_preview_required",
+            "message": "change experience mode through a previewed profile revision",
+        })
     updated = HarnessConfig.model_validate({**cfg.model_dump(), **body})
     save_config(p, updated)
     return updated.model_dump()
+
+
+class CapabilityCardStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card: CapabilityCard
+    fingerprint: str
+    evidence_valid: bool
+    source_valid: bool
+    expired: bool
+
+
+class CapabilityCardsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cards: list[CapabilityCardStatusResponse]
+
+
+@app.get("/api/capability-cards", response_model=CapabilityCardsResponse)
+async def get_capability_cards():
+    repository_root = Path(__file__).resolve().parents[2]
+    directory = repository_root / "benchmark_outputs" / "capability_cards"
+    now = datetime.now(timezone.utc)
+    return {
+        "cards": [
+            {
+                "card": card,
+                "fingerprint": card.fingerprint(),
+                "evidence_valid": evidence_hashes_match(card, repository_root),
+                "source_valid": source_hashes_match(card, repository_root),
+                "expired": now > card.valid_until,
+            }
+            for card in load_capability_cards(directory)
+        ]
+    }
+
+
+class ExperienceProfilePreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int
+    profile: ExperienceProfile
+
+
+class ExperienceProfileRevisionRequest(ExperienceProfilePreviewRequest):
+    preview_fingerprint: str
+
+
+def _experience_profile_store(p: ProjectPaths) -> ExperienceProfileStore:
+    return ExperienceProfileStore(p.experience_profiles_dir)
+
+
+def _current_experience_profile(p: ProjectPaths) -> tuple[ExperienceProfile, str]:
+    store = _experience_profile_store(p)
+    try:
+        return store.get(), "stored"
+    except FileNotFoundError:
+        return preset_for_mode(load_config(p).experience_mode), "compatibility_default"
+
+
+def _raise_experience_http(exc: ExperienceProfileConflict) -> None:
+    raise HTTPException(409, detail={"code": exc.code, "message": str(exc)})
+
+
+@app.get("/api/experience-profile")
+async def get_experience_profile():
+    profile, source = _current_experience_profile(_p())
+    return {
+        "profile": profile.model_dump(mode="json"),
+        "fingerprint": profile.fingerprint(),
+        "source": source,
+        "presets": {
+            mode: preset_for_mode(mode, revision=profile.revision + 1).model_dump(mode="json")
+            for mode in ("story_driven", "hybrid", "sandbox")
+        },
+    }
+
+
+@app.post("/api/experience-profile/preview")
+async def preview_experience_profile(req: ExperienceProfilePreviewRequest):
+    p = _p()
+    current, _ = _current_experience_profile(p)
+    if req.expected_revision != current.revision:
+        _raise_experience_http(ExperienceProfileConflict(
+            "experience_profile_revision_conflict",
+            f"expected revision {req.expected_revision}, found {current.revision}",
+        ))
+    try:
+        preview = preview_experience_migration(current, req.profile, load_story(p))
+    except ExperienceProfileConflict as exc:
+        _raise_experience_http(exc)
+    return preview.model_dump(mode="json")
+
+
+@app.post("/api/experience-profile/revisions")
+async def create_experience_profile_revision(req: ExperienceProfileRevisionRequest):
+    p = _p()
+    store = _experience_profile_store(p)
+    current, source = _current_experience_profile(p)
+    if req.expected_revision != current.revision:
+        _raise_experience_http(ExperienceProfileConflict(
+            "experience_profile_revision_conflict",
+            f"expected revision {req.expected_revision}, found {current.revision}",
+        ))
+    try:
+        preview = preview_experience_migration(current, req.profile, load_story(p))
+        if preview.preview_fingerprint != req.preview_fingerprint:
+            raise ExperienceProfileConflict(
+                "experience_profile_preview_stale",
+                "profile or story graph changed after the migration preview",
+            )
+        if source == "compatibility_default":
+            store.ensure_baseline(current)
+        saved = store.put(req.profile, expected_revision=current.revision)
+    except ExperienceProfileConflict as exc:
+        _raise_experience_http(exc)
+
+    # This field remains a compatibility projection for legacy clients; the
+    # immutable profile revision is authoritative if this secondary write fails.
+    cfg = load_config(p)
+    save_config(p, cfg.model_copy(update={"experience_mode": saved.mode.value}))
+    return {
+        "profile": saved.model_dump(mode="json"),
+        "fingerprint": saved.fingerprint(),
+        "source": "stored",
+        "preview": preview.model_dump(mode="json"),
+    }
+
+
+class TopologyLocationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=0)
+    location: LocationNode
+
+
+class TopologyRouteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    route: Route
+
+
+class TopologyDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+
+
+class SimulationCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fixture_id: str | None = None
+    start_location: str | None = None
+    seed: int | None = None
+    world_state: dict[str, Any] = Field(default_factory=dict)
+    resources: dict[str, float | int] = Field(default_factory=dict)
+    factions: tuple[FactionState, ...] = ()
+    character_stat_definitions: tuple[CharacterStatDefinition, ...] = ()
+    characters: tuple[CharacterRuntimeState, ...] = ()
+
+
+class SimulationActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    kind: str
+    action_id: str
+
+
+def _topology_store(p: ProjectPaths) -> TopologyStore:
+    return TopologyStore(p.topology_dir)
+
+
+def _simulation_store(p: ProjectPaths) -> RuntimeSessionStore:
+    return RuntimeSessionStore(p.simulations_dir)
+
+
+def _require_systemic_profile(p: ProjectPaths) -> ExperienceProfile:
+    profile, _ = _current_experience_profile(p)
+    if profile.mode.value == "story_driven":
+        raise HTTPException(409, detail={
+            "code": "systemic_profile_required",
+            "message": "topology and simulation require a Hybrid or Sandbox profile",
+        })
+    return profile
+
+
+def _raise_simulation_http(exc: SimulationStoreError | SimulationError) -> None:
+    status = 404 if exc.code in {
+        "topology_not_found", "topology_revision_not_found", "simulation_not_found", "revision_not_found",
+    } else 409
+    raise HTTPException(status, detail={"code": exc.code, "message": str(exc)})
+
+
+def _topology_payload(topology: WorldTopology) -> dict[str, Any]:
+    start = topology.locations[0].id
+    reached = reachable_locations(topology, start)
+    return {
+        "topology": topology.model_dump(mode="json"),
+        "fingerprint": topology.fingerprint(),
+        "diagnostics": [{
+            "code": "location_unreachable",
+            "level": "warning",
+            "message": f"{location.name} is unreachable from {start}.",
+            "location_id": location.id,
+        } for location in topology.locations if location.id not in reached],
+    }
+
+
+@app.get("/api/topology")
+async def get_topology():
+    try:
+        return _topology_payload(_topology_store(_p()).get())
+    except SimulationStoreError as exc:
+        if exc.code == "topology_not_found":
+            return {"topology": None, "fingerprint": "", "diagnostics": []}
+        _raise_simulation_http(exc)
+
+
+@app.get("/api/systems")
+async def get_systems():
+    p = _p()
+    catalog = _load_system_catalog(p)
+    return {"catalog": catalog.model_dump(mode="json"), "fingerprint": catalog.fingerprint()}
+
+
+@app.get("/api/encounters")
+async def get_encounters():
+    p = _p()
+    catalog = _load_encounter_catalog(p)
+    return {"catalog": catalog.model_dump(mode="json"), "fingerprint": catalog.fingerprint()}
+
+
+def _load_system_catalog(p: ProjectPaths) -> SystemCatalog:
+    return SystemCatalog.model_validate_json(p.systems_json.read_text(encoding="utf-8")) \
+        if p.systems_json.exists() else SystemCatalog()
+
+
+def _load_encounter_catalog(p: ProjectPaths) -> EncounterCatalog:
+    return EncounterCatalog.model_validate_json(p.encounters_json.read_text(encoding="utf-8")) \
+        if p.encounters_json.exists() else EncounterCatalog()
+
+
+def _load_simulation_fixture_catalog(p: ProjectPaths) -> SimulationFixtureCatalog:
+    return SimulationFixtureCatalog.model_validate_json(
+        p.simulation_fixtures_json.read_text(encoding="utf-8")
+    ) if p.simulation_fixtures_json.exists() else SimulationFixtureCatalog()
+
+
+_SYSTEM_CATALOG_WRITE_LOCK = threading.RLock()
+
+
+class SystemCatalogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_fingerprint: str
+    rules: tuple[SystemRule, ...]
+
+
+class EncounterCatalogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_fingerprint: str
+    templates: tuple[EncounterTemplate, ...]
+
+
+class SimulationFixtureCatalogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_fingerprint: str
+    fixtures: tuple[SimulationFixture, ...]
+
+
+def _save_catalog(path: Path, catalog: BaseModel) -> None:
+    _atomic_write_text(path, catalog.model_dump_json(indent=2))
+
+
+@app.put("/api/systems")
+async def update_systems(req: SystemCatalogRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    with _SYSTEM_CATALOG_WRITE_LOCK:
+        current = _load_system_catalog(p)
+        if req.expected_fingerprint != current.fingerprint():
+            raise HTTPException(409, detail={
+                "code": "system_catalog_conflict",
+                "message": "system catalog changed since it was loaded",
+            })
+        candidate = SystemCatalog(revision=current.revision + 1, rules=req.rules)
+        _save_catalog(p.systems_json, candidate)
+    return {"catalog": candidate.model_dump(mode="json"), "fingerprint": candidate.fingerprint()}
+
+
+@app.put("/api/encounters")
+async def update_encounters(req: EncounterCatalogRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    with _SYSTEM_CATALOG_WRITE_LOCK:
+        current = _load_encounter_catalog(p)
+        if req.expected_fingerprint != current.fingerprint():
+            raise HTTPException(409, detail={
+                "code": "encounter_catalog_conflict",
+                "message": "encounter catalog changed since it was loaded",
+            })
+        candidate = EncounterCatalog(revision=current.revision + 1, templates=req.templates)
+        _save_catalog(p.encounters_json, candidate)
+    return {"catalog": candidate.model_dump(mode="json"), "fingerprint": candidate.fingerprint()}
+
+
+@app.get("/api/simulation-fixtures")
+async def get_simulation_fixtures():
+    catalog = _load_simulation_fixture_catalog(_p())
+    return {"catalog": catalog.model_dump(mode="json"), "fingerprint": catalog.fingerprint()}
+
+
+@app.put("/api/simulation-fixtures")
+async def update_simulation_fixtures(req: SimulationFixtureCatalogRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    with _SYSTEM_CATALOG_WRITE_LOCK:
+        current = _load_simulation_fixture_catalog(p)
+        if req.expected_fingerprint != current.fingerprint():
+            raise HTTPException(409, detail={
+                "code": "simulation_fixture_catalog_conflict",
+                "message": "simulation fixture catalog changed since it was loaded",
+            })
+        try:
+            topology = _topology_store(p).get()
+        except SimulationStoreError as exc:
+            _raise_simulation_http(exc)
+        known_locations = {location.id for location in topology.locations}
+        unknown_locations = sorted({
+            location
+            for fixture in req.fixtures
+            for location in (
+                fixture.start_location,
+                *(character.current_location for character in fixture.characters),
+            )
+            if location not in known_locations
+        })
+        if unknown_locations:
+            raise HTTPException(422, detail={
+                "code": "simulation_fixture_location_unknown",
+                "message": f"fixture references unknown locations: {unknown_locations}",
+            })
+        candidate = SimulationFixtureCatalog(
+            revision=current.revision + 1,
+            fixtures=req.fixtures,
+        )
+        _save_catalog(p.simulation_fixtures_json, candidate)
+    return {"catalog": candidate.model_dump(mode="json"), "fingerprint": candidate.fingerprint()}
+
+
+@app.post("/api/topology/locations")
+async def add_topology_location(req: TopologyLocationRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        if req.expected_revision == 0:
+            topology = WorldTopology(revision=1, locations=(req.location,))
+        else:
+            current = store.get()
+            topology = current.model_copy(update={
+                "revision": current.revision + 1,
+                "locations": (*current.locations, req.location),
+            })
+            topology = WorldTopology.model_validate(topology.model_dump())
+        saved = store.put(topology, expected_revision=req.expected_revision)
+    except SimulationStoreError as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+@app.post("/api/topology/routes")
+async def add_topology_route(req: TopologyRouteRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        current = store.get()
+        topology = WorldTopology.model_validate(current.model_copy(update={
+            "revision": current.revision + 1,
+            "routes": (*current.routes, req.route),
+        }).model_dump())
+        saved = store.put(topology, expected_revision=req.expected_revision)
+    except SimulationStoreError as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+@app.put("/api/topology/locations/{location_id}")
+async def update_topology_location(location_id: str, req: TopologyLocationRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        current = store.get()
+        if req.location.id != location_id:
+            raise SimulationError("topology_identity_conflict", "location path and payload id differ")
+        if location_id not in {item.id for item in current.locations}:
+            raise SimulationError("location_unknown", "location is not in the topology")
+        candidate = WorldTopology.model_validate(current.model_copy(update={
+            "revision": current.revision + 1,
+            "locations": tuple(req.location if item.id == location_id else item for item in current.locations),
+        }).model_dump())
+        saved = store.put(candidate, expected_revision=req.expected_revision)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+@app.delete("/api/topology/locations/{location_id}")
+async def delete_topology_location(location_id: str, req: TopologyDeleteRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        current = store.get()
+        if location_id not in {item.id for item in current.locations}:
+            raise SimulationError("location_unknown", "location is not in the topology")
+        if any(route.source == location_id or route.destination == location_id for route in current.routes):
+            raise SimulationError("location_in_use", "remove routes that reference this location first")
+        remaining = tuple(item for item in current.locations if item.id != location_id)
+        if not remaining:
+            raise SimulationError("topology_empty", "topology must retain at least one location")
+        candidate = WorldTopology.model_validate(current.model_copy(update={
+            "revision": current.revision + 1,
+            "locations": remaining,
+        }).model_dump())
+        saved = store.put(candidate, expected_revision=req.expected_revision)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+@app.put("/api/topology/routes/{route_id}")
+async def update_topology_route(route_id: str, req: TopologyRouteRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        current = store.get()
+        if req.route.id != route_id:
+            raise SimulationError("topology_identity_conflict", "route path and payload id differ")
+        if route_id not in {item.id for item in current.routes}:
+            raise SimulationError("route_unknown", "route is not in the topology")
+        candidate = WorldTopology.model_validate(current.model_copy(update={
+            "revision": current.revision + 1,
+            "routes": tuple(req.route if item.id == route_id else item for item in current.routes),
+        }).model_dump())
+        saved = store.put(candidate, expected_revision=req.expected_revision)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+@app.delete("/api/topology/routes/{route_id}")
+async def delete_topology_route(route_id: str, req: TopologyDeleteRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _topology_store(p)
+    try:
+        current = store.get()
+        if route_id not in {item.id for item in current.routes}:
+            raise SimulationError("route_unknown", "route is not in the topology")
+        candidate = WorldTopology.model_validate(current.model_copy(update={
+            "revision": current.revision + 1,
+            "routes": tuple(item for item in current.routes if item.id != route_id),
+        }).model_dump())
+        saved = store.put(candidate, expected_revision=req.expected_revision)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+    return _topology_payload(saved)
+
+
+def _simulation_payload(p: ProjectPaths, record: SimulationRecord) -> dict[str, Any]:
+    topology = _topology_store(p).by_fingerprint(record.session.topology_fingerprint)
+    anchors = _hybrid_authored_anchors(p, topology, record.session)
+    return {
+        "session": record.session.model_dump(mode="json"),
+        "trace": record.trace.model_dump(mode="json") if record.trace else None,
+        "fingerprint": record.fingerprint(),
+        "opportunities": [
+            item.model_dump(mode="json")
+            for item in available_opportunities(topology, record.session, anchors)
+        ],
+    }
+
+
+def _hybrid_authored_anchors(
+    p: ProjectPaths,
+    topology: WorldTopology,
+    session,
+) -> tuple[AuthoredAnchor, ...]:
+    """Project explicitly tagged planned scenes into ordered Hybrid runtime anchors."""
+    profile, _ = _current_experience_profile(p)
+    if (
+        profile.mode.value != "hybrid"
+        or profile.fingerprint() != session.experience_profile_fingerprint
+    ):
+        return ()
+    location_ids = {item.id for item in topology.locations}
+    anchors: list[AuthoredAnchor] = []
+    for arc in plan_overview(p)["arcs"]:
+        previous_id = ""
+        for scene in arc["scenes"]:
+            keywords = {str(item).strip().lower() for item in scene.get("keywords", [])}
+            if "anchor" not in keywords:
+                continue
+            location = next(
+                (
+                    keyword.split(":", 1)[1]
+                    for keyword in keywords
+                    if keyword.startswith("location:") and ":" in keyword
+                ),
+                "",
+            )
+            if location not in location_ids:
+                continue
+            raw_id = re.sub(
+                r"[^a-z0-9_]+", "_", f"anchor_{arc['arc']}_{scene['id']}".lower()
+            ).strip("_")
+            if len(raw_id) > 64:
+                suffix = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10]
+                raw_id = f"{raw_id[:53]}_{suffix}"
+            label = str(scene.get("title") or scene.get("summary") or scene["id"])
+            anchor = AuthoredAnchor(
+                id=raw_id,
+                label=label,
+                location_id=location,
+                prerequisite_ids=(previous_id,) if previous_id else (),
+            )
+            anchors.append(anchor)
+            previous_id = anchor.id
+    return tuple(anchors)
+
+
+@app.post("/api/simulations")
+async def create_simulation(req: SimulationCreateRequest):
+    p = _p()
+    profile = _require_systemic_profile(p)
+    try:
+        topology = _topology_store(p).get()
+        start_location = req.start_location
+        seed = req.seed
+        world_state = req.world_state
+        resources = req.resources
+        factions = req.factions
+        definitions = req.character_stat_definitions
+        characters = req.characters
+        if req.fixture_id is not None:
+            override_fields = req.model_fields_set & {
+                "start_location", "seed", "world_state", "resources", "factions",
+                "character_stat_definitions", "characters",
+            }
+            if override_fields:
+                raise HTTPException(422, detail={
+                    "code": "simulation_fixture_override_forbidden",
+                    "message": "a named fixture cannot be combined with ad-hoc initial state",
+                })
+            fixture = next(
+                (item for item in _load_simulation_fixture_catalog(p).fixtures if item.id == req.fixture_id),
+                None,
+            )
+            if fixture is None:
+                raise HTTPException(404, detail={
+                    "code": "simulation_fixture_not_found",
+                    "message": "simulation fixture was not found",
+                })
+            start_location = fixture.start_location
+            seed = fixture.seed
+            world_state = fixture.world_state
+            resources = fixture.resources
+            factions = fixture.factions
+            definitions = fixture.character_stat_definitions
+            characters = fixture.characters
+        if start_location is None or seed is None:
+            raise HTTPException(422, detail={
+                "code": "simulation_initial_state_required",
+                "message": "provide fixture_id or both start_location and seed",
+            })
+        session = create_runtime_session(
+            topology,
+            session_id=f"simulation_{uuid.uuid4().hex}",
+            experience_profile_fingerprint=profile.fingerprint(),
+            start_location=start_location,
+            time_model=profile.time_model.value,
+            seed=seed,
+            world_state=world_state,
+            resources=resources,
+            factions=factions,
+            character_stat_definitions=definitions,
+            characters=characters,
+        )
+        record = _simulation_store(p).put(SimulationRecord(session=session), expected_revision=0)
+        return _simulation_payload(p, record)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+
+
+@app.get("/api/simulations/{simulation_id}")
+async def get_simulation(simulation_id: str):
+    p = _p()
+    try:
+        return _simulation_payload(p, _simulation_store(p).get(simulation_id))
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
+
+
+@app.post("/api/simulations/{simulation_id}/actions")
+async def apply_simulation_action(simulation_id: str, req: SimulationActionRequest):
+    p = _p()
+    _require_systemic_profile(p)
+    store = _simulation_store(p)
+    try:
+        current = store.get(simulation_id)
+        topology = _topology_store(p).by_fingerprint(current.session.topology_fingerprint)
+        rules = _load_system_catalog(p).rules
+        if req.kind == "local_action":
+            session, trace = apply_local_action(
+                topology,
+                current.session,
+                req.action_id,
+                expected_revision=req.expected_revision,
+                system_rules=rules,
+            )
+        elif req.kind == "travel":
+            session, trace = travel(
+                topology,
+                current.session,
+                req.action_id,
+                expected_revision=req.expected_revision,
+                system_rules=rules,
+            )
+        elif req.kind == "authored_anchor":
+            anchor = next(
+                (
+                    item for item in _hybrid_authored_anchors(p, topology, current.session)
+                    if item.id == req.action_id
+                ),
+                None,
+            )
+            if anchor is None:
+                raise SimulationError(
+                    "authored_anchor_unknown", "authored anchor is unavailable for this Hybrid session"
+                )
+            session, trace = complete_authored_anchor(
+                topology,
+                current.session,
+                anchor,
+                expected_revision=req.expected_revision,
+            )
+        else:
+            raise SimulationError(
+                "simulation_action_kind_invalid",
+                "kind must be local_action, travel, or authored_anchor",
+            )
+        record = store.put(
+            SimulationRecord(session=session, trace=trace),
+            expected_revision=req.expected_revision,
+        )
+        return _simulation_payload(p, record)
+    except (SimulationStoreError, SimulationError) as exc:
+        _raise_simulation_http(exc)
 
 
 # ── Chat / generate ────────────────────────────────────────────────────────────
@@ -582,12 +1339,965 @@ async def generate(req: GenerateRequest):
         "warnings": parsed.parse_warnings,
     }, kind="draft")
 
+    # Shadow generation is intentionally isolated from the returned draft and
+    # commit path. It records a comparable typed attempt for evaluation only.
+    if getattr(cfg, "typed_shadow_generation", False):
+        shadow_strategy = (
+            cfg.generation_strategy
+            if cfg.generation_strategy in {"typed_fill", "flat_fill"}
+            else "typed_fill"
+        )
+        context_pack = ContextPack(
+            parent_passage_id=req.parent_passage_id or "",
+            parent_summary=(
+                graph.passages[req.parent_passage_id].summary
+                if req.parent_passage_id and req.parent_passage_id in graph.passages
+                else ""
+            ),
+            inspiration=inspiration,
+            story_recall=story_recall,
+        )
+        plan_id = re.sub(r"[^a-z0-9_]+", "_", req.passage_slug.lower()).strip("_")
+        if not plan_id or not plan_id[0].isalpha():
+            plan_id = f"passage_{plan_id or 'shadow'}"
+        try:
+            shadow_plan = build_legacy_passage_plan(
+                parsed,
+                plan_id=plan_id[:64],
+                context_fingerprint=context_pack.fingerprint(),
+                experience_profile=_effective_experience_profile(p, req.arc_name),
+            )
+            shadow = await generate_typed_draft(
+                cfg,
+                shadow_plan,
+                context_pack,
+                author_task=human_prompt,
+                passage_id=req.passage_slug,
+                arc_name=req.arc_name,
+                strategy=shadow_strategy,
+            )
+            record_generation(p, {
+                "label": "passage-shadow",
+                "status": "accepted",
+                "strategy": shadow_strategy,
+                "model": cfg.ollama_model,
+                "arc_name": req.arc_name,
+                "passage_slug": req.passage_slug,
+                "parent_passage_id": req.parent_passage_id or "",
+                "plan": shadow_plan.model_dump(mode="json"),
+                "draft": shadow.draft.model_dump(mode="json"),
+                "compile_artifact": shadow.compile_artifact.model_dump(mode="json"),
+                "provenance": shadow.provenance.model_dump(mode="json"),
+                "raw_output": shadow.provenance.raw_model_output,
+            }, kind="shadow")
+        except Exception as exc:
+            record_generation(p, {
+                "label": "passage-shadow",
+                "status": "rejected",
+                "strategy": shadow_strategy,
+                "model": cfg.ollama_model,
+                "arc_name": req.arc_name,
+                "passage_slug": req.passage_slug,
+                "parent_passage_id": req.parent_passage_id or "",
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }, kind="shadow")
+
     return GenerateResponse(
         raw_output=raw,
         parsed=parsed.model_dump(),
         warnings=parsed.parse_warnings,
         generation_id=gen_id,
     )
+
+
+# ── Typed draft API (opt-in; legacy generate/commit remain unchanged) ─────────
+
+class TypedGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: PassagePlan | None = None
+    plan_id: str = ""
+    plan_revision: int | None = Field(default=None, ge=1)
+    expected_plan_fingerprint: str = ""
+    context: ContextPack
+    author_task: str
+    passage_id: str
+    arc_name: str
+    parent_passage_id: str = ""
+    parent_choice_index: Optional[int] = None
+    branch_name: str = "main"
+    strategy: str = "typed_fill"
+    seed: Optional[int] = None
+
+
+class TypedDraftEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_draft_fingerprint: str
+    fill: NarrativeFill
+
+
+class TypedDraftCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_plan_revision: int
+    expected_draft_fingerprint: str
+    expected_parent_fingerprint: str = ""
+
+
+class TypedDraftRejectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_draft_fingerprint: str
+
+
+class TypedDraftCompileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_draft_fingerprint: str
+
+
+class TypedDraftValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_draft_fingerprint: str
+
+
+class TypedDraftCompileResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draft_id: str
+    draft_revision: int
+    draft_fingerprint: str
+    artifact: CompileArtifact
+    persisted_artifact_match: bool
+
+
+class TypedDraftPlaytestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_draft_fingerprint: str
+    initial_state: dict[str, Any] = Field(default_factory=dict)
+    choice_slot_ids: tuple[str, ...] | None = None
+
+
+class TypedDraftPlaytestResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    passed: bool
+    tweego_compile: bool
+    browser_load: bool
+    choice_reachability: bool | None = None
+    choice_effect_execution: bool | None = None
+    runtime_state_transaction: bool | None = None
+    continuity_after_navigation: bool | None = None
+    form_binding: bool | None = None
+    hostile_text_safe: bool | None = None
+    runtime_errors: list[str] = Field(default_factory=list)
+    details: list[str] = Field(default_factory=list)
+
+
+class TypedDraftPlaytestJobResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    status: Literal["queued", "running", "completed", "failed"]
+    draft_id: str
+    draft_revision: int
+    draft_fingerprint: str
+    created_at: datetime
+    updated_at: datetime
+    result: TypedDraftPlaytestResult | None = None
+    error_code: str = ""
+    error_message: str = ""
+
+
+class TypedCommitResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["committed"]
+    draft_id: str
+    draft_revision: int
+    passage_id: str
+    pending_facts: list[ContinuityProposal]
+
+
+def _draft_store(p: ProjectPaths) -> DraftStore:
+    return DraftStore(p.harness_dir / "drafts")
+
+
+def _passage_plan_store(p: ProjectPaths) -> PassagePlanStore:
+    return PassagePlanStore(p.passage_plans_dir)
+
+
+def _raise_plan_store_http(exc: Exception) -> None:
+    if isinstance(exc, PlanNotFound):
+        raise HTTPException(404, detail={"code": exc.code, "message": str(exc)})
+    if isinstance(exc, PlanConflict):
+        raise HTTPException(409, detail={"code": exc.code, "message": str(exc)})
+    raise exc
+
+
+class PassagePlanCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: PassagePlan
+    arc_name: str = ""
+
+
+class PassagePlanRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: PassagePlan
+    expected_plan_fingerprint: str
+    arc_name: str = ""
+
+
+class PassagePlanApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_plan_fingerprint: str
+
+
+class PassagePlanRecordResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: PassagePlan
+    fingerprint: str
+    approved: bool
+
+
+@app.post("/api/plans", response_model=PassagePlanRecordResponse)
+async def create_passage_plan(req: PassagePlanCreateRequest):
+    try:
+        plan = req.plan
+        if req.arc_name:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", req.arc_name):
+                raise HTTPException(422, "arc_name contains unsafe characters")
+            plan = plan.model_copy(update={
+                "experience_profile_fingerprint": _effective_experience_profile(_p(), req.arc_name).fingerprint(),
+            })
+        plan = _passage_plan_store(_p()).put(plan)
+        return _passage_plan_store(_p()).payload(plan.plan_id, plan.revision)
+    except (PlanNotFound, PlanConflict) as exc:
+        _raise_plan_store_http(exc)
+
+
+@app.get(
+    "/api/plans/{plan_id}/revisions/{revision}",
+    response_model=PassagePlanRecordResponse,
+)
+async def get_passage_plan(plan_id: str, revision: int):
+    try:
+        return _passage_plan_store(_p()).payload(plan_id, revision)
+    except (PlanNotFound, PlanConflict) as exc:
+        _raise_plan_store_http(exc)
+
+
+@app.post(
+    "/api/plans/{plan_id}/revisions",
+    response_model=PassagePlanRecordResponse,
+)
+async def revise_passage_plan(plan_id: str, req: PassagePlanRevisionRequest):
+    if req.plan.plan_id != plan_id:
+        raise HTTPException(409, detail={
+            "code": "plan_identity_conflict", "message": "plan path and payload id differ",
+        })
+    try:
+        plan = req.plan
+        if req.arc_name:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", req.arc_name):
+                raise HTTPException(422, "arc_name contains unsafe characters")
+            plan = plan.model_copy(update={
+                "experience_profile_fingerprint": _effective_experience_profile(_p(), req.arc_name).fingerprint(),
+            })
+        plan = _passage_plan_store(_p()).put(
+            plan, expected_plan_fingerprint=req.expected_plan_fingerprint,
+        )
+        return _passage_plan_store(_p()).payload(plan.plan_id, plan.revision)
+    except (PlanNotFound, PlanConflict) as exc:
+        _raise_plan_store_http(exc)
+
+
+@app.post(
+    "/api/plans/{plan_id}/revisions/{revision}/approve",
+    response_model=PassagePlanRecordResponse,
+)
+async def approve_passage_plan(plan_id: str, revision: int, req: PassagePlanApprovalRequest):
+    try:
+        plan = _passage_plan_store(_p()).approve(
+            plan_id, revision, expected_plan_fingerprint=req.expected_plan_fingerprint,
+        )
+        return _passage_plan_store(_p()).payload(plan.plan_id, plan.revision)
+    except (PlanNotFound, PlanConflict) as exc:
+        _raise_plan_store_http(exc)
+
+
+def _raise_draft_store_http(exc: Exception) -> None:
+    if isinstance(exc, DraftNotFound):
+        raise HTTPException(404, detail={"code": exc.code, "message": str(exc)})
+    if isinstance(exc, DraftConflict):
+        raise HTTPException(409, detail={"code": exc.code, "message": str(exc)})
+    raise exc
+
+
+def _effective_experience_profile(p: ProjectPaths, arc_name: str) -> ExperienceProfile:
+    profile, _ = _current_experience_profile(p)
+    if re.fullmatch(r"[a-z][a-z0-9_]{0,63}", arc_name):
+        return profile.effective_for("arc", arc_name)
+    return profile.model_copy(update={"overrides": ()})
+
+
+@app.post("/api/typed/generate", response_model=DraftRecord)
+async def generate_typed(req: TypedGenerateRequest):
+    """Create and persist one validated typed draft revision."""
+    p = _p()
+    cfg = load_config(p)
+    if req.strategy not in {"typed_fill", "flat_fill"}:
+        raise HTTPException(422, "strategy must be typed_fill or flat_fill")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", req.passage_id):
+        raise HTTPException(422, "passage_id contains unsafe characters")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", req.arc_name):
+        raise HTTPException(422, "arc_name contains unsafe characters")
+    plan = req.plan
+    has_reference = bool(req.plan_id or req.plan_revision or req.expected_plan_fingerprint)
+    if plan is not None and has_reference:
+        raise HTTPException(422, detail={
+            "code": "plan_input_ambiguous",
+            "message": "provide either an inline plan or an approved persisted plan reference",
+        })
+    if plan is None:
+        if not (req.plan_id and req.plan_revision and req.expected_plan_fingerprint):
+            raise HTTPException(422, detail={
+                "code": "plan_reference_required",
+                "message": "persisted plans require id, revision, and expected fingerprint",
+            })
+        try:
+            store = _passage_plan_store(p)
+            plan = store.get(req.plan_id, req.plan_revision)
+            if plan.fingerprint() != req.expected_plan_fingerprint:
+                raise PlanConflict("plan_fingerprint_conflict", "plan changed since it was reviewed")
+            if not store.is_approved(req.plan_id, req.plan_revision):
+                raise PlanConflict("plan_not_approved", "plan must be explicitly approved before generation")
+        except (PlanNotFound, PlanConflict) as exc:
+            _raise_plan_store_http(exc)
+    assert plan is not None
+    effective_profile = _effective_experience_profile(p, req.arc_name)
+    effective_fingerprint = effective_profile.fingerprint()
+    if (
+        plan.experience_profile_fingerprint
+        and plan.experience_profile_fingerprint != effective_fingerprint
+    ):
+        raise HTTPException(409, detail={
+            "code": "experience_profile_fingerprint_conflict",
+            "message": "the plan was created for a different experience profile",
+        })
+    effective_plan = plan.model_copy(update={
+        "experience_profile_fingerprint": effective_fingerprint,
+    })
+    draft_id = f"draft_{uuid.uuid4().hex}"
+    generation_id = f"generation_{uuid.uuid4().hex}"
+    try:
+        captured_parent_fingerprint = parent_fingerprint(p, req.parent_passage_id)
+        outcome = await generate_typed_draft(
+            cfg,
+            effective_plan,
+            req.context,
+            author_task=req.author_task,
+            passage_id=req.passage_id,
+            arc_name=req.arc_name,
+            draft_id=draft_id,
+            strategy=req.strategy,
+            seed=req.seed,
+        )
+        record = DraftRecord(
+            generation_id=generation_id,
+            draft=outcome.draft,
+            lifecycle_state=DraftLifecycle.VALIDATED,
+            provenance=outcome.provenance,
+            diagnostics=outcome.compile_artifact.diagnostics,
+            compile_artifact=outcome.compile_artifact,
+            parent_passage_id=req.parent_passage_id,
+            parent_choice_index=req.parent_choice_index,
+            branch_name=req.branch_name,
+            parent_revision=1 if req.parent_passage_id else None,
+            parent_fingerprint=captured_parent_fingerprint,
+            passage_id=req.passage_id,
+            arc_name=req.arc_name,
+        )
+        _draft_store(p).put(record)
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    except Exception as exc:
+        raise HTTPException(422, detail={
+            "code": "typed_generation_rejected",
+            "message": str(exc),
+        }) from exc
+    return record.model_dump(mode="json")
+
+
+@app.get("/api/drafts/{draft_id}/{revision}", response_model=DraftRecord)
+async def get_typed_draft(draft_id: str, revision: int):
+    try:
+        record = _draft_store(_p()).get(draft_id, revision)
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    return record.model_dump(mode="json")
+
+
+@app.get("/api/drafts/{draft_id}", response_model=DraftRecord)
+async def get_latest_typed_draft(draft_id: str):
+    store = _draft_store(_p())
+    try:
+        record = store.get(draft_id, store.latest_revision(draft_id))
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    return record.model_dump(mode="json")
+
+
+@app.post("/api/drafts/{draft_id}/{revision}/edit", response_model=DraftRecord)
+async def edit_typed_draft(draft_id: str, revision: int, req: TypedDraftEditRequest):
+    """Validate a human edit as a new immutable revision of the same plan."""
+    store = _draft_store(_p())
+    try:
+        current = store.get(draft_id, revision)
+        if store.latest_revision(draft_id) != revision:
+            raise DraftConflict("draft_superseded", "a newer draft revision already exists")
+        if current.lifecycle_state in {DraftLifecycle.COMMITTED, DraftLifecycle.REJECTED}:
+            raise DraftConflict("draft_closed", "committed or rejected drafts cannot be edited")
+        if current.draft.fingerprint() != req.expected_draft_fingerprint:
+            raise DraftConflict("draft_fingerprint_conflict", "draft changed since it was loaded")
+
+        next_revision = revision + 1
+        fill = req.fill.model_copy(update={"revision": next_revision})
+        draft = assemble_passage_draft(
+            current.draft.plan,
+            fill,
+            draft_id=draft_id,
+            revision=next_revision,
+        )
+        artifact = compile_passage_draft(
+            draft,
+            passage_id=current.passage_id,
+            arc_name=current.arc_name,
+        )
+        edited = DraftRecord(
+            generation_id=f"edit_{uuid.uuid4().hex}",
+            draft=draft,
+            lifecycle_state=DraftLifecycle.EDITED,
+            provenance=GenerationProvenance(
+                model_name=current.provenance.model_name,
+                effective_configuration={"human_edit": True},
+            ),
+            diagnostics=artifact.diagnostics,
+            compile_artifact=artifact,
+            parent_passage_id=current.parent_passage_id,
+            parent_choice_index=current.parent_choice_index,
+            branch_name=current.branch_name,
+            parent_revision=current.parent_revision,
+            parent_fingerprint=current.parent_fingerprint,
+            passage_id=current.passage_id,
+            arc_name=current.arc_name,
+        )
+        store.put(edited)
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    except Exception as exc:
+        raise HTTPException(422, detail={
+            "code": "draft_edit_rejected",
+            "message": str(exc),
+        }) from exc
+    return edited.model_dump(mode="json")
+
+
+@app.post("/api/drafts/{draft_id}/{revision}/validate", response_model=DraftRecord)
+async def validate_typed_draft(
+    draft_id: str,
+    revision: int,
+    req: TypedDraftValidateRequest,
+):
+    """Promote a compiled human edit to the explicit validated state."""
+    store = _draft_store(_p())
+    try:
+        record = store.get(draft_id, revision)
+        if store.latest_revision(draft_id) != revision:
+            raise DraftConflict("draft_superseded", "a newer draft revision already exists")
+        if record.draft.fingerprint() != req.expected_draft_fingerprint:
+            raise DraftConflict("draft_fingerprint_conflict", "draft changed since it was loaded")
+        if record.compile_artifact is None:
+            raise DraftConflict("compile_artifact_missing", "draft has no compile artifact")
+        if record.lifecycle_state == DraftLifecycle.VALIDATED:
+            return record.model_dump(mode="json")
+        validated = store.transition(
+            draft_id,
+            revision,
+            expected=DraftLifecycle.EDITED,
+            target=DraftLifecycle.VALIDATED,
+        )
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    return validated.model_dump(mode="json")
+
+
+def _exact_draft_record(
+    draft_id: str,
+    revision: int,
+    expected_draft_fingerprint: str,
+) -> DraftRecord:
+    try:
+        record = _draft_store(_p()).get(draft_id, revision)
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    if record.draft.fingerprint() != expected_draft_fingerprint:
+        _raise_draft_store_http(DraftConflict(
+            "draft_fingerprint_conflict", "draft changed since it was loaded"
+        ))
+    return record
+
+
+@app.post(
+    "/api/drafts/{draft_id}/{revision}/compile",
+    response_model=TypedDraftCompileResponse,
+)
+async def compile_typed_draft(
+    draft_id: str,
+    revision: int,
+    req: TypedDraftCompileRequest,
+):
+    """Compile one exact immutable draft without mutating its persisted revision."""
+    record = _exact_draft_record(draft_id, revision, req.expected_draft_fingerprint)
+    artifact = compile_passage_draft(
+        record.draft,
+        passage_id=record.passage_id,
+        arc_name=record.arc_name,
+    )
+    return TypedDraftCompileResponse(
+        draft_id=draft_id,
+        draft_revision=revision,
+        draft_fingerprint=record.draft.fingerprint(),
+        artifact=artifact,
+        persisted_artifact_match=(
+            record.compile_artifact is not None
+            and record.compile_artifact.fingerprint() == artifact.fingerprint()
+        ),
+    )
+
+
+def _playtest_job_path(p: ProjectPaths, job_id: str) -> Path:
+    if not re.fullmatch(r"playtest_[0-9a-f]{32}", job_id):
+        raise HTTPException(404, detail={
+            "code": "playtest_job_not_found", "message": "playtest job was not found",
+        })
+    return p.harness_dir / "playtests" / f"{job_id}.json"
+
+
+def _write_playtest_job(p: ProjectPaths, job: TypedDraftPlaytestJobResponse) -> None:
+    _atomic_write_text(_playtest_job_path(p, job.job_id), job.model_dump_json(indent=2))
+
+
+_PLAYTEST_JOB_STALE_AFTER = timedelta(minutes=5)
+
+
+def _read_playtest_job(p: ProjectPaths, job_id: str) -> TypedDraftPlaytestJobResponse:
+    path = _playtest_job_path(p, job_id)
+    if not path.exists():
+        raise HTTPException(404, detail={
+            "code": "playtest_job_not_found", "message": "playtest job was not found",
+        })
+    try:
+        job = TypedDraftPlaytestJobResponse.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValidationError) as exc:
+        raise HTTPException(500, detail={
+            "code": "playtest_job_corrupt", "message": "playtest job record is corrupt",
+        }) from exc
+    updated_at = job.updated_at
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    if (
+        job.status in {"queued", "running"}
+        and datetime.now(timezone.utc) - updated_at > _PLAYTEST_JOB_STALE_AFTER
+    ):
+        job = job.model_copy(update={
+            "status": "failed",
+            "updated_at": datetime.now(timezone.utc),
+            "error_code": "playtest_job_stale",
+            "error_message": "playtest worker stopped updating this persisted job",
+        })
+        _write_playtest_job(p, job)
+    return job
+
+
+def _draft_browser_scenario(
+    record: DraftRecord,
+    initial_state: dict[str, Any],
+    choice_slot_ids: tuple[str, ...] | None = None,
+) -> BrowserScenario:
+    unknown_state = set(initial_state) - set(record.draft.plan.allowed_state_refs)
+    invalid_state = {
+        key for key in initial_state if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", key)
+    }
+    if unknown_state or invalid_state:
+        raise ValueError("playtest state fixture contains an unauthorized state reference")
+    plan_choice_ids = {slot.id for slot in record.draft.plan.choice_slots}
+    if choice_slot_ids is not None:
+        if not choice_slot_ids:
+            raise ValueError("playtest choice selection must contain at least one slot")
+        if len(set(choice_slot_ids)) != len(choice_slot_ids):
+            raise ValueError("playtest choice selection contains duplicate slots")
+        if set(choice_slot_ids) - plan_choice_ids:
+            raise ValueError("playtest choice selection contains an unknown slot")
+    selected_choice_ids = set(choice_slot_ids) if choice_slot_ids is not None else None
+    filled = {item.slot_id: item for item in record.draft.fill.choices}
+    choices = []
+    for slot in record.draft.plan.choice_slots:
+        if selected_choice_ids is not None and slot.id not in selected_choice_ids:
+            continue
+        if not all(_playtest_condition_matches(item, initial_state) for item in slot.conditions):
+            continue
+        destination = slot.destination
+        if not destination and record.draft.plan.passage_mode.value in {"dialogue_loop", "loop"}:
+            destination = record.passage_id
+        if destination and slot.id in filled:
+            choices.append(BrowserChoiceExpectation(
+                label=filled[slot.id].text,
+                target=destination,
+            ))
+    return BrowserScenario(
+        passage_id=record.passage_id,
+        initial_state=tuple(sorted(initial_state.items())),
+        choices=tuple(choices),
+        verify_state=False,
+    )
+
+
+def _playtest_condition_matches(condition: Any, state: dict[str, Any]) -> bool:
+    """Evaluate a trusted condition only to select links reachable in a fixture."""
+    actual = state.get(condition.target)
+    operation = condition.operation
+    if operation == "truthy":
+        return _javascript_truthy(actual)
+    if operation == "falsy":
+        return not _javascript_truthy(actual)
+    if operation in {"eq", "ne"}:
+        equal = _javascript_strict_equal(actual, condition.value)
+        return equal if operation == "eq" else not equal
+    try:
+        return {
+            "gt": actual > condition.value,
+            "gte": actual >= condition.value,
+            "lt": actual < condition.value,
+            "lte": actual <= condition.value,
+        }[operation]
+    except (TypeError, ValueError):
+        return False
+
+
+def _javascript_truthy(value: Any) -> bool:
+    if value is None or value is False or value == 0 or value == "":
+        return False
+    return True
+
+
+def _javascript_strict_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return left == right
+    return type(left) is type(right) and left == right
+
+
+def _execute_draft_playtest(
+    project_root: Path,
+    record: DraftRecord,
+    scenario: BrowserScenario,
+) -> TypedDraftPlaytestResult:
+    cfg = load_config(ProjectPaths(project_root))
+    tweego = find_tweego(cfg.tweego_path)
+    formats_value = os.environ.get("TWEEGO_FORMATS") or os.environ.get("TWEEGO_PATH") or ""
+    formats = Path(formats_value)
+    if not tweego or not formats.is_dir():
+        raise PlaytestRuntimeUnavailable(
+            "playtest runtime unavailable: configure tweego and TWEEGO_FORMATS"
+        )
+    browser_value = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "").strip()
+    evaluation = evaluate_compile_artifact(
+        record.compile_artifact or compile_passage_draft(
+            record.draft, passage_id=record.passage_id, arc_name=record.arc_name
+        ),
+        scenario,
+        tweego_path=Path(tweego),
+        story_format_path=formats,
+        browser_path=Path(browser_value) if browser_value else None,
+    )
+    required = [
+        value for value in (
+            evaluation.tweego_compile,
+            evaluation.browser_load,
+            evaluation.choice_reachability,
+            evaluation.choice_effect_execution,
+            evaluation.runtime_state_transaction,
+            evaluation.continuity_after_navigation,
+            evaluation.form_binding,
+            evaluation.hostile_text_safe,
+        ) if value is not None
+    ]
+    return TypedDraftPlaytestResult(
+        passed=all(required),
+        tweego_compile=evaluation.tweego_compile,
+        browser_load=evaluation.browser_load,
+        choice_reachability=evaluation.choice_reachability,
+        choice_effect_execution=evaluation.choice_effect_execution,
+        runtime_state_transaction=evaluation.runtime_state_transaction,
+        continuity_after_navigation=evaluation.continuity_after_navigation,
+        form_binding=evaluation.form_binding,
+        hostile_text_safe=evaluation.hostile_text_safe,
+        runtime_errors=list(evaluation.runtime_errors),
+        details=list(evaluation.details),
+    )
+
+
+class PlaytestRuntimeUnavailable(RuntimeError):
+    """Raised when an isolated playtest cannot start its required toolchain."""
+
+
+def _run_draft_playtest_job(
+    project_root: Path,
+    queued: TypedDraftPlaytestJobResponse,
+    record: DraftRecord,
+    scenario: BrowserScenario,
+) -> None:
+    p = ProjectPaths(project_root)
+    running = queued.model_copy(update={"status": "running", "updated_at": datetime.now(timezone.utc)})
+    _write_playtest_job(p, running)
+    try:
+        result = _execute_draft_playtest(project_root, record, scenario)
+        finished = running.model_copy(update={
+            "status": "completed",
+            "updated_at": datetime.now(timezone.utc),
+            "result": result,
+        })
+    except PlaytestRuntimeUnavailable as exc:
+        finished = running.model_copy(update={
+            "status": "failed",
+            "updated_at": datetime.now(timezone.utc),
+            "error_code": "playtest_runtime_unavailable",
+            "error_message": str(exc),
+        })
+    except Exception as exc:
+        finished = running.model_copy(update={
+            "status": "failed",
+            "updated_at": datetime.now(timezone.utc),
+            "error_code": "playtest_execution_failed",
+            "error_message": str(exc),
+        })
+    _write_playtest_job(p, finished)
+
+
+@app.post(
+    "/api/drafts/{draft_id}/{revision}/playtest",
+    response_model=TypedDraftPlaytestJobResponse,
+    status_code=202,
+)
+async def playtest_typed_draft(
+    draft_id: str,
+    revision: int,
+    req: TypedDraftPlaytestRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Queue isolated browser evaluation for one exact immutable draft revision."""
+    record = _exact_draft_record(draft_id, revision, req.expected_draft_fingerprint)
+    if record.compile_artifact is None:
+        raise HTTPException(409, detail={
+            "code": "compile_artifact_missing", "message": "draft has no compile artifact",
+        })
+    fresh_artifact = compile_passage_draft(
+        record.draft,
+        passage_id=record.passage_id,
+        arc_name=record.arc_name,
+    )
+    if record.compile_artifact.fingerprint() != fresh_artifact.fingerprint():
+        raise HTTPException(409, detail={
+            "code": "compile_artifact_conflict",
+            "message": "persisted compile artifact does not reproduce from the exact draft",
+        })
+    record = record.model_copy(update={"compile_artifact": fresh_artifact})
+    try:
+        scenario = _draft_browser_scenario(record, req.initial_state, req.choice_slot_ids)
+    except ValueError as exc:
+        raise HTTPException(422, detail={
+            "code": "playtest_fixture_invalid", "message": str(exc),
+        }) from exc
+    now = datetime.now(timezone.utc)
+    queued = TypedDraftPlaytestJobResponse(
+        job_id=f"playtest_{uuid.uuid4().hex}",
+        status="queued",
+        draft_id=draft_id,
+        draft_revision=revision,
+        draft_fingerprint=record.draft.fingerprint(),
+        created_at=now,
+        updated_at=now,
+    )
+    _write_playtest_job(_p(), queued)
+    background_tasks.add_task(
+        _run_draft_playtest_job, _p().root, queued, record, scenario
+    )
+    return queued
+
+
+@app.get(
+    "/api/playtests/{job_id}",
+    response_model=TypedDraftPlaytestJobResponse,
+)
+async def get_typed_draft_playtest(job_id: str):
+    return _read_playtest_job(_p(), job_id)
+
+
+@app.post(
+    "/api/drafts/{draft_id}/{revision}/commit",
+    response_model=TypedCommitResponse,
+)
+async def commit_typed(draft_id: str, revision: int, req: TypedDraftCommitRequest):
+    """Commit the exact persisted compile artifact; no raw output is accepted."""
+    p = _p()
+    store = _draft_store(p)
+    try:
+        committed = commit_typed_draft(
+            p,
+            store,
+            draft_id=draft_id,
+            revision=revision,
+            expected_plan_revision=req.expected_plan_revision,
+            expected_draft_fingerprint=req.expected_draft_fingerprint,
+            expected_parent_fingerprint=req.expected_parent_fingerprint,
+        )
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    record_generation(p, {
+        "label": "typed-commit",
+        "draft_id": draft_id,
+        "draft_revision": revision,
+        "passage_id": committed.passage_id,
+        "arc_name": committed.arc_name,
+        "parent_passage_id": committed.parent_passage_id,
+        "draft_fingerprint": committed.draft.fingerprint(),
+        "compile_artifact_fingerprint": committed.compile_artifact.fingerprint(),
+    }, kind="commit")
+    return {
+        "status": "committed",
+        "draft_id": draft_id,
+        "draft_revision": revision,
+        "passage_id": committed.passage_id,
+        "pending_facts": [
+            proposal.model_dump(mode="json")
+            for proposal in committed.draft.fill.continuity_proposals
+        ],
+    }
+
+
+class TypedFactDecisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["accept", "reject"]
+
+
+class TypedFactDecisionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["accepted", "rejected"]
+    key: str
+
+
+_TYPED_FACT_WRITE_LOCK = threading.RLock()
+
+
+@app.post(
+    "/api/drafts/{draft_id}/{revision}/facts/{fact_key}/decision",
+    response_model=TypedFactDecisionResponse,
+)
+async def decide_typed_fact(
+    draft_id: str,
+    revision: int,
+    fact_key: str,
+    req: TypedFactDecisionRequest,
+):
+    """Accept or reject an exact proposal from one committed draft revision."""
+    p = _p()
+    try:
+        record = _draft_store(p).get(draft_id, revision)
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    if record.lifecycle_state != DraftLifecycle.COMMITTED:
+        raise HTTPException(409, detail={
+            "code": "fact_decision_before_commit",
+            "message": "continuity facts can only be decided after exact draft commit",
+        })
+    proposal = next(
+        (item for item in record.draft.fill.continuity_proposals if item.key == fact_key),
+        None,
+    )
+    if proposal is None:
+        raise HTTPException(404, detail={
+            "code": "fact_proposal_not_found",
+            "message": "the committed draft has no continuity proposal with this key",
+        })
+
+    decision_path = p.harness_dir / "fact_decisions" / draft_id / str(revision) / f"{fact_key}.json"
+    decision = {
+        "draft_id": draft_id,
+        "draft_revision": revision,
+        "proposal_fingerprint": proposal.fingerprint(),
+        "action": req.action,
+    }
+    with _TYPED_FACT_WRITE_LOCK:
+        if decision_path.exists():
+            existing = json.loads(decision_path.read_text(encoding="utf-8"))
+            if existing != decision:
+                raise HTTPException(409, detail={
+                    "code": "fact_decision_conflict",
+                    "message": "this immutable proposal already has a different decision",
+                })
+            return {"status": f"{req.action}ed", "key": fact_key}
+        if req.action == "accept":
+            sheet = (
+                f"---\nid: {proposal.key}\ncategory: continuity\n"
+                f"source_draft: {draft_id}@{revision}\n---\n"
+                f"# {proposal.key}\n\n{proposal.value}\n"
+            )
+            target = p.lore_file("continuity", proposal.key)
+            if target.exists() and target.read_text(encoding="utf-8") != sheet:
+                raise HTTPException(409, detail={
+                    "code": "continuity_fact_exists",
+                    "message": "an authored continuity fact with this key already exists",
+                })
+            if not target.exists():
+                write_lore_entity(p, "continuity", proposal.key, sheet)
+        _atomic_write_text(
+            decision_path,
+            json.dumps(decision, sort_keys=True, separators=(",", ":")),
+        )
+    return {"status": f"{req.action}ed", "key": fact_key}
+
+
+@app.post("/api/drafts/{draft_id}/{revision}/reject", response_model=DraftRecord)
+async def reject_typed_draft(draft_id: str, revision: int, req: TypedDraftRejectRequest):
+    store = _draft_store(_p())
+    try:
+        record = store.get(draft_id, revision)
+        if store.latest_revision(draft_id) != revision:
+            raise DraftConflict("draft_superseded", "a newer draft revision already exists")
+        if record.draft.fingerprint() != req.expected_draft_fingerprint:
+            raise DraftConflict("draft_fingerprint_conflict", "draft changed since it was loaded")
+        if record.lifecycle_state in {DraftLifecycle.COMMITTED, DraftLifecycle.REJECTED}:
+            raise DraftConflict("draft_closed", "committed or rejected drafts cannot be rejected")
+        rejected = store.transition(
+            draft_id, revision,
+            expected=record.lifecycle_state,
+            target=DraftLifecycle.REJECTED,
+        )
+    except (DraftConflict, DraftNotFound) as exc:
+        _raise_draft_store_http(exc)
+    return rejected.model_dump(mode="json")
 
 
 # ── Entity extraction ─────────────────────────────────────────────────────────
@@ -1087,15 +2797,36 @@ async def approve_fact(body: FactApproval):
 @app.get("/api/media/slots")
 async def get_slots():
     slots = list_all_slots(_p())
-    return {k: v.model_dump() for k, v in slots.items()}
+    return {k: {**v.model_dump(), "fingerprint": _media_slot_fingerprint(v)} for k, v in slots.items()}
 
 
 class ResolveSlotRequest(BaseModel):
     resolved_path: str
+    expected_slot_fingerprint: str = ""
+
+
+class SlotMutationGuard(BaseModel):
+    expected_slot_fingerprint: str = ""
+
+
+def _media_slot_fingerprint(slot: MediaSlot) -> str:
+    payload = json.dumps(slot.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _require_current_slot(slot_id: str, expected_fingerprint: str) -> None:
+    slot = list_all_slots(_p()).get(slot_id)
+    if slot is None:
+        raise HTTPException(404, f"Slot {slot_id!r} not found.")
+    if expected_fingerprint and _media_slot_fingerprint(slot) != expected_fingerprint:
+        raise HTTPException(409, detail={
+            "code": "media_slot_conflict", "message": "media slot changed since it was loaded"
+        })
 
 
 @app.post("/api/media/slots/{slot_id}/resolve")
 async def resolve(slot_id: str, body: ResolveSlotRequest):
+    _require_current_slot(slot_id, body.expected_slot_fingerprint)
     ok, msg = resolve_slot(_p(), slot_id, body.resolved_path)
     if not ok:
         raise HTTPException(400, msg)
@@ -1103,7 +2834,8 @@ async def resolve(slot_id: str, body: ResolveSlotRequest):
 
 
 @app.post("/api/media/slots/{slot_id}/unresolve")
-async def unresolve(slot_id: str):
+async def unresolve(slot_id: str, body: SlotMutationGuard = Body(default_factory=SlotMutationGuard)):
+    _require_current_slot(slot_id, body.expected_slot_fingerprint)
     ok, msg = unresolve_slot(_p(), slot_id)
     if not ok:
         raise HTTPException(400, msg)
@@ -1118,6 +2850,7 @@ async def search_media_slots(q: str = "", status: str = ""):
 
 
 class SlotMetaRequest(BaseModel):
+    expected_slot_fingerprint: str = ""
     description: Optional[str] = None
     alt: Optional[str] = None
     caption: Optional[str] = None
@@ -1134,7 +2867,9 @@ class SlotMetaRequest(BaseModel):
 @app.post("/api/media/slots/{slot_id}/meta")
 async def update_slot_meta(slot_id: str, body: SlotMetaRequest):
     """Set description / alt / caption / type / embed options on a slot."""
-    ok, msg = set_slot_meta(_p(), slot_id, **body.model_dump(exclude_none=True))
+    _require_current_slot(slot_id, body.expected_slot_fingerprint)
+    values = body.model_dump(exclude_none=True, exclude={"expected_slot_fingerprint"})
+    ok, msg = set_slot_meta(_p(), slot_id, **values)
     if not ok:
         raise HTTPException(400, msg)
     return {"status": "ok", "message": msg}
@@ -1151,6 +2886,28 @@ async def delete_media_slot(slot_id: str):
 async def media_files():
     """List usable files in the project media/ folder for one-click resolving."""
     return {"files": list_media_files(_p())}
+
+
+@app.get("/api/media/slots/{slot_id}/preview")
+async def preview_media_slot(slot_id: str):
+    """Serve only the file already approved on a resolved media slot."""
+    slot = list_all_slots(_p()).get(slot_id)
+    if slot is None:
+        raise HTTPException(404, f"Slot {slot_id!r} not found.")
+    if slot.status != "resolved" or not slot.resolved_path:
+        raise HTTPException(409, detail={
+            "code": "media_slot_unresolved", "message": "media slot is unresolved"
+        })
+    path = Path(slot.resolved_path)
+    if not path.is_absolute():
+        path = _p().root / path
+    path = path.resolve()
+    valid_extensions = {extension for values in MEDIA_EXTS.values() for extension in values}
+    if not path.is_file() or path.suffix.lower() not in valid_extensions:
+        raise HTTPException(404, detail={
+            "code": "media_file_missing", "message": "resolved media file is unavailable"
+        })
+    return FileResponse(path)
 
 
 class ImportMediaRequest(BaseModel):
@@ -1235,7 +2992,9 @@ async def init_story(body: StoryInitRequest):
     from the init wizard form. Safe to call on an existing project — only
     overwrites files explicitly provided.
     """
-    p = _p()
+    # The browser wizard is also the entry point for a completely bare target
+    # directory, not only for a CLI-initialized project.
+    p = init_project(_PROJECT_ROOT, title=body.title or "Untitled Story")
     cfg = load_config(p)
 
     # update story title in config
@@ -1449,12 +3208,17 @@ async def project_status():
     p = _p()
     graph = load_story(p) if p.story_json.exists() else None
     premise = p.premise_md.read_text(encoding="utf-8") if p.premise_md.exists() else ""
-    is_empty = (not graph or not graph.passages) and "(Write your premise here.)" in premise
+    placeholders = (
+        "(Write your premise here.)",
+        "(What is this story about?)",
+        "Write your story premise",
+    )
+    has_premise = bool(premise.strip()) and not any(marker in premise for marker in placeholders)
+    is_empty = (not graph or not graph.passages) and not has_premise
     return {
         "is_empty": is_empty,
         "passage_count": len(graph.passages) if graph else 0,
-        "has_premise": bool(premise and "Write your story premise" not in premise
-                            and "(Write your premise here.)" not in premise),
+        "has_premise": has_premise,
     }
 
 
@@ -1467,6 +3231,8 @@ async def get_characters():
 
 @app.get("/api/characters/{char_id}")
 async def get_character(char_id: str):
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", char_id):
+        raise HTTPException(422, "invalid character id")
     p = _p()
     content = load_character(p, char_id)
     if content is None:
@@ -1485,6 +3251,7 @@ async def get_character(char_id: str):
         "appearances": appearances,
         "keywords": meta.get("keywords", []),
         "tags": meta.get("tags", []),
+        "content_fingerprint": hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
 
 
@@ -1524,12 +3291,29 @@ async def generate_character_keywords(
 
 class SaveCharacterRequest(BaseModel):
     content: str
+    expected_content_fingerprint: str = ""
 
 
 @app.post("/api/characters/{char_id}")
 async def save_character(char_id: str, body: SaveCharacterRequest):
-    write_character(_p(), char_id, body.content)
-    return {"status": "saved", "id": char_id}
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", char_id):
+        raise HTTPException(422, "invalid character id")
+    p = _p()
+    current = load_character(p, char_id)
+    if current is None:
+        raise HTTPException(404, f"Character {char_id!r} not found.")
+    current_fingerprint = hashlib.sha256(current.encode("utf-8")).hexdigest()
+    if body.expected_content_fingerprint and body.expected_content_fingerprint != current_fingerprint:
+        raise HTTPException(409, detail={
+            "code": "character_content_conflict",
+            "message": "character sheet changed since it was loaded",
+        })
+    write_character(p, char_id, body.content)
+    return {
+        "status": "saved",
+        "id": char_id,
+        "content_fingerprint": hashlib.sha256(body.content.encode("utf-8")).hexdigest(),
+    }
 
 
 class NewCharacterRequest(BaseModel):
@@ -1545,6 +3329,10 @@ async def create_character(body: NewCharacterRequest):
     cid = _clean_id(body.id)
     if not cid:
         raise HTTPException(400, "Character id is required.")
+    if load_character(p, cid) is not None:
+        raise HTTPException(409, detail={
+            "code": "character_exists", "message": f"Character {cid!r} already exists."
+        })
     name = body.name or cid
     sheet = (
         f"---\nid: {cid}\nname: {name}\ntags: {body.tags}\n---\n"
@@ -1571,6 +3359,8 @@ async def get_lore():
 
 @app.get("/api/lore/{category}/{lore_id}")
 async def get_lore_entry(category: str, lore_id: str):
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", category) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", lore_id):
+        raise HTTPException(422, "invalid lore identity")
     p = _p()
     content = load_lore_entity(p, category, lore_id)
     if content is None:
@@ -1581,6 +3371,7 @@ async def get_lore_entry(category: str, lore_id: str):
         "id": lore_id,
         "content": content,
         "keywords": meta.get("keywords", []),
+        "content_fingerprint": hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
 
 
@@ -1612,12 +3403,28 @@ async def generate_lore_keywords(
 
 class SaveLoreRequest(BaseModel):
     content: str
+    expected_content_fingerprint: str = ""
 
 
 @app.post("/api/lore/{category}/{lore_id}")
 async def save_lore_entry(category: str, lore_id: str, body: SaveLoreRequest):
-    write_lore_entity(_p(), category, lore_id, body.content)
-    return {"status": "saved"}
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", category) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", lore_id):
+        raise HTTPException(422, "invalid lore identity")
+    p = _p()
+    current = load_lore_entity(p, category, lore_id)
+    if current is None:
+        raise HTTPException(404, f"Lore {category}/{lore_id} not found.")
+    current_fingerprint = hashlib.sha256(current.encode("utf-8")).hexdigest()
+    if body.expected_content_fingerprint and body.expected_content_fingerprint != current_fingerprint:
+        raise HTTPException(409, detail={
+            "code": "lore_content_conflict",
+            "message": "lore sheet changed since it was loaded",
+        })
+    write_lore_entity(p, category, lore_id, body.content)
+    return {
+        "status": "saved",
+        "content_fingerprint": hashlib.sha256(body.content.encode("utf-8")).hexdigest(),
+    }
 
 
 class NewLoreRequest(BaseModel):
@@ -1630,8 +3437,14 @@ class NewLoreRequest(BaseModel):
 @app.post("/api/lore")
 async def create_lore(body: NewLoreRequest):
     p = _p()
-    lid = body.id.strip().lower().replace(" ", "_")
-    cat = body.category.strip().lower().replace(" ", "_")
+    lid = _clean_id(body.id)
+    cat = _clean_id(body.category)
+    if not lid or not cat:
+        raise HTTPException(422, "Lore category and id are required.")
+    if load_lore_entity(p, cat, lid) is not None:
+        raise HTTPException(409, detail={
+            "code": "lore_exists", "message": f"Lore {cat}/{lid} already exists."
+        })
     title = body.title or lid
     sheet = (
         f"---\nid: {lid}\ntitle: {title}\ncategory: {cat}\n---\n"
@@ -1775,39 +3588,82 @@ async def get_arcs():
 @app.get("/api/plan")
 async def get_plan():
     """Full planning overview: acts, beats+coverage, arcs+status, and gaps."""
-    return plan_overview(_p())
+    p = _p()
+    return {**plan_overview(p), "story_fingerprint": _story_fingerprint(load_story(p))}
+
+
+def _story_fingerprint(graph) -> str:
+    return story_fingerprint(graph)
+
+
+def _require_story_fingerprint(p: ProjectPaths, expected: str) -> None:
+    if expected and _story_fingerprint(load_story(p)) != expected:
+        raise HTTPException(409, detail={
+            "code": "story_plan_conflict", "message": "story plan changed since it was loaded"
+        })
 
 
 class BeatRequest(BaseModel):
     text: str
     act: str = ""
+    expected_story_fingerprint: str = ""
 
 
 @app.post("/api/plan/beats")
 async def create_beat(body: BeatRequest):
     if not body.text.strip():
-        raise HTTPException(400, "Beat text is required.")
-    beat = add_beat(_p(), body.text, body.act)
-    return {"status": "created", "beat": beat.model_dump()}
+        raise HTTPException(400, detail={"code": "invalid_beat_text", "message": "Beat text is required."})
+    p = _p()
+    try:
+        beat = add_beat(
+            p, body.text, body.act,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    return {"status": "created", "beat": beat.model_dump(), "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 class BeatUpdateRequest(BaseModel):
     text: Optional[str] = None
     act: Optional[str] = None
+    expected_story_fingerprint: str = ""
 
 
 @app.put("/api/plan/beats/{beat_id}")
 async def edit_beat(beat_id: str, body: BeatUpdateRequest):
-    if not update_beat(_p(), beat_id, text=body.text, act=body.act):
+    p = _p()
+    try:
+        updated = update_beat(
+            p, beat_id, text=body.text, act=body.act,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    if not updated:
         raise HTTPException(404, f"Beat {beat_id!r} not found.")
-    return {"status": "updated", "beat_id": beat_id}
+    return {"status": "updated", "beat_id": beat_id, "story_fingerprint": _story_fingerprint(load_story(p))}
+
+
+class PlanDeleteRequest(BaseModel):
+    expected_story_fingerprint: str = ""
 
 
 @app.delete("/api/plan/beats/{beat_id}")
-async def remove_beat(beat_id: str):
-    if not delete_beat(_p(), beat_id):
+async def remove_beat(beat_id: str, body: PlanDeleteRequest):
+    p = _p()
+    try:
+        deleted = delete_beat(
+            p, beat_id, expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    if not deleted:
         raise HTTPException(404, f"Beat {beat_id!r} not found.")
-    return {"status": "deleted", "beat_id": beat_id}
+    return {"status": "deleted", "beat_id": beat_id, "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 class ActsRequest(BaseModel):
@@ -1835,16 +3691,23 @@ class ArcPlanRequest(BaseModel):
     beat_ids: Optional[list[str]] = None
     status: Optional[str] = None
     summary: Optional[str] = None
+    expected_story_fingerprint: str = ""
 
 
 @app.put("/api/plan/arcs/{arc_name}")
 async def edit_arc_plan(arc_name: str, body: ArcPlanRequest):
-    ap = set_arc_plan(
-        _p(), arc_name,
-        goal=body.goal, beat_ids=body.beat_ids,
-        status=body.status, summary=body.summary,
-    )
-    return {"status": "ok", "arc": arc_name, "plan": ap.model_dump()}
+    p = _p()
+    try:
+        ap = set_arc_plan(
+            p, arc_name,
+            goal=body.goal, beat_ids=body.beat_ids,
+            status=body.status, summary=body.summary,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    return {"status": "ok", "arc": arc_name, "plan": ap.model_dump(), "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 class PassageBeatsRequest(BaseModel):
@@ -1910,16 +3773,25 @@ async def generate_plan_arcs(body: GenItemsRequest):
 class CreateArcRequest(BaseModel):
     name: str
     goal: str = ""
+    expected_story_fingerprint: str = ""
 
 
 @app.post("/api/plan/arcs")
 async def create_arc_endpoint(body: CreateArcRequest):
     """Create a new empty arc plan by name."""
-    res = create_arc(_p(), body.name, body.goal)
+    p = _p()
+    try:
+        res = create_arc(
+            p, body.name, body.goal,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
     if res is None:
-        raise HTTPException(400, "Arc name is required.")
+        raise HTTPException(400, detail={"code": "invalid_arc_name", "message": "Arc name is required."})
     name, ap = res
-    return {"status": "created", "arc": name, "plan": ap.model_dump()}
+    return {"status": "created", "arc": name, "plan": ap.model_dump(), "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 # ── Planned scenes (per arc) ─────────────────────────────────────────────────
@@ -1930,16 +3802,23 @@ class SceneRequest(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     characters: list[str] = Field(default_factory=list)
     beat_ids: list[str] = Field(default_factory=list)
+    expected_story_fingerprint: str = ""
 
 
 @app.post("/api/plan/arcs/{arc_name}/scenes")
 async def create_scene(arc_name: str, body: SceneRequest):
-    scene = add_scene(
-        _p(), arc_name,
-        title=body.title, summary=body.summary,
-        keywords=body.keywords, characters=body.characters, beat_ids=body.beat_ids,
-    )
-    return {"status": "created", "arc": arc_name, "scene": scene.model_dump()}
+    p = _p()
+    try:
+        scene = add_scene(
+            p, arc_name,
+            title=body.title, summary=body.summary,
+            keywords=body.keywords, characters=body.characters, beat_ids=body.beat_ids,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    return {"status": "created", "arc": arc_name, "scene": scene.model_dump(), "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 class SceneUpdateRequest(BaseModel):
@@ -1950,25 +3829,42 @@ class SceneUpdateRequest(BaseModel):
     beat_ids: Optional[list[str]] = None
     passage_id: Optional[str] = None
     status: Optional[str] = None
+    expected_story_fingerprint: str = ""
 
 
 @app.put("/api/plan/arcs/{arc_name}/scenes/{scene_id}")
 async def edit_scene(arc_name: str, scene_id: str, body: SceneUpdateRequest):
-    if not update_scene(
-        _p(), arc_name, scene_id,
-        title=body.title, summary=body.summary,
-        keywords=body.keywords, characters=body.characters,
-        beat_ids=body.beat_ids, passage_id=body.passage_id, status=body.status,
-    ):
+    p = _p()
+    try:
+        updated = update_scene(
+            p, arc_name, scene_id,
+            title=body.title, summary=body.summary,
+            keywords=body.keywords, characters=body.characters,
+            beat_ids=body.beat_ids, passage_id=body.passage_id, status=body.status,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    if not updated:
         raise HTTPException(404, f"Scene {scene_id!r} not found in arc {arc_name!r}.")
-    return {"status": "updated", "arc": arc_name, "scene_id": scene_id}
+    return {"status": "updated", "arc": arc_name, "scene_id": scene_id, "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 @app.delete("/api/plan/arcs/{arc_name}/scenes/{scene_id}")
-async def remove_scene(arc_name: str, scene_id: str):
-    if not delete_scene(_p(), arc_name, scene_id):
+async def remove_scene(arc_name: str, scene_id: str, body: PlanDeleteRequest):
+    p = _p()
+    try:
+        deleted = delete_scene(
+            p, arc_name, scene_id,
+            expected_fingerprint=body.expected_story_fingerprint or None,
+        )
+    except StoryPlanConflict:
+        _require_story_fingerprint(p, body.expected_story_fingerprint)
+        raise
+    if not deleted:
         raise HTTPException(404, f"Scene {scene_id!r} not found in arc {arc_name!r}.")
-    return {"status": "deleted", "arc": arc_name, "scene_id": scene_id}
+    return {"status": "deleted", "arc": arc_name, "scene_id": scene_id, "story_fingerprint": _story_fingerprint(load_story(p))}
 
 
 class GenerateScenesRequest(BaseModel):
@@ -2230,6 +4126,137 @@ async def get_generation(gen_id: str):
     return rec
 
 
+# ── Immutable benchmark artifacts ────────────────────────────────────────────
+
+def _benchmark_outputs_dir() -> Path:
+    configured = os.environ.get("HARNESS_BENCHMARK_OUTPUTS", "").strip()
+    return Path(configured).resolve() if configured else _p().root / "benchmark_outputs"
+
+
+def _benchmark_run_dir(run_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", run_id):
+        raise HTTPException(404, "Benchmark run not found.")
+    root = _benchmark_outputs_dir().resolve()
+    candidate = (root / run_id).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(404, "Benchmark run not found.") from exc
+    if not candidate.is_dir():
+        raise HTTPException(404, "Benchmark run not found.")
+    return candidate
+
+
+class BenchmarkRunSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    run_id: str
+    benchmark_name: str
+    benchmark_version: str
+    started_at: str
+    result_count: int
+    has_comparison: bool
+
+
+class BenchmarkRunsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runs: list[BenchmarkRunSummaryResponse]
+
+
+class BenchmarkPaginationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    offset: int
+    limit: int
+    total: int
+
+
+class BenchmarkRunDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    manifest: dict[str, Any]
+    summary: str
+    results: list[dict[str, Any]]
+    pagination: BenchmarkPaginationResponse
+
+
+def _read_json_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(422, f"Unreadable benchmark artifact: {path.name}") from exc
+
+
+@app.get("/api/benchmarks/runs", response_model=BenchmarkRunsResponse)
+async def benchmark_runs():
+    root = _benchmark_outputs_dir()
+    runs = []
+    if root.is_dir():
+        for directory in sorted(root.iterdir(), reverse=True):
+            manifest_path = directory / "run_manifest.json"
+            if not directory.is_dir() or not manifest_path.is_file():
+                continue
+            manifest = _read_json_file(manifest_path)
+            results_path = directory / "results_internal.jsonl"
+            result_count = 0
+            if results_path.is_file():
+                with results_path.open("r", encoding="utf-8") as handle:
+                    result_count = sum(1 for line in handle if line.strip())
+            runs.append({
+                "id": directory.name,
+                "run_id": manifest.get("run_id", directory.name),
+                "benchmark_name": manifest.get("benchmark_name", ""),
+                "benchmark_version": manifest.get("benchmark_version", ""),
+                "started_at": manifest.get("started_at", manifest.get("timestamp", "")),
+                "result_count": result_count,
+                "has_comparison": (directory / "comparison.json").is_file(),
+            })
+    return {"runs": runs}
+
+
+@app.get("/api/benchmarks/runs/{run_id}", response_model=BenchmarkRunDetailResponse)
+async def benchmark_run(run_id: str, offset: int = 0, limit: int = 100):
+    directory = _benchmark_run_dir(run_id)
+    if offset < 0 or limit < 1 or limit > 500:
+        raise HTTPException(422, "offset must be >= 0 and limit must be 1..500")
+    manifest_path = directory / "run_manifest.json"
+    if not manifest_path.is_file():
+        raise HTTPException(404, "Benchmark run manifest not found.")
+    records = []
+    total = 0
+    results_path = directory / "results_internal.jsonl"
+    if results_path.is_file():
+        with results_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                if offset <= total < offset + limit:
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError as exc:
+                        raise HTTPException(422, "Unreadable benchmark results JSONL") from exc
+                total += 1
+    summary_path = directory / "summary_internal.md"
+    return {
+        "id": directory.name,
+        "manifest": _read_json_file(manifest_path),
+        "summary": summary_path.read_text(encoding="utf-8") if summary_path.is_file() else "",
+        "results": records,
+        "pagination": {"offset": offset, "limit": limit, "total": total},
+    }
+
+
+@app.get("/api/benchmarks/runs/{run_id}/comparison")
+async def benchmark_run_comparison(run_id: str):
+    path = _benchmark_run_dir(run_id) / "comparison.json"
+    if not path.is_file():
+        raise HTTPException(404, "This run has no persisted comparison artifact.")
+    return _read_json_file(path)
+
+
 # ── Delete models ──────────────────────────────────────────────────────────────
 
 async def _ollama_delete(base_url: str, model: str) -> tuple[bool, str]:
@@ -2479,10 +4506,33 @@ async def rag_delete_file(path: str):
 
 # ── SPA root ───────────────────────────────────────────────────────────────────
 
+def _ui_index(variant: str) -> Path:
+    if variant == "next":
+        return _next_ui_dir / "index.html"
+    return _HERE / "templates" / "index.html"
+
+
+def _configured_ui() -> str:
+    override = os.environ.get("HARNESS_AUTHORING_UI", "").strip().lower()
+    if override in {"legacy", "next"}:
+        return override
+    return load_config(_p()).authoring_ui
+
+
+@app.get("/legacy", response_class=HTMLResponse)
+async def legacy_spa():
+    return HTMLResponse(_ui_index("legacy").read_text(encoding="utf-8"))
+
+
+@app.get("/next", response_class=HTMLResponse)
+async def next_spa():
+    return HTMLResponse(_ui_index("next").read_text(encoding="utf-8"))
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{path:path}", response_class=HTMLResponse)
 async def spa(path: str = ""):
-    index = _HERE / "templates" / "index.html"
+    index = _ui_index(_configured_ui())
     if index.exists():
         return HTMLResponse(index.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>Harness UI not built yet</h1>")

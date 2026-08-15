@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "revision": 2,
+  "fixtures": [
+    {
+      "id": "storm_watch",
+      "label": "Storm watch",
+      "start_location": "harbor",
+      "seed": 1,
+      "world_state": {},
+      "resources": {},
+      "factions": [
+        {
+          "faction_id": "wardens",
+          "influence": 0.7,
+          "disposition": 0.0,
+          "resources": {},
+          "relationships": {}
+        }
+      ],
+      "character_stat_definitions": [
+        {
+          "id": "energy",
+          "value_type": "int",
+          "default": 7,
+          "minimum": 0,
+          "maximum": 10,
+          "visibility": "model",
+          "allowed_operations": [
+            "set",
+            "add",
+            "clamp"
+          ],
+          "decay_per_tick": null,
+          "description": "Current energy"
+        }
+      ],
+      "characters": [
+        {
+          "character_id": "captain",
+          "revision": 1,
+          "current_location": "harbor",
+          "activity": "idle",
+          "stats": {
+            "energy": 7
+          },
+          "needs": [],
+          "relationships": [],
+          "faction_standings": {},
+          "inventory": {},
+          "known_facts": [],
+          "agendas": [],
+          "schedules": [],
+          "conditions": [],
+          "memories": [],
+          "cooldowns": {},
+          "last_updated_tick": 0
+        }
+      ]
+    }
+  ]
+}

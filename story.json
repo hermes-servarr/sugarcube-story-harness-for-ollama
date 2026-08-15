@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "start_passage": "",
+  "passages": {},
+  "state_variables": {},
+  "branches": {},
+  "plan": {
+    "acts": [],
+    "beats": [],
+    "open_questions": []
+  },
+  "arcs": {},
+  "text_templates": []
+}

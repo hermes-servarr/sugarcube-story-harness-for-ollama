@@ -1,0 +1,92 @@
+[
+  {
+    "schema_version": 1,
+    "id": "S0-CYCLIC-REVISIT",
+    "seed": 17,
+    "topology": {
+      "schema_version": 1,
+      "revision": 1,
+      "locations": [
+        {"id": "east", "name": "East Gate", "region_id": "ring"},
+        {"id": "west", "name": "West Gate", "region_id": "ring"}
+      ],
+      "routes": [
+        {"id": "east_west", "source": "east", "destination": "west", "time_cost": 1},
+        {"id": "west_east", "source": "west", "destination": "east", "time_cost": 1}
+      ]
+    },
+    "start_location": "east",
+    "time_model": "turn",
+    "world_state": {},
+    "resources": {},
+    "actions": [
+      {"kind": "travel", "id": "east_west"},
+      {"kind": "travel", "id": "west_east"},
+      {"kind": "travel", "id": "east_west"},
+      {"kind": "travel", "id": "west_east"}
+    ],
+    "expected": {"location": "east", "tick": 4, "world_state": {}, "resources": {}, "visits": 5, "opportunity_ids": ["east_west"]}
+  },
+  {
+    "schema_version": 1,
+    "id": "S1-RESOURCE-BOUND",
+    "seed": 29,
+    "topology": {
+      "schema_version": 1,
+      "revision": 1,
+      "locations": [
+        {"id": "dock", "name": "Dock", "region_id": "coast"},
+        {"id": "island", "name": "Island", "region_id": "coast"}
+      ],
+      "routes": [
+        {"id": "outbound", "source": "dock", "destination": "island", "resource_cost": {"fuel": 1}, "time_cost": 2},
+        {"id": "return", "source": "island", "destination": "dock", "resource_cost": {"fuel": 1}, "time_cost": 2}
+      ]
+    },
+    "start_location": "dock",
+    "time_model": "turn",
+    "world_state": {},
+    "resources": {"fuel": 1},
+    "actions": [{"kind": "travel", "id": "outbound"}],
+    "expected": {"location": "island", "tick": 2, "world_state": {}, "resources": {"fuel": 0}, "visits": 2, "opportunity_ids": []}
+  },
+  {
+    "schema_version": 1,
+    "id": "S2-ACTION-UNLOCK",
+    "seed": 41,
+    "topology": {
+      "schema_version": 1,
+      "revision": 1,
+      "locations": [
+        {"id": "vault", "name": "Vault", "region_id": "ruins", "actions": [{"id": "read_runes", "label": "Read the runes", "effects": [{"component_id": "unlock_door", "target": "door_open", "operation": "set", "value": true}], "time_cost": 1}]},
+        {"id": "garden", "name": "Garden", "region_id": "ruins"}
+      ],
+      "routes": [{"id": "sealed_door", "source": "vault", "destination": "garden", "eligibility": [{"target": "door_open", "operation": "truthy"}], "time_cost": 1}]
+    },
+    "start_location": "vault",
+    "time_model": "turn",
+    "world_state": {"door_open": false},
+    "resources": {},
+    "actions": [{"kind": "local_action", "id": "read_runes"}, {"kind": "travel", "id": "sealed_door"}],
+    "expected": {"location": "garden", "tick": 2, "world_state": {"door_open": true}, "resources": {}, "visits": 2, "opportunity_ids": []}
+  },
+  {
+    "schema_version": 1,
+    "id": "S3-PERSISTENT-CONSEQUENCE",
+    "seed": 53,
+    "topology": {
+      "schema_version": 1,
+      "revision": 1,
+      "locations": [
+        {"id": "camp", "name": "Camp", "region_id": "wilds", "actions": [{"id": "gather", "label": "Gather supplies", "effects": [{"component_id": "gain_supply", "target": "supplies", "operation": "add", "value": 2}], "time_cost": 3}]}
+      ],
+      "routes": []
+    },
+    "start_location": "camp",
+    "time_model": "turn",
+    "world_state": {"supplies": 1},
+    "resources": {},
+    "actions": [{"kind": "local_action", "id": "gather"}, {"kind": "local_action", "id": "gather"}],
+    "expected": {"location": "camp", "tick": 6, "world_state": {"supplies": 5}, "resources": {}, "visits": 1, "opportunity_ids": ["gather"]}
+  }
+]

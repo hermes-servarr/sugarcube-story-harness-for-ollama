@@ -87,6 +87,18 @@ class BenchmarkConfig:
     refactor_architectures: tuple[str, ...] = ("typed_fill",)
     """Harness structures compared by the fixed-plan refactor profiles."""
 
+    browser_gate: bool = False
+    """Compile and execute refactor artifacts in Tweego/Playwright."""
+
+    tweego_bin: str = ""
+    """Tweego executable used by the opt-in browser gate."""
+
+    tweego_formats: str = ""
+    """Directory containing the SugarCube story format."""
+
+    chromium_bin: str = ""
+    """Optional explicit Chromium executable for Playwright."""
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argparse parser for legacy and operational run flags."""
@@ -140,10 +152,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--architectures",
         nargs="+",
-        choices=["typed_fill", "flat_fill"],
+        choices=["typed_fill", "flat_fill", "legacy_json"],
         default=["typed_fill", "flat_fill"],
         help="Harness structures for refactor profiles",
     )
+    parser.add_argument("--browser-gate", action="store_true",
+                        help="Compile and execute refactor artifacts in Playwright")
+    parser.add_argument("--tweego-bin", default="",
+                        help="Tweego executable for --browser-gate")
+    parser.add_argument("--tweego-formats", default="",
+                        help="Story-format directory for --browser-gate")
+    parser.add_argument("--chromium-bin", default="",
+                        help="Optional Chromium executable for --browser-gate")
 
     return parser
 
@@ -185,4 +205,8 @@ def parse_cli_args(argv: list[str] | None = None) -> BenchmarkConfig:
         ingestion_routing_path=args.ingestion_routing,
         benchmark_profile=args.profile,
         refactor_architectures=tuple(args.architectures),
+        browser_gate=args.browser_gate,
+        tweego_bin=args.tweego_bin,
+        tweego_formats=args.tweego_formats,
+        chromium_bin=args.chromium_bin,
     )

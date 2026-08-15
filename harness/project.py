@@ -69,6 +69,13 @@ class ProjectPaths:
         self.harness_dir = root / ".harness"
         self.config_yaml = root / ".harness" / "config.yaml"
         self.cache_dir = root / ".harness" / "cache"
+        self.experience_profiles_dir = root / ".harness" / "experience_profiles"
+        self.passage_plans_dir = root / ".harness" / "passage_plans"
+        self.topology_dir = root / ".harness" / "topology"
+        self.simulations_dir = root / ".harness" / "simulations"
+        self.systems_json = root / ".harness" / "systems.json"
+        self.encounters_json = root / ".harness" / "encounters.json"
+        self.simulation_fixtures_json = root / ".harness" / "simulation_fixtures.json"
         self.session_json = root / ".harness" / "session.json"
         self.slots_json = root / "media" / "_slots.json"
         self.inspiration_dir = root / "inspiration"
@@ -190,12 +197,21 @@ def init_project(root: Path, title: str = "Untitled Story") -> ProjectPaths:
 
     # .harness/config.yaml — generate stable IFID once so SugarCube save files
     # remain compatible across rebuilds.
-    if not p.config_yaml.exists():
+    new_config = not p.config_yaml.exists()
+    if new_config:
         config = HarnessConfig(
             story_title=title,
             story_ifid=str(uuid.uuid4()).upper(),
         )
         _atomic_write_text(p.config_yaml, yaml.dump(config.model_dump(), allow_unicode=True))
+
+        # New projects make their selected experience an explicit, immutable
+        # capability. Existing projects intentionally keep compatibility fallback
+        # semantics until an author previews and saves a revision.
+        from .generation.experience import ExperienceProfileStore, preset_for_mode
+        ExperienceProfileStore(p.experience_profiles_dir).ensure_baseline(
+            preset_for_mode(config.experience_mode)
+        )
 
     # .harness/session.json
     if not p.session_json.exists():
@@ -298,7 +314,7 @@ def load_lore_entity(p: ProjectPaths, category: str, lore_id: str) -> str | None
 def write_character(p: ProjectPaths, char_id: str, prose_sheet: str) -> None:
     f = p.character_file(char_id)
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(prose_sheet, encoding="utf-8")
+    _atomic_write_text(f, prose_sheet)
     # update _index.json
     index_path = p.characters_dir / "_index.json"
     index: list = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else []
@@ -328,7 +344,7 @@ def delete_character(p: ProjectPaths, char_id: str) -> bool:
 def write_lore_entity(p: ProjectPaths, category: str, lore_id: str, prose_sheet: str) -> None:
     f = p.lore_file(category, lore_id)
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(prose_sheet, encoding="utf-8")
+    _atomic_write_text(f, prose_sheet)
     index_path = p.lore_dir / "_index.json"
     index: list = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else []
     entry = f"{category}/{lore_id}"

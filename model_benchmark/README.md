@@ -140,7 +140,7 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `--models` | (auto-discover) | Model tags to test. Empty = discover from Ollama |
 | `--variants` | `compact full json` | Prompt variants to test |
 | `--directions` | `A B C` | Direction prompts (A: inventory/set flag, B: conditional, C: stats) |
-| `--profile` | custom | Named workload: `canary` (16 calls/model), `core` (28), `full` (82), `refactor-canary` (10 cases), or `refactor-core` (24 cases) |
+| `--profile` | custom | Named workload: `canary`, `core`, `full`, `refactor-canary`, `refactor-core`, `sandbox-canary`, or `sandbox-core` |
 | `--architectures` | `typed_fill flat_fill` | Harness structures compared by refactor profiles |
 | `--base-url` | `http://localhost:11434` | Ollama server URL |
 | `--timeout` | `120` | Seconds per model call |
@@ -170,6 +170,8 @@ uv run python -m model_benchmark.cli models --base-url http://192.168.1.100:1143
 | `full` | 4 variants × 8 directions | All 50 built-in cases | 82 | Historical probes, stress, and scorer validation |
 | `refactor-canary` | None | 10 fixed-plan cases × selected architectures | 20 | Fast paired checks of potential harness structures |
 | `refactor-core` | None | 24 fixed-plan cases × selected architectures | 48 | Paired harness-architecture comparison |
+| `sandbox-canary` | None | 10 fixed-plan cases × architectures + 3 frozen runtime/domain scenarios | 23 | Fast paired generation and deterministic Sandbox gates |
+| `sandbox-core` | None | 24 fixed-plan cases × architectures + 7 frozen runtime/domain scenarios | 55 | Full generation/runtime Sandbox promotion cohort |
 
 Call counts assume `--runs 1`. Refactor profiles repeat every fixed-plan case
 for larger values and increment an explicit base seed for each repetition.
@@ -212,6 +214,71 @@ compared on final usability without being credited as better raw model
 compliance. Historical direct-SugarCube probes remain available in `full`.
 See `model_benchmark/docs/refactor-contract.md` for the ownership boundary and
 rules for adding AST, staged-generation, compiler, and browser adapters.
+
+### Blinded narrative review
+
+Create a deterministic A/B review package without exposing model or
+architecture identity, and without including compiler scores:
+
+```bash
+python -m model_benchmark.narrative_review RUN_DIR REVIEW_DIR \
+  --architectures typed_fill legacy_json \
+  --require-architectures typed_fill flat_fill legacy_json \
+  --sample-size 30 --seed frozen-v1
+```
+
+Share `review_bundle.json` and fill a copy of
+`review_scores.template.json`. Keep `review_key.private.json` private; it is
+mode `0600` on filesystems that support POSIX permissions and is used only to
+decode the completed review.
+
+After review, decode the filled score copy into per-dimension paired means and
+preference counts (no combined quality score):
+
+```bash
+python -m model_benchmark.narrative_review_results \
+  COMPLETED_SCORES REVIEW_KEY_PRIVATE REVIEW_RESULTS_PRIVATE
+```
+
+For separately executed, same-seed browser-rescored runs, freeze the observed
+request-playability noise floor and the protocol-defined promotion margin:
+
+```bash
+python -m model_benchmark.replay_variance RUN_1 RUN_2 RUN_3 \
+  --output replay_variance.json
+```
+
+After the frozen multi-seed parent and its zero-call browser rescore complete,
+validate their linkage and generate the independent promotion-gate report:
+
+```bash
+python -m model_benchmark.promotion_confirmation PARENT_RUN BROWSER_CHILD \
+  --required-margin-percentage-points 5 \
+  --output promotion_confirmation.json
+```
+
+The analyzer rejects changed generation fields, incompatible provenance,
+wrong parent hashes, duplicate/missing paired identities, and seed/repetition
+mismatches. It reports request pass, request and compiled playability,
+individual scoring categories, per-seed outcomes, paired exact tests and loss
+identities, tokens, latency, and automated gates. Human narrative quality is
+explicitly left `not_assessed`.
+
+Issue a mechanical-only capability card only from that reproduced report:
+
+```bash
+python -m model_benchmark.capability_card promotion_confirmation.json \
+  --card-id MODEL-ARTIFACT-mechanical-v2 \
+  --output benchmark_outputs/capability_cards/MODEL-ARTIFACT-mechanical-v2.json
+```
+
+The issuer refuses failed candidate gates, evidence outside the repository,
+source files modified after the parent/browser run began, and reports that no
+longer reproduce with the current analyzer. It hashes the result-bound report,
+both manifests, all compiler/evaluator/analyzer sources, and emits strategies
+with narrative review unassessed and default eligibility false. A later
+narrative pass/fail claim must bind its decoded 30-item review report; routing
+recomputes the frozen seven-dimension and preference tolerances.
 
 ## The 6 Scoring Categories
 

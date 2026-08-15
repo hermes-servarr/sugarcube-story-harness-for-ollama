@@ -9,10 +9,34 @@ never stored — so they can't drift out of sync with the graph.
 promotes its act/bullet structure into the canonical beat list on demand.
 """
 from __future__ import annotations
+import hashlib
+import json
 import re
+import threading
 
 from .models import ArcPlan, Beat, PlannedScene, StoryGraph
 from .project import ProjectPaths, load_story, save_story
+
+
+class StoryPlanConflict(ValueError):
+    def __init__(self, expected: str, actual: str):
+        self.expected = expected
+        self.actual = actual
+        super().__init__("story plan changed since it was loaded")
+
+
+_PLAN_WRITE_LOCK = threading.RLock()
+
+
+def story_fingerprint(graph: StoryGraph) -> str:
+    payload = json.dumps(graph.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _expect_fingerprint(graph: StoryGraph, expected: str | None) -> None:
+    actual = story_fingerprint(graph)
+    if expected is not None and expected != actual:
+        raise StoryPlanConflict(expected, actual)
 
 
 # ── Beat id allocation ─────────────────────────────────────────────────────────
@@ -153,12 +177,16 @@ def plan_focus_text(p: ProjectPaths, arc_name: str) -> str:
 
 # ── Mutations ──────────────────────────────────────────────────────────────────
 
-def add_beat(p: ProjectPaths, text: str, act: str = "") -> Beat:
-    graph = load_story(p)
-    beat = Beat(id=_next_beat_id(graph), text=text.strip(), act=act.strip())
-    graph.plan.beats.append(beat)
-    save_story(p, graph)
-    return beat
+def add_beat(
+    p: ProjectPaths, text: str, act: str = "", *, expected_fingerprint: str | None = None
+) -> Beat:
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        beat = Beat(id=_next_beat_id(graph), text=text.strip(), act=act.strip())
+        graph.plan.beats.append(beat)
+        save_story(p, graph)
+        return beat
 
 
 def add_beats_bulk(p: ProjectPaths, beats: list[dict]) -> list[Beat]:
@@ -231,38 +259,40 @@ def normalize_arc_name(name: str, existing_arcs: list[str] | None = None) -> str
     return norm
 
 
-def create_arc(p: ProjectPaths, name: str, goal: str = "") -> tuple[str, ArcPlan] | None:
+def create_arc(
+    p: ProjectPaths, name: str, goal: str = "", *, expected_fingerprint: str | None = None
+) -> tuple[str, ArcPlan] | None:
     """Create a new (empty) arc plan under a normalised name. Returns
     (normalised_name, ArcPlan), or None if the name is blank.
 
     Arc names are normalized to NN_short_name format (e.g. "01_atlantis").
     """
-    graph = load_story(p)
-    norm = normalize_arc_name(name, list(graph.arcs.keys()))
-    if not norm:
-        return None
-    # If normalization produced a name that already exists (e.g. same number
-    # different short name), bump to next available number.
-    if norm in graph.arcs:
-        # Try to find a free slot
-        used_nums = set()
-        for arc in graph.arcs:
-            m = re.match(r"^(\d{2})_", arc)
-            if m:
-                used_nums.add(int(m.group(1)))
-        # Extract short name from norm
-        m = re.match(r"^\d{2}_(.+)$", norm)
-        short_name = m.group(1) if m else norm
-        n = 1
-        while n in used_nums:
-            n += 1
-        norm = f"{n:02d}_{short_name}"[:_MAX_ARC_NAME_LEN]
-    ap = graph.arcs.get(norm) or ArcPlan()
-    if goal.strip():
-        ap.goal = goal.strip()
-    graph.arcs[norm] = ap
-    save_story(p, graph)
-    return norm, ap
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        norm = normalize_arc_name(name, list(graph.arcs.keys()))
+        if not norm:
+            return None
+        # If normalization produced a name that already exists (e.g. same number
+        # different short name), bump to next available number.
+        if norm in graph.arcs:
+            used_nums = set()
+            for arc in graph.arcs:
+                m = re.match(r"^(\d{2})_", arc)
+                if m:
+                    used_nums.add(int(m.group(1)))
+            m = re.match(r"^\d{2}_(.+)$", norm)
+            short_name = m.group(1) if m else norm
+            n = 1
+            while n in used_nums:
+                n += 1
+            norm = f"{n:02d}_{short_name}"[:_MAX_ARC_NAME_LEN]
+        ap = graph.arcs.get(norm) or ArcPlan()
+        if goal.strip():
+            ap.goal = goal.strip()
+        graph.arcs[norm] = ap
+        save_story(p, graph)
+        return norm, ap
 
 
 def add_arcs_bulk(p: ProjectPaths, arcs: list[dict]) -> list[str]:
@@ -277,32 +307,41 @@ def add_arcs_bulk(p: ProjectPaths, arcs: list[dict]) -> list[str]:
     return created
 
 
-def update_beat(p: ProjectPaths, beat_id: str, text: str | None = None, act: str | None = None) -> bool:
-    graph = load_story(p)
-    beat = _find_beat(graph, beat_id)
-    if beat is None:
-        return False
-    if text is not None:
-        beat.text = text.strip()
-    if act is not None:
-        beat.act = act.strip()
-    save_story(p, graph)
-    return True
+def update_beat(
+    p: ProjectPaths, beat_id: str, text: str | None = None, act: str | None = None,
+    *, expected_fingerprint: str | None = None,
+) -> bool:
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        beat = _find_beat(graph, beat_id)
+        if beat is None:
+            return False
+        if text is not None:
+            beat.text = text.strip()
+        if act is not None:
+            beat.act = act.strip()
+        save_story(p, graph)
+        return True
 
 
-def delete_beat(p: ProjectPaths, beat_id: str) -> bool:
+def delete_beat(
+    p: ProjectPaths, beat_id: str, *, expected_fingerprint: str | None = None
+) -> bool:
     """Remove a beat and scrub its id from every arc and passage reference."""
-    graph = load_story(p)
-    before = len(graph.plan.beats)
-    graph.plan.beats = [b for b in graph.plan.beats if b.id != beat_id]
-    if len(graph.plan.beats) == before:
-        return False
-    for ap in graph.arcs.values():
-        ap.beat_ids = [b for b in ap.beat_ids if b != beat_id]
-    for e in graph.passages.values():
-        e.plan_beats = [b for b in e.plan_beats if b != beat_id]
-    save_story(p, graph)
-    return True
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        before = len(graph.plan.beats)
+        graph.plan.beats = [b for b in graph.plan.beats if b.id != beat_id]
+        if len(graph.plan.beats) == before:
+            return False
+        for ap in graph.arcs.values():
+            ap.beat_ids = [b for b in ap.beat_ids if b != beat_id]
+        for e in graph.passages.values():
+            e.plan_beats = [b for b in e.plan_beats if b != beat_id]
+        save_story(p, graph)
+        return True
 
 
 def set_acts(p: ProjectPaths, acts: list[str]) -> None:
@@ -325,21 +364,24 @@ def set_arc_plan(
     beat_ids: list[str] | None = None,
     status: str | None = None,
     summary: str | None = None,
+    expected_fingerprint: str | None = None,
 ) -> ArcPlan:
-    graph = load_story(p)
-    ap = graph.arcs.get(arc_name) or ArcPlan()
-    if goal is not None:
-        ap.goal = goal.strip()
-    if status is not None:
-        ap.status = status.strip() or "planned"
-    if summary is not None:
-        ap.summary = summary.strip()
-    if beat_ids is not None:
-        known = {b.id for b in graph.plan.beats}
-        ap.beat_ids = [b for b in beat_ids if b in known]
-    graph.arcs[arc_name] = ap
-    save_story(p, graph)
-    return ap
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        ap = graph.arcs.get(arc_name) or ArcPlan()
+        if goal is not None:
+            ap.goal = goal.strip()
+        if status is not None:
+            ap.status = status.strip() or "planned"
+        if summary is not None:
+            ap.summary = summary.strip()
+        if beat_ids is not None:
+            known = {b.id for b in graph.plan.beats}
+            ap.beat_ids = [b for b in beat_ids if b in known]
+        graph.arcs[arc_name] = ap
+        save_story(p, graph)
+        return ap
 
 
 def set_passage_beats(p: ProjectPaths, passage_id: str, beat_ids: list[str]) -> bool:
@@ -386,21 +428,24 @@ def add_scene(
     keywords: list[str] | None = None,
     characters: list[str] | None = None,
     beat_ids: list[str] | None = None,
+    expected_fingerprint: str | None = None,
 ) -> PlannedScene:
-    graph = load_story(p)
-    ap = _ensure_arc(graph, arc_name)
-    known = {b.id for b in graph.plan.beats}
-    scene = PlannedScene(
-        id=_next_scene_id(ap),
-        title=title.strip(),
-        summary=summary.strip(),
-        keywords=[k.strip() for k in (keywords or []) if k.strip()],
-        characters=[c.strip() for c in (characters or []) if c.strip()],
-        beat_ids=[b for b in (beat_ids or []) if b in known],
-    )
-    ap.scenes.append(scene)
-    save_story(p, graph)
-    return scene
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        ap = _ensure_arc(graph, arc_name)
+        known = {b.id for b in graph.plan.beats}
+        scene = PlannedScene(
+            id=_next_scene_id(ap),
+            title=title.strip(),
+            summary=summary.strip(),
+            keywords=[k.strip() for k in (keywords or []) if k.strip()],
+            characters=[c.strip() for c in (characters or []) if c.strip()],
+            beat_ids=[b for b in (beat_ids or []) if b in known],
+        )
+        ap.scenes.append(scene)
+        save_story(p, graph)
+        return scene
 
 
 def update_scene(
@@ -415,45 +460,53 @@ def update_scene(
     beat_ids: list[str] | None = None,
     passage_id: str | None = None,
     status: str | None = None,
+    expected_fingerprint: str | None = None,
 ) -> bool:
-    graph = load_story(p)
-    ap = graph.arcs.get(arc_name)
-    if ap is None:
-        return False
-    scene = next((s for s in ap.scenes if s.id == scene_id), None)
-    if scene is None:
-        return False
-    if title is not None:
-        scene.title = title.strip()
-    if summary is not None:
-        scene.summary = summary.strip()
-    if keywords is not None:
-        scene.keywords = [k.strip() for k in keywords if k.strip()]
-    if characters is not None:
-        scene.characters = [c.strip() for c in characters if c.strip()]
-    if beat_ids is not None:
-        known = {b.id for b in graph.plan.beats}
-        scene.beat_ids = [b for b in beat_ids if b in known]
-    if passage_id is not None:
-        scene.passage_id = passage_id.strip()
-        scene.status = "drafted" if scene.passage_id else "planned"
-    if status is not None:
-        scene.status = status.strip() or "planned"
-    save_story(p, graph)
-    return True
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        ap = graph.arcs.get(arc_name)
+        if ap is None:
+            return False
+        scene = next((s for s in ap.scenes if s.id == scene_id), None)
+        if scene is None:
+            return False
+        if title is not None:
+            scene.title = title.strip()
+        if summary is not None:
+            scene.summary = summary.strip()
+        if keywords is not None:
+            scene.keywords = [k.strip() for k in keywords if k.strip()]
+        if characters is not None:
+            scene.characters = [c.strip() for c in characters if c.strip()]
+        if beat_ids is not None:
+            known = {b.id for b in graph.plan.beats}
+            scene.beat_ids = [b for b in beat_ids if b in known]
+        if passage_id is not None:
+            scene.passage_id = passage_id.strip()
+            scene.status = "drafted" if scene.passage_id else "planned"
+        if status is not None:
+            scene.status = status.strip() or "planned"
+        save_story(p, graph)
+        return True
 
 
-def delete_scene(p: ProjectPaths, arc_name: str, scene_id: str) -> bool:
-    graph = load_story(p)
-    ap = graph.arcs.get(arc_name)
-    if ap is None:
-        return False
-    before = len(ap.scenes)
-    ap.scenes = [s for s in ap.scenes if s.id != scene_id]
-    if len(ap.scenes) == before:
-        return False
-    save_story(p, graph)
-    return True
+def delete_scene(
+    p: ProjectPaths, arc_name: str, scene_id: str,
+    *, expected_fingerprint: str | None = None,
+) -> bool:
+    with _PLAN_WRITE_LOCK:
+        graph = load_story(p)
+        _expect_fingerprint(graph, expected_fingerprint)
+        ap = graph.arcs.get(arc_name)
+        if ap is None:
+            return False
+        before = len(ap.scenes)
+        ap.scenes = [s for s in ap.scenes if s.id != scene_id]
+        if len(ap.scenes) == before:
+            return False
+        save_story(p, graph)
+        return True
 
 
 def add_scenes_bulk(p: ProjectPaths, arc_name: str, scenes: list[dict]) -> list[PlannedScene]:

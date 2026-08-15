@@ -15,16 +15,16 @@ dependencies = [
     "watchdog>=4.0.0",
     "networkx>=3.3",
     "pytest>=9.0.3",
+    "tinycss2>=1.4.0",
 ]
 
 # Optional dependencies for the playtester
 [project.optional-dependencies]
 playtest = ["playwright>=1.40"]
 
-# TODO(e2e-test-runner): add e2e optional-dependency group for playwright (browser check)
-# e2e = ["playwright>=1.40"]
+# Headless runtime gates for compiled SugarCube behavior.
+e2e = ["playwright>=1.40"]
 
-# TODO(e2e-test-runner): register the "e2e" pytest marker to suppress unknown-marker warnings
 [tool.pytest.ini_options]
 # Tests live in three trees:
 #   - tests/                     top-level harness / story-engine tests

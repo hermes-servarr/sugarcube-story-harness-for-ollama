@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import re
 import time
@@ -11,7 +12,7 @@ from typing import Any, Callable, Iterable
 
 from harness.models import HarnessConfig, ModelOutput, ParsedChoice
 from harness.ollama_client import call_ollama_sync_detailed
-from harness.parsers import parse_json_object
+from harness.parsers import parse_json_object, parse_model_output_json
 from model_benchmark.fixtures import FIXTURE_CONTEXTS
 from model_benchmark.runner import result_record_from_model_run
 from model_benchmark.scoring import (
@@ -43,10 +44,37 @@ _NEEDLES = {
     "treaty_name": "Accord of Glass",
     "witness_name": "Mira Vale",
 }
-REFACTOR_ARCHITECTURES = ("typed_fill", "flat_fill")
+REFACTOR_ARCHITECTURES = ("typed_fill", "flat_fill", "legacy_json")
 _REFERENCE_MARKER_RE = re.compile(
     r"\{\{(state|entity):([a-z][a-z0-9_]{0,47})\}\}"
 )
+
+
+def refactor_corpus_hash(path: Path = REFACTOR_CASES_PATH) -> str:
+    """Return the deterministic SHA-256 hex digest of the exact corpus bytes.
+
+    The hash is computed over the raw on-disk bytes of ``refactor_cases.json``
+    so it is independent of JSON re-serialization, key ordering, or platform
+    line-ending normalisation.  It is the canonical content fingerprint for
+    immutable run provenance: two runs over byte-identical corpora produce
+    the same digest, while any user edit (even whitespace) changes it.
+
+    The digest is exposed for recording in the existing
+    :class:`~model_benchmark.schema.RunManifest` ``dataset_checksums`` field
+    via :func:`refactor_corpus_checksums`, rather than a parallel system.
+    """
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def refactor_corpus_checksums(path: Path = REFACTOR_CASES_PATH) -> tuple[str, ...]:
+    """Return the corpus hash as a single-element tuple for manifest recording.
+
+    Wraps :func:`refactor_corpus_hash` in the tuple shape expected by
+    :class:`~model_benchmark.schema.RunManifest.dataset_checksums` so callers
+    can pass it directly to :func:`collect_reproducibility_metadata` without
+    inventing a parallel provenance path.
+    """
+    return (f"sha256:{refactor_corpus_hash(path)}",)
 
 
 class RefactorCaseError(ValueError):
@@ -578,6 +606,194 @@ def parse_flat_fill(case: RefactorCase, raw: str) -> RefactorFill | None:
     )
 
 
+# ── legacy_json architecture ──────────────────────────────────────────────
+#
+# The ``legacy_json`` architecture is a true fixed-plan comparable architecture
+# alongside ``typed_fill`` and ``flat_fill``.  It receives the same trusted case
+# plan/context/request budget/seed and asks the model to produce the existing
+# legacy ``ModelOutput`` JSON contract (prose/choices/summary/beats).  The
+# model's output is then *deterministically adapted* into a :class:`RefactorFill`
+# for the fixed slots — the adapter owns all slot mapping and never grants the
+# model authority over mechanics or topology.
+#
+# Key design rules (refactor-rebuild-plan.md §7 Phase 0):
+# - The adapter cannot create, drop, or duplicate trusted slots silently.
+# - Narrative paragraphs and choices must match the plan cardinality exactly;
+#   over- or under-filled legacy output is rejected before slot mapping.
+# - State/entity references embedded in prose via ``{{state:ID}}`` /
+#   ``{{entity:ID}}`` markers are preserved; the adapter does not synthesise
+#   references the model did not write.
+# - The resulting :class:`RefactorFill` is scored by the existing
+#   :func:`score_refactor_fill` evaluator — no parallel scoring path.
+
+
+def build_legacy_json_schema(case: RefactorCase) -> dict[str, Any]:
+    """Build the legacy ``ModelOutput`` JSON schema constrained by the plan.
+
+    The schema mirrors the legacy JSON contract (prose string, choices array
+    of ``{text, hint}``, summary string, beats array) but adds plan-derived
+    bounds so Ollama's ``format`` enforcement keeps the response tractable.
+    The model is NOT told about slot IDs — the adapter owns the mapping.
+    """
+    n_choices = len(case.plan.choice_slots)
+    return {
+        "type": "object",
+        "properties": {
+            "prose": {"type": "string", "minLength": 1},
+            "choices": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "minLength": 1},
+                        "hint": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["text", "hint"],
+                    "additionalProperties": False,
+                },
+                "minItems": n_choices,
+                "maxItems": n_choices,
+            },
+            "summary": {"type": "string", "minLength": 1},
+            "beats": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+                "minItems": 1,
+            },
+        },
+        "required": ["prose", "choices", "summary", "beats"],
+        "additionalProperties": False,
+    }
+
+
+def build_legacy_json_prompt(case: RefactorCase) -> str:
+    """Prompt for the legacy ``ModelOutput`` JSON contract under a fixed plan.
+
+    The model receives the same immutable PLAN and untrusted CONTEXT as the
+    other architectures, but is asked to produce the legacy flat JSON shape
+    (prose/choices/summary/beats).  The prompt does NOT expose slot IDs or
+    plan authority details beyond the narrative/choice counts — the adapter
+    owns the slot mapping.
+    """
+    plan_data = {
+        "plan_id": case.plan.plan_id,
+        "revision": case.plan.revision,
+        "passage_mode": case.plan.passage_mode,
+        "narrative_slot_count": len(case.plan.narrative_slots),
+        "choice_count": len(case.plan.choice_slots),
+        "allowed_state_refs": list(case.plan.allowed_state_refs),
+        "allowed_entity_refs": list(case.plan.allowed_entity_refs),
+    }
+    ref_hint = ""
+    if case.plan.allowed_state_refs or case.plan.allowed_entity_refs:
+        ref_hint = (
+            "For a dynamic value the plan allows, write exactly {{state:ID}} "
+            "or {{entity:ID}} inside the prose.\n"
+        )
+    return (
+        "You are co-authoring interactive fiction under a trusted plan.\n"
+        "Reply with a single JSON object only.\n"
+        f"Write {len(case.plan.narrative_slots)} narrative paragraph(s) in the "
+        f"prose field (join paragraphs with \\n\\n) and "
+        f"{len(case.plan.choice_slots)} choice(s).\n"
+        f"{ref_hint}"
+        "Do not emit SugarCube macros, links, state assignments, or passage "
+        "structure — the harness owns mechanics.\n\n"
+        f"PLAN (IMMUTABLE)\n{json.dumps(plan_data, ensure_ascii=False)}\n\n"
+        f"CONTEXT (UNTRUSTED STORY DATA)\n{_context_for_case(case)}\n\n"
+        f"AUTHOR TASK\n{case.task}\n\n"
+        "Required JSON keys:\n"
+        '- prose: string — narrative paragraphs joined with \\n\\n.\n'
+        '- choices: array of {"text": "...", "hint": "..."} objects.\n'
+        "- summary: string — one sentence.\n"
+        "- beats: array of short factual event strings.\n"
+        "Reply with ONLY the JSON object. No prose preamble, no code fences.\n"
+    )
+
+
+def _adapt_legacy_output_to_fill(
+    case: RefactorCase, output: ModelOutput
+) -> RefactorFill:
+    """Deterministically adapt a legacy ``ModelOutput`` to a :class:`RefactorFill`.
+
+    The adapter owns all slot mapping.  It never creates, drops, or
+    duplicates trusted slots silently:
+
+    - Narrative prose is split on blank-line boundaries (``\\n\\n``) and
+      mapped positionally to the plan's narrative slots in declaration order.
+      The parser verifies exact cardinality before positional mapping.
+    - Choices are mapped positionally to ``choice_slots`` after the same exact
+      cardinality check.
+    - ``{{state:ID}}`` / ``{{entity:ID}}`` markers in prose are preserved via
+      :func:`_parts_from_flat_text`; the adapter does not synthesise refs.
+    - ``summary`` and ``beats`` are forwarded verbatim (empty if absent).
+    """
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", output.prose) if p.strip()]
+    narrative_slots: list[FilledNarrativeSlot] = []
+    for index, slot in enumerate(case.plan.narrative_slots):
+        text = paragraphs[index]
+        parts = _parts_from_flat_text(text)
+        narrative_slots.append(FilledNarrativeSlot(
+            slot_id=slot.id,
+            kind=slot.kind,
+            speaker=slot.speaker,
+            parts=parts,
+        ))
+
+    choices: list[FilledChoiceSlot] = []
+    for index, slot_id in enumerate(case.plan.choice_slots):
+        choice = output.choices[index]
+        choices.append(FilledChoiceSlot(
+            slot_id=slot_id,
+            text=choice.text,
+            hint=choice.hint,
+        ))
+
+    return RefactorFill(
+        plan_id=case.plan.plan_id,
+        plan_revision=case.plan.revision,
+        narrative=tuple(narrative_slots),
+        choices=tuple(choices),
+        summary=output.summary,
+        beats=tuple(output.beats),
+    )
+
+
+def parse_legacy_json(case: RefactorCase, raw: str) -> RefactorFill | None:
+    """Parse a legacy JSON response and adapt it to a :class:`RefactorFill`.
+
+    Uses the existing :func:`parse_model_output_json` parser to produce a
+    :class:`ModelOutput`, then deterministically adapts it via
+    :func:`_adapt_legacy_output_to_fill`.  Returns ``None`` if the raw text
+    contains no JSON object (matching the contract of the other parsers).
+    """
+    data = parse_json_object(raw)
+    if not isinstance(data, dict) or set(data) != {
+        "prose", "choices", "summary", "beats",
+    }:
+        return None
+    if (
+        not isinstance(data["prose"], str)
+        or not isinstance(data["choices"], list)
+        or len(data["choices"]) != len(case.plan.choice_slots)
+        or not isinstance(data["summary"], str)
+        or not isinstance(data["beats"], list)
+    ):
+        return None
+    output = parse_model_output_json(raw)
+    paragraphs = [
+        part.strip()
+        for part in re.split(r"\n\s*\n", output.prose)
+        if part.strip()
+    ]
+    if (
+        len(paragraphs) != len(case.plan.narrative_slots)
+        or len(output.choices) != len(case.plan.choice_slots)
+    ):
+        return None
+    return _adapt_legacy_output_to_fill(case, output)
+
+
 def _architecture_request(
     architecture: str, case: RefactorCase
 ) -> tuple[str, dict[str, Any], Callable[[str], RefactorFill | None]]:
@@ -592,6 +808,12 @@ def _architecture_request(
             build_flat_fill_prompt(case),
             build_flat_fill_schema(case),
             lambda raw: parse_flat_fill(case, raw),
+        )
+    if architecture == "legacy_json":
+        return (
+            build_legacy_json_prompt(case),
+            build_legacy_json_schema(case),
+            lambda raw: parse_legacy_json(case, raw),
         )
     raise RefactorCaseError(f"unknown refactor architecture: {architecture}")
 
@@ -872,12 +1094,491 @@ def _model_output_from_fill(fill: RefactorFill | None) -> ModelOutput:
     )
 
 
+_BROWSER_CATEGORY_NAMES = (
+    "tweego_compile",
+    "browser_load",
+    "choice_reachability",
+    "choice_effect_execution",
+    "runtime_state_transaction",
+    "continuity_after_navigation",
+)
+
+
+def _production_plan_for_case(case: RefactorCase):
+    """Expand compact corpus mechanics into one production PassagePlan."""
+    from harness.generation.contracts import (
+        ChoiceSlot,
+        FormField,
+        FormOption,
+        LoopBinding,
+        PassagePlan,
+        RouteSlot,
+        StateCondition,
+        StateEffect,
+        StateOperation,
+    )
+
+    refs = list(case.plan.allowed_state_refs)
+    choices = [
+        ChoiceSlot(id=slot_id, destination=f"target_{index}")
+        for index, slot_id in enumerate(case.plan.choice_slots)
+    ]
+    fixed_effects = []
+    form_fields = []
+    exits = []
+    loop_binding = None
+
+    def add_ref(target: str) -> None:
+        if target not in refs:
+            refs.append(target)
+
+    for component in case.plan.required_components:
+        parts = component.split(":")
+        if component == "choice_guard:gold_gte_5":
+            add_ref("gold")
+            choices[0] = choices[0].model_copy(update={"conditions": (
+                StateCondition(target="gold", operation="gte", value=5),
+            )})
+        elif component == "choice_guard:has_flashlight_truthy":
+            add_ref("has_flashlight")
+            choices[0] = choices[0].model_copy(update={"conditions": (
+                StateCondition(target="has_flashlight", operation="truthy"),
+            )})
+        elif component == "scene_effect:add_gold_-5":
+            add_ref("gold")
+            fixed_effects.append(StateEffect(
+                component_id="add_gold_5",
+                target="gold",
+                operation=StateOperation.ADD,
+                value=-5,
+            ))
+        elif component == "choice_effect:spend_supplies":
+            add_ref("supplies")
+            choices[0] = choices[0].model_copy(update={"effects": (StateEffect(
+                component_id="spend_supplies",
+                target="supplies",
+                operation=StateOperation.SUBTRACT,
+                value=1,
+            ),)})
+        elif len(parts) == 3 and parts[0] == "input":
+            kind, target = parts[1:]
+            add_ref(target)
+            form_fields.append(FormField(
+                id=target,
+                kind=kind,
+                label=target.replace("_", " ").title(),
+                options=(
+                    (FormOption(label="Warrior"), FormOption(label="Scholar"))
+                    if kind == "listbox" else ()
+                ),
+            ))
+        elif len(parts) == 2 and parts[0] == "iteration":
+            add_ref(parts[1])
+            loop_binding = LoopBinding(variable="item_id", collection=parts[1])
+        elif len(parts) == 2 and parts[0] == "capture":
+            add_ref(parts[1])
+            loop_binding = LoopBinding(
+                variable=parts[1],
+                collection=loop_binding.collection if loop_binding else "inventory_items",
+            )
+        elif len(parts) == 2 and parts[0] == "exit":
+            exits.append(RouteSlot(label=parts[1], destination=f"exit_{parts[1]}"))
+        elif len(parts) == 3 and parts[0] == "weight":
+            index = next(i for i, choice in enumerate(choices) if parts[1] in choice.id)
+            choices[index] = choices[index].model_copy(update={"weight": int(parts[2])})
+        elif len(parts) == 2 and parts[0] == "restart":
+            choices[0] = choices[0].model_copy(update={
+                "destination": parts[1],
+                "restart": True,
+            })
+
+    if case.plan.passage_mode == "hub":
+        choices = [
+            choice.model_copy(update={"destination": f"hub_target_{index}"})
+            for index, choice in enumerate(choices)
+        ]
+    elif case.plan.passage_mode == "random":
+        choices = [
+            choice.model_copy(update={"destination": f"random_target_{index}"})
+            for index, choice in enumerate(choices)
+        ]
+    elif case.plan.passage_mode in {"loop", "room"}:
+        choices = [choice.model_copy(update={"destination": ""}) for choice in choices]
+    elif case.plan.passage_mode == "dialogue_loop":
+        choices = [
+            choice.model_copy(update={
+                "destination": (
+                    f"dialogue_exit_{index}" if "exit" in choice.id else ""
+                ),
+            })
+            for index, choice in enumerate(choices)
+        ]
+
+    payload = dataclasses.asdict(case.plan)
+    payload.update({
+        "choice_slots": choices,
+        "allowed_state_refs": refs,
+        "fixed_effects": fixed_effects,
+        "form_fields": form_fields,
+        "exits": exits,
+        "loop_binding": loop_binding,
+    })
+    return PassagePlan.model_validate(payload)
+
+
+def _production_pipeline_categories(
+    case: RefactorCase,
+    fill: RefactorFill | None,
+    browser_evaluator: Callable[[Any, Any, Any], Iterable[CategoryResult]] | None = None,
+) -> list[CategoryResult]:
+    names = (
+        "draft_assembly",
+        "required_component_resolution",
+        "state_transaction",
+        "compile_success",
+    )
+    unavailable_browser = [
+        CategoryResult(
+            name=name,
+            passed=False,
+            score=0.0,
+            details="browser evaluator not requested",
+            applicable=False,
+            gating=False,
+        )
+        for name in _BROWSER_CATEGORY_NAMES
+    ]
+    if fill is None:
+        return [
+            CategoryResult(
+                name=name,
+                passed=False,
+                score=0.0,
+                details="no normalized fill reached production",
+            )
+            for name in names
+        ] + unavailable_browser
+    try:
+        from harness.generation.compiler import compile_passage_draft
+        from harness.generation.contracts import NarrativeFill, assemble_passage_draft
+
+        plan = _production_plan_for_case(case)
+        production_fill = NarrativeFill.model_validate({
+            "plan_id": fill.plan_id,
+            "plan_revision": fill.plan_revision,
+            "narrative": [{
+                "slot_id": slot.slot_id,
+                "kind": slot.kind,
+                "speaker": slot.speaker,
+                "parts": [
+                    ({"kind": "text", "text": part.text}
+                     if part.kind == "text"
+                     else {"kind": part.kind, "target": part.target})
+                    for part in slot.parts
+                ],
+            } for slot in fill.narrative],
+            "choices": [dataclasses.asdict(choice) for choice in fill.choices],
+            "summary": fill.summary,
+            "beats": fill.beats,
+        })
+        draft = assemble_passage_draft(plan, production_fill)
+        artifact = compile_passage_draft(
+            draft,
+            passage_id=f"benchmark__{case.plan.plan_id}",
+            arc_name="benchmark",
+        )
+    except Exception as exc:
+        return [
+            CategoryResult(
+                name=name,
+                passed=False,
+                score=0.0,
+                details=f"production pipeline failed: {exc}",
+            )
+            for name in names
+        ] + unavailable_browser
+
+    expected_writes = (
+        *draft.resolved_effects,
+        *(effect for choice in plan.choice_slots for effect in choice.effects),
+        *(effect for effect in artifact.state_writes if effect.component_id.startswith("form_")),
+    )
+    state_ok = artifact.state_writes == expected_writes
+    categories = [
+        CategoryResult("draft_assembly", True, 1.0, "production PassageDraft assembled"),
+        CategoryResult(
+            "required_component_resolution",
+            draft.resolved_required_components == plan.required_components,
+            1.0 if draft.resolved_required_components == plan.required_components else 0.0,
+            "required component authority preserved",
+        ),
+        CategoryResult(
+            "state_transaction",
+            state_ok,
+            1.0 if state_ok else 0.0,
+            "compiler state writes match plan authority",
+        ),
+        CategoryResult(
+            "compile_success",
+            bool(artifact.twee_source),
+            1.0 if artifact.twee_source else 0.0,
+            "production compiler returned Twee",
+        ),
+    ]
+    if browser_evaluator is None:
+        return categories + unavailable_browser
+    return categories + list(browser_evaluator(case, draft, artifact))
+
+
+def make_refactor_browser_evaluator(
+    tweego_path: str | Path,
+    story_format_path: str | Path,
+    *,
+    browser_path: str | Path | None = None,
+) -> Callable[[RefactorCase, Any, Any], Iterable[CategoryResult]]:
+    """Build the opt-in real Tweego/Playwright benchmark evaluator."""
+    from harness.generation.browser_evaluator import evaluate_compile_artifact
+
+    tweego = Path(tweego_path)
+    formats = Path(story_format_path)
+    browser = Path(browser_path) if browser_path else None
+
+    def evaluate(case: RefactorCase, draft, artifact):
+        scenario = _browser_scenario_for_case(case, draft, artifact)
+        result = evaluate_compile_artifact(
+            artifact,
+            scenario,
+            tweego_path=tweego,
+            story_format_path=formats,
+            browser_path=browser,
+        )
+        details = "; ".join((*result.details, *result.runtime_errors)) or "passed"
+        values = {
+            "tweego_compile": result.tweego_compile,
+            "browser_load": result.browser_load and result.hostile_text_safe is not False,
+            "choice_reachability": result.choice_reachability,
+            "choice_effect_execution": result.choice_effect_execution,
+            "runtime_state_transaction": (
+                result.runtime_state_transaction
+                if result.form_binding is None
+                else bool(result.form_binding)
+            ),
+            "continuity_after_navigation": result.continuity_after_navigation,
+        }
+        return [
+            CategoryResult(
+                name=name,
+                passed=bool(value),
+                score=1.0 if value else 0.0,
+                details=details,
+                applicable=value is not None,
+            )
+            for name, value in values.items()
+        ]
+
+    return evaluate
+
+
+def _browser_scenario_for_case(case: RefactorCase, draft, artifact):
+    from harness.generation.browser_evaluator import (
+        BrowserChoiceExpectation,
+        BrowserFormExpectation,
+        BrowserGuardExpectation,
+        BrowserScenario,
+    )
+    plan = draft.plan
+    passage_id = f"benchmark__{case.plan.plan_id}"
+    state = {
+        target: _browser_initial_state(target)
+        for target in plan.allowed_state_refs
+    }
+    if plan.loop_binding:
+        state[plan.loop_binding.collection] = ["first", "second", "third"]
+        state.pop(plan.loop_binding.variable, None)
+    guards = []
+    for choice in plan.choice_slots:
+        for condition in choice.conditions:
+            true_value, false_value = _condition_examples(condition)
+            true_value = _state_before_entry_effects(
+                condition.target, true_value, draft.resolved_effects
+            )
+            false_value = _state_before_entry_effects(
+                condition.target, false_value, draft.resolved_effects
+            )
+            guards.extend((
+                BrowserGuardExpectation(
+                    draft.fill.choices[[item.id for item in plan.choice_slots].index(choice.id)].text,
+                    condition.target,
+                    true_value,
+                    True,
+                ),
+                BrowserGuardExpectation(
+                    draft.fill.choices[[item.id for item in plan.choice_slots].index(choice.id)].text,
+                    condition.target,
+                    false_value,
+                    False,
+                ),
+            ))
+
+    choice_expectations = []
+    copy = {item.slot_id: item for item in draft.fill.choices}
+    initial_after_entry = dict(state)
+    for effect in draft.resolved_effects:
+        _apply_browser_effect(initial_after_entry, effect)
+    for index, choice in enumerate(plan.choice_slots):
+        target = choice.destination
+        if not target and plan.passage_mode.value in {"loop", "room", "dialogue_loop"}:
+            target = passage_id
+        if not target or plan.passage_mode.value in {"form", "random"}:
+            continue
+        after = dict(initial_after_entry)
+        for effect in choice.effects:
+            _apply_browser_effect(after, effect)
+        if choice.restart:
+            after = dict(state)
+        if target == passage_id:
+            for effect in draft.resolved_effects:
+                _apply_browser_effect(after, effect)
+        choice_expectations.append(BrowserChoiceExpectation(
+            label=copy[choice.id].text,
+            target=target,
+            state_after=tuple(after.items()),
+            occurrence=(1 if plan.loop_binding else 0),
+            return_label=(
+                "Return"
+                if target != passage_id and not choice.restart and index == 0
+                else ""
+            ),
+            state_after_return=(
+                tuple(_after_revisit(after, draft.resolved_effects).items())
+                if target != passage_id and not choice.restart and index == 0
+                else ()
+            ),
+            hidden_after_return=(plan.passage_mode.value == "hub" and index == 0),
+            accept_dialog=choice.restart,
+        ))
+        if plan.passage_mode.value in {"hub", "ending"}:
+            break
+
+    form_expectations = []
+    for field in plan.form_fields:
+        if field.kind == "listbox":
+            selected = field.options[-1].label
+            selector = "select"
+            value = selected
+        else:
+            selector = 'input[type="text"]'
+            value = "Benchmark value"
+        form_expectations.append(BrowserFormExpectation(
+            selector=selector,
+            value=value,
+            state_key=field.id,
+            expected_value=value,
+        ))
+
+    expected_text = tuple(
+        part.text
+        for slot in draft.fill.narrative
+        for part in slot.parts
+        if getattr(part, "kind", "") == "text" and part.text.strip()
+    ) if plan.passage_mode.value != "random" else ()
+    random_targets = (
+        tuple(choice.destination for choice in plan.choice_slots)
+        if plan.passage_mode.value == "random" else ()
+    )
+    return BrowserScenario(
+        passage_id=passage_id,
+        story_start=("Start" if any(choice.restart for choice in plan.choice_slots) else ""),
+        expected_text=expected_text,
+        initial_state=tuple(state.items()),
+        setup_entities=tuple((target, target) for target in plan.allowed_entity_refs),
+        choices=tuple(choice_expectations),
+        guards=tuple(guards),
+        forms=tuple(form_expectations),
+        submit_label=(copy[plan.choice_slots[0].id].text if form_expectations else ""),
+        hostile_marker=("Café Æsir" if case.id == "R6-UNICODE-HOSTILE" else ""),
+        expected_choice_counts=(
+            ((copy[plan.choice_slots[0].id].text, 3),) if plan.loop_binding else ()
+        ),
+        allowed_initial_targets=random_targets,
+        random_runs=12 if random_targets else 0,
+    )
+
+
+def _browser_initial_state(target: str):
+    if target in {"gold", "supplies", "military_trust"}:
+        return 10
+    if target.startswith("has_"):
+        return True
+    return False
+
+
+def _condition_examples(condition):
+    if condition.operation == "truthy":
+        return True, False
+    if condition.operation == "falsy":
+        return False, True
+    value = condition.value
+    if condition.operation == "gte":
+        return value, value - 1
+    if condition.operation == "gt":
+        return value + 1, value
+    if condition.operation == "lte":
+        return value, value + 1
+    if condition.operation == "lt":
+        return value - 1, value
+    if condition.operation == "eq":
+        return value, None
+    return None, value
+
+
+def _apply_browser_effect(state: dict[str, Any], effect) -> None:
+    from harness.generation.contracts import StateOperation
+
+    value = state.get(effect.source) if effect.source else effect.value
+    if effect.operation == StateOperation.SET:
+        state[effect.target] = value
+    elif effect.operation == StateOperation.ADD:
+        state[effect.target] = state.get(effect.target, 0) + value
+    elif effect.operation == StateOperation.SUBTRACT:
+        state[effect.target] = state.get(effect.target, 0) - value
+    else:
+        state[effect.target] = not state.get(effect.target, False)
+
+
+def _state_before_entry_effects(target: str, desired: Any, effects) -> Any:
+    """Invert deterministic entry effects so guards are tested post-entry."""
+    from harness.generation.contracts import StateOperation
+
+    value = desired
+    for effect in reversed(tuple(effects)):
+        if effect.target != target or effect.source:
+            continue
+        if effect.operation == StateOperation.ADD:
+            value -= effect.value
+        elif effect.operation == StateOperation.SUBTRACT:
+            value += effect.value
+        elif effect.operation == StateOperation.TOGGLE:
+            value = not value
+        elif effect.operation == StateOperation.SET:
+            value = effect.value
+    return value
+
+
+def _after_revisit(state: dict[str, Any], effects) -> dict[str, Any]:
+    result = dict(state)
+    for effect in effects:
+        _apply_browser_effect(result, effect)
+    return result
+
+
 def execute_refactor_cases(
     cfg: BenchmarkConfig,
     cases: Iterable[RefactorCase],
     *,
     architectures: Iterable[str] | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
+    browser_evaluator: Callable[[Any, Any, Any], Iterable[CategoryResult]] | None = None,
 ) -> list[Any]:
     case_list = tuple(cases)
     architecture_list = tuple(
@@ -942,7 +1643,10 @@ def execute_refactor_cases(
                         )
                         raw = generated.response
                         fill = parse(raw)
-                        categories = score_refactor_fill(case, raw, fill)
+                        categories = [
+                            *score_refactor_fill(case, raw, fill),
+                            *_production_pipeline_categories(case, fill, browser_evaluator),
+                        ]
                     except Exception as exc:
                         raw = ""
                         fill = None

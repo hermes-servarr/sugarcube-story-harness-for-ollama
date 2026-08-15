@@ -1,0 +1,1 @@
+{"fingerprint":"720f49933ee699244c495a43c82cdc935153b49153b8d7cbdbf9f5b90a7f9e57","topology":{"locations":[{"actions":[],"encounter_table_refs":[],"id":"harbor","name":"Harbor","region_id":"coast","tags":[]},{"actions":[],"encounter_table_refs":[],"id":"island","name":"Island","region_id":"coast","tags":[]}],"revision":2,"routes":[],"schema_version":1}}

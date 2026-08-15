@@ -1,0 +1,5 @@
+[
+  {"schema_version": 1, "id": "SD-FACTION-BOUNDS", "kind": "faction", "seed": 61},
+  {"schema_version": 1, "id": "SD-ENCOUNTER-REUSE", "kind": "encounter", "seed": 67},
+  {"schema_version": 1, "id": "SD-CHARACTER-VISIBILITY", "kind": "character", "seed": 71}
+]

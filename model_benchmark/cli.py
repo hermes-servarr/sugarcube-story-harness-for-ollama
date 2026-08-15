@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
 from model_benchmark.config import BenchmarkConfig, parse_cli_args
-from model_benchmark.profiles import PROFILE_NAMES, REFACTOR_PROFILE_NAMES
+from model_benchmark.profiles import PROFILE_NAMES, REFACTOR_PROFILE_NAMES, SANDBOX_PROFILE_NAMES
 
 logger = logging.getLogger("model_benchmark.cli")
 
@@ -493,18 +493,31 @@ def _build_subcommand_parser() -> argparse.ArgumentParser:
             "Named built-in workload: canary=16 calls/model, "
             "core=28 calls/model, full=82 calls/model, "
             "refactor-canary=10 cases/architecture, "
-            "refactor-core=24 cases/architecture."
+            "refactor-core=24 cases/architecture, sandbox-canary/core add "
+            "frozen deterministic runtime scenarios."
         ),
     )
     p_run.add_argument(
         "--architectures",
         nargs="+",
-        choices=["typed_fill", "flat_fill"],
+        choices=["typed_fill", "flat_fill", "legacy_json"],
         default=["typed_fill", "flat_fill"],
         help=(
             "Harness structures compared by refactor profiles "
             "(default: typed_fill flat_fill)."
         ),
+    )
+    p_run.add_argument(
+        "--browser-gate",
+        action="store_true",
+        help="Compile and execute refactor artifacts in Playwright.",
+    )
+    p_run.add_argument("--tweego-bin", default="", help="Tweego executable.")
+    p_run.add_argument(
+        "--tweego-formats", default="", help="SugarCube story-format directory."
+    )
+    p_run.add_argument(
+        "--chromium-bin", default="", help="Optional Chromium executable."
     )
     p_run.add_argument(
         "--runs",
@@ -1150,7 +1163,13 @@ def _cmd_run(
         except ValueError:
             if not quiet:
                 sys.stderr.write("Seed must be a non-negative integer.\n")
-            return 2
+                return 2
+    if cfg.browser_gate and (not cfg.tweego_bin or not cfg.tweego_formats):
+        if not quiet:
+            sys.stderr.write(
+                "--browser-gate requires --tweego-bin and --tweego-formats.\n"
+            )
+        return 2
     profile = cfg.benchmark_profile
     if profile and declarative_mode:
         if not quiet:
@@ -1180,7 +1199,8 @@ def _cmd_run(
                 sys.stderr.write(f"Invalid private ingestion routing: {exc}\n")
             return 2
 
-    refactor_profile = profile in REFACTOR_PROFILE_NAMES
+    sandbox_profile = profile in SANDBOX_PROFILE_NAMES
+    refactor_profile = profile in (*REFACTOR_PROFILE_NAMES, *SANDBOX_PROFILE_NAMES)
     capability_cases: tuple[Any, ...] = ()
     run_capability_tests = bool(
         (profile and not refactor_profile)
@@ -1210,8 +1230,14 @@ def _cmd_run(
 
         refactor_cases = select_refactor_cases(
             load_refactor_cases(),
-            profile,
+            "refactor-canary" if profile == "sandbox-canary" else
+            "refactor-core" if profile == "sandbox-core" else profile,
         )
+
+    sandbox_cases: tuple[Any, ...] = ()
+    if sandbox_profile and not cfg.dry_run:
+        from model_benchmark.sandbox_benchmark import load_sandbox_cases, select_sandbox_cases
+        sandbox_cases = select_sandbox_cases(load_sandbox_cases(), profile)
 
     context_sizes: tuple[int, ...] = ()
     if getattr(args, "context_window_tests", False) and not cfg.dry_run:
@@ -1241,7 +1267,9 @@ def _cmd_run(
         * max(1, cfg.runs)
         * len(cfg.refactor_architectures)
     )
-    capability_total = legacy_capability_total + refactor_total
+    sandbox_domain_total = 1 if profile == "sandbox-canary" else 3 if profile == "sandbox-core" else 0
+    sandbox_total = model_count * (len(sandbox_cases) + sandbox_domain_total)
+    capability_total = legacy_capability_total + refactor_total + sandbox_total
     context_total = model_count * len(context_sizes)
     overall_total = matrix_total + capability_total + context_total
     benchmark_started_clock = time.monotonic()
@@ -1416,14 +1444,29 @@ def _cmd_run(
                 }
             )
 
+        browser_evaluator = None
+        if cfg.browser_gate:
+            from model_benchmark.refactor_benchmark import make_refactor_browser_evaluator
+
+            browser_evaluator = make_refactor_browser_evaluator(
+                cfg.tweego_bin,
+                cfg.tweego_formats,
+                browser_path=cfg.chromium_bin or None,
+            )
+
         results.extend(
             execute_refactor_cases(
                 cfg,
                 refactor_cases,
                 architectures=cfg.refactor_architectures,
                 progress_callback=report_refactor_progress,
+                browser_evaluator=browser_evaluator,
             )
         )
+
+    if sandbox_profile and not cfg.dry_run:
+        from model_benchmark.sandbox_benchmark import execute_sandbox_cases
+        results.extend(execute_sandbox_cases(cfg, sandbox_cases))
 
     if getattr(args, "context_window_tests", False) and not cfg.dry_run:
         from model_benchmark.context_window_tests import (
@@ -1482,8 +1525,7 @@ def _cmd_run(
 
     # ── Manifest ─────────────────────────────────────────────────────────
     from model_benchmark.metadata import collect_reproducibility_metadata
-    manifest = collect_reproducibility_metadata(
-        cfg,
+    _manifest_kwargs: dict[str, Any] = dict(
         run_id=getattr(runner, "run_id", None),
         start_timestamp=benchmark_started_at,
         completion_timestamp=benchmark_completed_at,
@@ -1492,6 +1534,17 @@ def _cmd_run(
         random_seed=cfg.random_seed,
         argv=sys.argv[1:],
     )
+    if refactor_profile:
+        from model_benchmark.refactor_benchmark import refactor_corpus_checksums
+        checksums = refactor_corpus_checksums()
+        dataset_name = "refactor_cases"
+        if sandbox_profile:
+            from model_benchmark.sandbox_benchmark import sandbox_corpus_checksums
+            checksums = (*checksums, *sandbox_corpus_checksums())
+            dataset_name = "refactor_and_sandbox_cases"
+        _manifest_kwargs["dataset_checksums"] = checksums
+        _manifest_kwargs["dataset_name"] = dataset_name
+    manifest = collect_reproducibility_metadata(cfg, **_manifest_kwargs)
 
     # ── Anonymization ───────────────────────────────────────────────────
     anon_results = results
@@ -1622,6 +1675,14 @@ def _run_args_to_legacy_argv(args: argparse.Namespace) -> list[str]:
     architectures = getattr(args, "architectures", []) or []
     if architectures:
         out += ["--architectures", *architectures]
+    if getattr(args, "browser_gate", False):
+        out.append("--browser-gate")
+    if getattr(args, "tweego_bin", ""):
+        out += ["--tweego-bin", args.tweego_bin]
+    if getattr(args, "tweego_formats", ""):
+        out += ["--tweego-formats", args.tweego_formats]
+    if getattr(args, "chromium_bin", ""):
+        out += ["--chromium-bin", args.chromium_bin]
     runs = getattr(args, "runs", 1)
     if runs != 1:
         out += ["--runs", str(runs)]

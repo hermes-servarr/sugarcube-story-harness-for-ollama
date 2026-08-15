@@ -160,6 +160,21 @@ region, or scenario. A local override inherits global world/state definitions
 but declares its own validation profile. Changing modes runs a migration preview
 and never rewrites graph structure automatically.
 
+Authors may tune **Story guidance** independently of the preset:
+
+| Setting | Planner behavior |
+|---|---|
+| **Off** | no required main plot, beats, anchors, climax, or ending; generate only from world state, player action, and eligible agendas/opportunities |
+| **Light** | suggest optional threads and distant developments, but never force them into the current encounter |
+| **Anchors** | Hybrid default; major authored events become eligible when world conditions are met |
+| **Directed** | Story-driven default; unresolved beats and arc progression strongly influence passage planning |
+
+Sandbox defaults to `story_guidance: off`. This is the explicit “much more
+sandbox” option: planned arcs become optional reference material; ending,
+climax, and forward-beat coverage checks are disabled; player-selected goals,
+local actions, character agendas, and world-system changes drive opportunity
+selection. Authors may enable `Light` guidance without leaving Sandbox mode.
+
 Mode affects:
 
 - planning vocabulary and prompt/context assembly;
@@ -187,6 +202,7 @@ A versioned project-level contract containing:
 - `mode`: `story_driven`, `hybrid`, or `sandbox`;
 - `narrative_pressure`: how strongly planning prioritizes unresolved authored
   beats;
+- `story_guidance`: off, light, anchors, or directed;
 - `world_reactivity`: how frequently persistent systems create opportunities;
 - `encounter_reuse`: whether and how authored encounters may recur;
 - `time_model`: none, turn, phase, day, or authored clock;
@@ -194,6 +210,8 @@ A versioned project-level contract containing:
 - `ending_policy`: required, optional, or none;
 - `failure_persistence`: whether setbacks alter the continuing world rather than
   forcing retry; and
+- `character_simulation`: none, relationships, persistent_stats, or full_agendas;
+- `main_plot_required`: false for Sandbox by default; and
 - explicit region/arc overrides.
 
 Named modes provide safe defaults. Advanced values may be tuned independently,
@@ -322,6 +340,38 @@ Add shared production contracts rather than encoding sandbox behavior in prose:
 - `RuntimeSession`: persistent player/world state plus deterministic event seed
   and visit history.
 
+Persistent characters use explicit typed contracts:
+
+- `CharacterStatDefinition`: stable stat ID, value type, bounds, default,
+  visibility, update operations, optional decay/recovery rule, and description;
+- `CharacterRuntimeState`: character ID, current location, activity, health and
+  condition values, needs, relationship values, faction standings, inventory,
+  known facts, goals/agendas, schedule state, cooldowns, last-updated clock, and
+  revision;
+- `RelationshipState`: directed character-to-character values such as trust,
+  fear, affection, hostility, obligation, and familiarity;
+- `NeedState`: bounded needs such as hunger, rest, safety, money, status, or
+  belonging plus deterministic change rules;
+- `AgendaState`: goal, priority, progress, eligibility, deadline, current step,
+  blocked reason, and completion/failure state;
+- `ScheduleRule`: time/location/activity rules plus exception priority;
+- `ConditionState`: injuries, illnesses, moods, buffs/debuffs, duration, source,
+  and deterministic recovery/expiry; and
+- `CharacterMemory`: bounded structured facts/events the character knows or
+  remembers, with source visit and optional salience/expiry.
+
+Stats are schema-defined rather than hard-coded. A project can use a small
+social sandbox with only trust and location, or a deeper simulation with health,
+energy, needs, schedules, inventory, skills, relationships, and agendas.
+Definitions declare what the UI and model may see; hidden/private character
+state remains excluded from player-facing prose unless a plan authorizes it.
+
+All runtime character mutations are typed effects such as `set`, `add`,
+`remove`, `clamp`, `add_fact`, `remove_fact`, `move_character`,
+`start_condition`, `advance_agenda`, and `schedule_activity`. The engine validates
+bounds, type, target, and authority before applying an effect. The model never
+returns an arbitrary stat dictionary or directly decides mutation values.
+
 The model may write narrative variation and choice copy for an eligible
 encounter. It does not select arbitrary targets, advance time, mutate faction
 state, determine eligibility, or bypass cooldown/occurrence limits.
@@ -334,7 +384,8 @@ states. Separate:
 
 1. **Canonical authored facts** — stable world/entity truth;
 2. **Persistent runtime state** — player, faction, resource, clock, and world
-   values for one playthrough;
+   values for one playthrough, including one `CharacterRuntimeState` per active
+   simulated character;
 3. **Visit history** — ordered observations/actions/effects per entry;
 4. **Authoring fixtures** — named states used to preview and test content; and
 5. **Context summaries** — derived, disposable views for generation.
@@ -343,6 +394,12 @@ states. Separate:
 hybrid/sandbox content references state requirements and fixture IDs rather than
 claiming one snapshot is true for every visit. Migration must not copy a static
 node snapshot into runtime state on every re-entry.
+
+Starting a new game/session initializes fresh runtime character state from
+canonical defaults. Saving/loading preserves it. Returning to a character later
+uses the updated state—injuries, relationships, inventory, location, knowledge,
+agenda progress, and cooldowns do not reset unless an explicit rule changes
+them. Canonical character sheets are never rewritten by ordinary play.
 
 ## 5. Proposed Module Boundaries
 
@@ -437,7 +494,8 @@ The complete visual and interaction set is indexed in
 `docs/ui-mockups/README.md`. It includes the authoring workspace, full story
 map, new-passage plan review, mechanics editor, playable preview and runtime
 trace, world continuity, benchmark comparison, media library, commit transaction
-review, stale-draft recovery, and model/capability settings. The index defines
+review, stale-draft recovery, model/capability settings, sandbox topology, and
+sandbox-experience settings. The index defines
 component inventories, interaction contracts, and required loading, empty,
 stale, conflict, failure, and long-running states that are not visible in the
 happy-path images.
@@ -467,6 +525,15 @@ It replaces linear act lanes with location topology, current world time,
 persistent systems, reusable opportunities, available player actions, local
 state, and eligible encounter tables. The complete interaction contract is in
 `docs/ui-mockups/README.md`.
+
+The corresponding experience and persistent-character configuration is also
+specified visually:
+
+![Sandbox experience settings](docs/ui-mockups/sandbox-experience-settings.png)
+
+This makes the non-story-driven behavior explicit: Story guidance Off,
+player-directed goals, optional endings, persistent failure, reusable
+encounters, and selectable character-simulation depth.
 
 ### 6.3 Information architecture
 
@@ -1499,14 +1566,17 @@ forcing sandbox behavior into a static branching-story abstraction.
 2. Add topology/location/route authoring and validation.
 3. Add typed time, resource, faction, agenda, trigger, cooldown, and occurrence
    rules.
-4. Add reusable `EncounterTemplate` planning and generation through the same
+4. Add configurable persistent character stats, relationships, needs,
+   conditions, schedules, knowledge/memory, inventory, location, and agendas.
+5. Add reusable `EncounterTemplate` planning and generation through the same
    NarrativeFill/PassageDraft/compiler pipeline.
-5. Add runtime session and visit-history persistence separate from authored
+6. Add runtime session and visit-history persistence separate from authored
    `story.json` truth.
-6. Add fixture-driven simulation, opportunity eligibility, and trace export.
-7. Add Story-driven, Hybrid, and Sandbox project presets plus migration preview.
-8. Implement the sandbox UI workspace and Hybrid anchor overlay.
-9. Add sandbox-specific benchmark cases and long-run invariant/property tests.
+7. Add fixture-driven simulation, opportunity eligibility, and trace export.
+8. Add Story-driven, Hybrid, and Sandbox project presets, Story-guidance
+   controls, character-simulation depth, and migration preview.
+9. Implement the sandbox UI workspace and Hybrid anchor overlay.
+10. Add sandbox-specific benchmark cases and long-run invariant/property tests.
 
 #### Deterministic ownership
 
@@ -1517,6 +1587,8 @@ The engine owns:
 - time advancement;
 - resource bounds;
 - faction/system transitions;
+- character stat, condition, need, relationship, location, schedule, memory, and
+  agenda transitions;
 - encounter selection from eligible weighted tables;
 - cooldowns and occurrence limits;
 - persistent consequences; and
@@ -1538,12 +1610,15 @@ open slot.
 | Opportunity availability | optional | minimum coverage by region/state | liveness gate |
 | Resource/system bounds | mechanics-specific | required for enabled systems | required |
 | Long-run invariant | diagnostic | gate for enabled systems | promotion gate |
+| Character persistence | optional | required for enabled character simulation | promotion gate |
 
 #### Exit gate
 
 - The same fixed state/seed/action sequence produces the same trace.
 - Authored project files remain unchanged during disposable simulation.
 - Revisit and occurrence semantics pass deterministic and browser tests.
+- Character state persists across travel, time advancement, encounters,
+  save/load, and revisits without rewriting canonical character sheets.
 - Sandbox liveness and invariants pass across declared long-run fixtures.
 - Hybrid anchor progression works without disabling free exploration.
 - Existing Story-driven projects behave identically under the explicit profile.
@@ -1621,6 +1696,11 @@ Sandbox/Hybrid records additionally report:
 9. invariant violations and soft-locks;
 10. player-goal support and consequence legibility; and
 11. narrative repetition/variation quality for reused encounters.
+12. character-state persistence across encounters, travel, clock advancement,
+    save/load, and revisits;
+13. character stat bounds, relationship directionality, agenda progression, and
+    schedule/location consistency; and
+14. private/hidden character-state leakage into player-facing text.
 
 Ending reachability is reported only when the effective profile declares an
 ending policy. Cyclic play is not itself a failure.
@@ -1660,6 +1740,10 @@ For sandbox scenarios also review:
   forcing an authored main plot; and
 - whether character/faction behavior feels persistent instead of reset per
   location.
+- whether simulated characters pursue their own agendas without making every
+  opportunity serve a main plot; and
+- whether persistent stats affect prose and available actions when relevant,
+  without turning every scene into a visible-stat recital.
 
 ### 8.6 Case changes
 
@@ -1753,6 +1837,9 @@ Do these next, in order:
 12. Develop sandbox simulation after compiler/draft authority is stable; begin
     with pure topology, action, clock, and eligibility fixtures before any model
     generation.
+13. Define `CharacterStatDefinition` and `CharacterRuntimeState` together with
+    save/load and revisit fixtures before enabling Persistent stats or Full
+    agendas in project creation.
 
 Do not begin with more global prompt suffixes, a UI rewrite, staged mechanics, capability routing, or deletion of legacy code. Those changes either lack a trustworthy evaluation boundary or depend on the compiler and draft contracts established in the first slices.
 
@@ -1778,3 +1865,5 @@ Do not begin with more global prompt suffixes, a UI rewrite, staged mechanics, c
 - `docs/ui-mockups/greenfield-authoring-workspace.prompt.md` — reproducible mockup brief and generation metadata
 - `docs/ui-mockups/README.md` — complete mockup index and screen-by-screen interaction contract
 - `docs/ui-mockups/mockup-set-prompts.md` — reproducible prompts for the extended screen set
+- `docs/ui-mockups/sandbox-workspace.png` — sandbox topology, systems, opportunities, and location actions
+- `docs/ui-mockups/sandbox-experience-settings.png` — Story-guidance and persistent-character simulation controls

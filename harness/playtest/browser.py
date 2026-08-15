@@ -33,7 +33,11 @@ def launch_browser() -> Page:
         os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", pw_path)
 
     pw = sync_playwright().start()
-    browser = pw.chromium.launch(headless=True)
+    try:
+        browser = pw.chromium.launch(headless=True)
+    except Exception:
+        pw.stop()
+        raise
     page = browser.new_page()
     # Attach handles so close_browser can find them
     page._browser = browser  # type: ignore[attr-defined]
@@ -43,8 +47,9 @@ def launch_browser() -> Page:
 
 def close_browser(browser: Browser) -> None:
     """Close the browser and release all resources."""
+    attached_browser = getattr(browser, "_browser", None)
     try:
-        browser.close()
+        (attached_browser or browser).close()
     except Exception:
         pass
     # Stop the playwright instance if it's attached

@@ -18,10 +18,10 @@ from model_benchmark.config import BenchmarkConfig, parse_cli_args, _build_parse
 class TestBenchmarkConfigFields:
     """Test the EXTENDED BenchmarkConfig dataclass per P2 §2 and P3 §1.1."""
 
-    def test_benchmark_config_23_fields(self):
-        """23 fields total (8 required + 15 optional)."""
+    def test_benchmark_config_27_fields(self):
+        """27 fields total (8 required + 19 optional)."""
         fields = list(BenchmarkConfig.__dataclass_fields__)
-        assert len(fields) == 23, f"Expected 23 fields, got {len(fields)}"
+        assert len(fields) == 27, f"Expected 27 fields, got {len(fields)}"
 
     def test_benchmark_config_required_fields(self):
         """8 required fields have no defaults."""
@@ -31,13 +31,14 @@ class TestBenchmarkConfigFields:
             assert name in BenchmarkConfig.__dataclass_fields__
 
     def test_benchmark_config_optional_fields(self):
-        """12 optional fields have defaults (3 original + 9 new)."""
+        """All optional fields have backward-compatible defaults."""
         optional = ["dry_run", "output_path", "json_output_path",
                     "checkpoint_every", "checkpoint_interval_seconds",
                     "output_dir", "verbose", "quiet", "anonymize",
                     "baseline_dir", "random_seed", "force_rerun",
                     "ingestion_routing_path", "benchmark_profile",
-                    "refactor_architectures"]
+                    "refactor_architectures", "browser_gate", "tweego_bin",
+                    "tweego_formats", "chromium_bin"]
         for name in optional:
             assert name in BenchmarkConfig.__dataclass_fields__
 
@@ -59,6 +60,10 @@ class TestBenchmarkConfigFields:
         assert cfg.force_rerun is False
         assert cfg.ingestion_routing_path == ""
         assert cfg.benchmark_profile == ""
+        assert cfg.browser_gate is False
+        assert cfg.tweego_bin == ""
+        assert cfg.tweego_formats == ""
+        assert cfg.chromium_bin == ""
 
     def test_benchmark_config_frozen(self):
         """Dataclass is frozen (immutable)."""
@@ -161,6 +166,19 @@ class TestParseCliArgs:
         assert cfg.variants == ("compact", "full", "json", "thinking")
         assert cfg.directions == tuple("ABCDEFGH")
 
+    def test_parse_cli_args_browser_gate(self):
+        cfg = parse_cli_args([
+            "--browser-gate",
+            "--tweego-bin", "/opt/tweego",
+            "--tweego-formats", "/opt/storyformats",
+            "--chromium-bin", "/opt/chromium",
+        ])
+
+        assert cfg.browser_gate is True
+        assert cfg.tweego_bin == "/opt/tweego"
+        assert cfg.tweego_formats == "/opt/storyformats"
+        assert cfg.chromium_bin == "/opt/chromium"
+
     def test_parse_cli_args_anonymize_boolean_optional_action(self):
         """--anonymize / --no-anonymize toggle the anonymize field (default True)."""
         cfg_default = parse_cli_args([])
@@ -205,6 +223,7 @@ class TestBuildParser:
                     "baseline", "seed", "force_rerun"}
         expected.add("ingestion_routing")
         expected.add("profile")
+        expected.update({"browser_gate", "tweego_bin", "tweego_formats", "chromium_bin"})
         assert expected.issubset(actions), f"Missing: {expected - actions}"
 
     def test_build_parser_defaults(self):
@@ -220,6 +239,10 @@ class TestBuildParser:
         assert defaults["checkpoint_interval"] == 60.0
         assert defaults["output_dir"] == "benchmark_outputs"
         assert defaults["anonymize"] is True
+        assert defaults["browser_gate"] is False
+        assert defaults["tweego_bin"] == ""
+        assert defaults["tweego_formats"] == ""
+        assert defaults["chromium_bin"] == ""
 
     def test_build_parser_anonymize_default_true(self):
         """--anonymize defaults True."""

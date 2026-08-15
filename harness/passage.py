@@ -575,7 +575,10 @@ def _render_passage_tw(
         for i, c in enumerate(choices):
             ph = f'"UNRESOLVED_choice{i}_{_safe_slug(c.hint or c.text)}"'
             weighted.extend([ph] * max(1, int(getattr(c, "weight", 1) or 1)))
-        lines.append(f"<<goto either({', '.join(weighted)})>>")
+        lines.append(
+            f"<<set _harnessRoute to either({', '.join(weighted)})>>"
+            "<<goto _harnessRoute>>"
+        )
         lines.append("")
 
     elif passage_type == "room":
@@ -662,9 +665,9 @@ def _render_passage_tw(
         # is emitted once per iteration (the LLM conventionally supplies a
         # single templated choice whose text/state reference $loopvar).
         loop_head = (
-            f"<<for {loop_vars[0]} in {loop_collection}>>"
+            f"<<for {loop_vars[0]} range {loop_collection}>>"
             if len(loop_vars) == 1
-            else f"<<for _i, {loop_vars[0]} in {loop_collection}>>"
+            else f"<<for _i, {loop_vars[0]} range {loop_collection}>>"
         )
         lines.append(loop_head)
         for i, choice in enumerate(choices):
@@ -690,6 +693,12 @@ def _render_passage_tw(
     for slot_id in media_slot_ids:
         lines.append(f"<!-- media:{slot_id} -->")
     return "\n".join(lines) + "\n"
+
+
+# Preserve the pre-extraction renderer solely as a byte-parity oracle during
+# migration.  All production callers below use the pure generation compiler.
+_legacy_render_passage_tw = _render_passage_tw
+from .generation.compiler import render_passage_tw as _render_passage_tw
 
 
 def _update_passage_links(content: str, link_map: dict[str, str]) -> str:

@@ -268,6 +268,35 @@ async def call_ollama(
     ingestion_profile: str = "",
     seed: int | None = None,
 ) -> str:
+    """Compatibility wrapper returning only generated text."""
+    return (
+        await call_ollama_detailed(
+            cfg,
+            prompt,
+            timeout,
+            temperature=temperature,
+            num_predict=num_predict,
+            format_spec=format_spec,
+            label=label,
+            ingestion_profile=ingestion_profile,
+            seed=seed,
+        )
+    ).response
+
+
+async def call_ollama_detailed(
+    cfg: HarnessConfig,
+    prompt: str,
+    timeout: float = 120.0,
+    *,
+    temperature: float | None = None,
+    num_predict: int | None = None,
+    format_spec: str | dict | None = None,
+    label: str = "",
+    ingestion_profile: str = "",
+    seed: int | None = None,
+) -> OllamaGenerationResult:
+    """Async generation retaining Ollama's token and completion metadata."""
     url = f"{cfg.ollama_base_url.rstrip('/')}/api/generate"
     payload = _ollama_payload(
         cfg, prompt,
@@ -283,10 +312,16 @@ async def call_ollama(
             resp = await client.post(url, json=payload)
             _raise_if_missing(resp, cfg.ollama_model)
             resp.raise_for_status()
-            out = resp.json().get("response", "")
+            data = resp.json()
+            result = OllamaGenerationResult(
+                response=str(data.get("response", "")),
+                prompt_eval_count=max(0, int(data.get("prompt_eval_count", 0) or 0)),
+                eval_count=max(0, int(data.get("eval_count", 0) or 0)),
+                done_reason=str(data.get("done_reason", "") or ""),
+            )
         _log_call(cfg, payload, label, format_spec,
                   status="ok", ms=int((time.monotonic() - t0) * 1000))
-        return out
+        return result
     except Exception as e:
         _log_call(cfg, payload, label, format_spec,
                   status="error", ms=int((time.monotonic() - t0) * 1000), detail=str(e))

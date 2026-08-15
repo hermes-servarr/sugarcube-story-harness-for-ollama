@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import os
 import ast
+from pathlib import Path
 
 from harness.playtest.models import (
     ChoiceInfo, ConsoleMessage, IssueCategory, IssueSeverity,
     PlaytestConfig, PlaytestIssue, PlaytestStep,
 )
+
+REPO_ROOT = Path(__file__).parents[1]
 
 
 # --- CLI / parse_args tests ---
@@ -83,9 +86,12 @@ def test_launch_browser_missing_playwright():
     # We can't truly remove it, but we can test the function exists and is callable
     # In the project venv (no playwright), this will raise ImportError
     try:
-        launch_browser()
+        page = launch_browser()
         # If we get here, playwright is installed (e.g. in crawl4ai venv)
-        # That's fine — the test just verifies the function is callable
+        # That's fine — close it so the sync Playwright event loop does not
+        # leak into later tests.
+        from harness.playtest.browser import close_browser
+        close_browser(page)
     except ImportError as e:
         assert "playwright" in str(e).lower() or "install" in str(e).lower()
     except Exception:
@@ -102,7 +108,7 @@ def test_no_todo_markers_in_playtest():
         ["grep", "-r", "TODO(playtest)",
          "harness/playtest/", "scripts/playtest_game.py"],
         capture_output=True, text=True,
-        cwd="/opt/data/sugarcube-story-harness-for-ollama",
+        cwd=REPO_ROOT,
     )
     # grep returns 1 when no matches found
     assert result.returncode == 1 or result.stdout == ""
@@ -114,7 +120,7 @@ def test_no_not_implemented_in_playtest():
         ["grep", "-r", "NotImplementedError",
          "harness/playtest/", "scripts/playtest_game.py"],
         capture_output=True, text=True,
-        cwd="/opt/data/sugarcube-story-harness-for-ollama",
+        cwd=REPO_ROOT,
     )
     assert result.returncode == 1 or result.stdout == ""
 

@@ -6,6 +6,7 @@ from model_benchmark.profiles import (
     CORE_MATRIX_CASES,
     PROFILE_NAMES,
     REFACTOR_PROFILE_NAMES,
+    SANDBOX_PROFILE_NAMES,
     resolve_matrix_cases,
 )
 
@@ -47,6 +48,13 @@ def test_refactor_profiles_run_only_fixed_plan_cases():
     assert set(REFACTOR_PROFILE_NAMES).issubset(PROFILE_NAMES)
     assert resolve_matrix_cases("refactor-canary", ALL_VARIANTS, ALL_DIRECTIONS) == ()
     assert resolve_matrix_cases("refactor-core", ALL_VARIANTS, ALL_DIRECTIONS) == ()
+
+
+def test_sandbox_profiles_combine_fixed_plan_and_runtime_cases():
+    assert SANDBOX_PROFILE_NAMES == ("sandbox-canary", "sandbox-core")
+    assert set(SANDBOX_PROFILE_NAMES).issubset(PROFILE_NAMES)
+    assert resolve_matrix_cases("sandbox-canary", ALL_VARIANTS, ALL_DIRECTIONS) == ()
+    assert resolve_matrix_cases("sandbox-core", ALL_VARIANTS, ALL_DIRECTIONS) == ()
 
 
 def test_canary_capability_set_has_eight_unique_harness_cases():

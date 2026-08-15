@@ -186,7 +186,7 @@ def play_to_final_confrontation(page, html_path: str, class_choice="Mage"):
     return True
 
 
-def test_ending(page, ending_name, ending_link_text, expected_passage):
+def _test_ending(page, ending_name, ending_link_text, expected_passage):
     """Test a single ending by clicking the appropriate link."""
     # Click the ending choice
     if not click_link(page, ending_link_text):
@@ -223,7 +223,7 @@ def run_ending_tests(project_path: Path, html_path: str):
         context.clear_cookies()
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
         play_to_final_confrontation(page, html_path, class_choice="Warrior")
-        results.append(("Seal the Breach", test_ending(page, "Seal", "Seal the breach", "Ending Seal")))
+        results.append(("Seal the Breach", _test_ending(page, "Seal", "Seal the breach", "Ending Seal")))
 
         print("\n=== ENDING TEST: Claim the Power ===")
         # Need a fresh page to clear SugarCube state completely
@@ -231,7 +231,7 @@ def run_ending_tests(project_path: Path, html_path: str):
         page = context.new_page()
         page.on("pageerror", lambda err: js_errors.append(str(err)))
         play_to_final_confrontation(page, html_path, class_choice="Warrior")
-        results.append(("Claim the Power", test_ending(page, "Power", "Claim the power", "Ending Power")))
+        results.append(("Claim the Power", _test_ending(page, "Power", "Claim the power", "Ending Power")))
 
         print("\n=== ENDING TEST: Ritual of Binding (requires INT >= 13) ===")
         page.close()
@@ -241,7 +241,7 @@ def run_ending_tests(project_path: Path, html_path: str):
         # Check if the ritual link appears (requires INT >= 13)
         ritual_link = page.query_selector('.passage a:has-text("Attempt the ritual")')
         if ritual_link:
-            results.append(("Ritual of Binding", test_ending(page, "Ritual", "Attempt the ritual", "Ending Ritual")))
+            results.append(("Ritual of Binding", _test_ending(page, "Ritual", "Attempt the ritual", "Ending Ritual")))
         else:
             print("  SKIP: Ritual link not found (INT may be too low)")
             results.append(("Ritual of Binding", False))

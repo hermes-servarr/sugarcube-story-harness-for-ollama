@@ -189,18 +189,18 @@ class LoopPassageTypeTests(unittest.TestCase):
         c = ParsedChoice(text="Talk to $npc", hint="talk",
                          skill_check=SkillCheck(stat="$npc", dc=5))
         tw = self._render_loop([c], ["$npc"])
-        self.assertIn("<<for $npc in $npcs>>", tw)
+        self.assertIn("<<for $npc range $npcs>>", tw)
         self.assertIn("<</for>>", tw)
         self.assertIn("<<capture $npc>>", tw)
         self.assertIn("<</capture>>", tw)
         # capture is INSIDE the for, wrapping the link
-        self.assertIn("<<for $npc in $npcs>>\n<<capture $npc>><<link", tw)
+        self.assertIn("<<for $npc range $npcs>>\n<<capture $npc>><<link", tw)
 
     def test_loop_link_with_set_referencing_loop_var(self):
         c = ParsedChoice(text="Select $npc", hint="sel",
                          state_writes={"$chosen": "$npc"})
         tw = self._render_loop([c], ["$npc"])
-        self.assertIn("<<for $npc in $npcs>>", tw)
+        self.assertIn("<<for $npc range $npcs>>", tw)
         self.assertIn("<<capture $npc>>", tw)
         self.assertIn("<<set $chosen to \"$npc\">>", tw)
 
@@ -209,7 +209,7 @@ class LoopPassageTypeTests(unittest.TestCase):
         wrapped — capture only applies when the body reads a loop var."""
         c = ParsedChoice(text="Continue", hint="cont")
         tw = self._render_loop([c], ["$npc"])
-        self.assertIn("<<for $npc in $npcs>>", tw)
+        self.assertIn("<<for $npc range $npcs>>", tw)
         self.assertNotIn("<<capture", tw)
 
     def test_loop_passage_tag_in_header(self):
@@ -271,7 +271,7 @@ class NestedForLoopTests(unittest.TestCase):
             location="", characters=[], passage_type="loop",
             loop_vars=["$item"], loop_collection="$room.items",
         )
-        self.assertIn("<<for $item in $room.items>>", tw)
+        self.assertIn("<<for $item range $room.items>>", tw)
         self.assertIn("<<capture $item>>", tw)
         self.assertIn("<<set $inv to \"$item\">>", tw)
 

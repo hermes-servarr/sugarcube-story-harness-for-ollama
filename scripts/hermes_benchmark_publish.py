@@ -477,13 +477,13 @@ def _benchmark_args(config: dict[str, Any], output_dir: Path) -> list[str]:
             or not architectures
             or len(architectures) != len(set(map(str, architectures)))
             or any(
-                architecture not in {"typed_fill", "flat_fill"}
+                architecture not in {"typed_fill", "flat_fill", "legacy_json"}
                 for architecture in architectures
             )
         ):
             raise ValueError(
                 "architectures must be a unique non-empty subset of "
-                "typed_fill and flat_fill"
+                "typed_fill, flat_fill, and legacy_json"
             )
         args.extend(["--architectures", *map(str, architectures)])
     for flag, key in (

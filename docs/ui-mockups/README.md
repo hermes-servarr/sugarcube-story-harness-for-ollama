@@ -26,6 +26,7 @@ this file and `refactor-rebuild-plan.md` wins.
 | [Stale draft conflict](stale-draft-conflict.png) | `/write/:draftId` conflict state | How does an author recover when parent context changes? |
 | [Models and generation](models-generation-settings.png) | `/settings/models` | How are local models, measured capabilities, routing, and invalidation exposed? |
 | [Sandbox workspace](sandbox-workspace.png) | `/story/sandbox` | How are topology, systems, actions, and emergent opportunities authored and simulated? |
+| [Sandbox experience settings](sandbox-experience-settings.png) | `/settings/experience` | How does an author disable main-plot pressure and configure persistent character simulation? |
 
 ## Shared shell contract
 
@@ -368,6 +369,8 @@ claims and must not be copied into reports or promotion decisions.
 ### Component inventory
 
 - `ExperienceModeSelector`
+- `StoryGuidanceControl`
+- `CharacterSimulationDepthControl`
 - `WorldClockStatus`
 - `TopologyMap`
 - `LocationNode`
@@ -382,6 +385,8 @@ claims and must not be copied into reports or promotion decisions.
 ### Interaction contract
 
 - Topology describes reusable places/routes, not a start-to-ending progression.
+- Sandbox defaults Story guidance to Off: no required main plot, beats, climax,
+  or ending. Light guidance may suggest optional threads without forcing them.
 - Topology, Visit history, and Systems are views of authored world structure and
   a selected runtime/fixture context.
 - Current-player location appears only when a preview/runtime session is
@@ -400,6 +405,15 @@ claims and must not be copied into reports or promotion decisions.
   and policy; it never changes project canon.
 - A saved runtime session stores persistent world/player state and visit history
   separately from authored topology and templates.
+- Characters have persistent per-session state according to the configured
+  simulation depth: location, activity, stats, health/conditions, inventory,
+  knowledge, relationships, needs, schedules, cooldowns, and agendas. Leaving
+  and returning does not reset them.
+- Character runtime state is inspectable from a location/opportunity and links
+  to its canonical World sheet. Canonical identity/personality data and mutable
+  session stats are never presented as one editable object.
+- Character stats are project-defined typed fields with bounds and visibility;
+  the UI does not assume every sandbox needs RPG combat attributes.
 - Sandbox validation treats cycles/revisits as normal, requires route/action
   consistency, and reports liveness/soft-lock risk rather than demanding an
   ending.
@@ -410,11 +424,48 @@ claims and must not be copied into reports or promotion decisions.
 - **Hybrid:** expose both Story anchors and Sandbox topology, with anchor events
   eligible through typed world conditions.
 - **Sandbox:** use topology, systems, opportunities, and visit history as the
-  default; authored endings are optional.
+  default; Story guidance is Off and authored endings are optional.
 
 Switching a project mode opens a migration preview listing validation changes,
 missing topology/system requirements, and UI default changes. It does not
 rewrite passages, routes, or snapshots automatically.
+
+## 13. Sandbox experience settings
+
+![Sandbox experience settings](sandbox-experience-settings.png)
+
+### Component inventory
+
+- `ExperiencePresetSelector`
+- `StoryGuidanceSelector`
+- `PlayerAgencySettings`
+- `CharacterSimulationDepthSelector`
+- `CharacterSystemToggles`
+- `AdvancedExperienceTuning`
+- `EffectiveBehaviorSummary`
+- `MigrationImpactSummary`
+
+### Interaction contract
+
+- Selecting Sandbox applies safe defaults but does not save immediately.
+- Story guidance Off explicitly removes required main-plot, beat, climax, and
+  ending pressure from planning and validation.
+- Light, Anchors, and Directed change planning pressure without changing the
+  underlying compiler or runtime storage.
+- Character simulation depth controls which runtime systems are active:
+  Relationships, Persistent stats, or Full agendas.
+- Individual character systems can be enabled only when their schema and engine
+  support exist; unavailable dependencies are explained.
+- Persistent stats include project-defined bounded fields and may cover
+  location, health/conditions, inventory, knowledge, relationships, and needs.
+- Schedules and autonomous agendas are opt-in because they add simulation cost
+  and require liveness/invariant validation.
+- The Effective behavior panel is derived from the full normalized profile, not
+  hard-coded to the selected preset label.
+- Preview migration lists validation/UI/default changes and proves authored
+  files will not be rewritten silently.
+- Save creates a new versioned `ExperienceProfile` revision and invalidates
+  incompatible plans, simulations, playtests, and benchmark capability evidence.
 
 ## Required states not pictured
 

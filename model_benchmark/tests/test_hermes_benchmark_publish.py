@@ -487,13 +487,15 @@ def test_benchmark_args_forward_harness_architectures(tmp_path):
         {
             "models": ["private-model"],
             "benchmark_profile": "refactor-core",
-            "architectures": ["typed_fill", "flat_fill"],
+            "architectures": ["legacy_json", "typed_fill", "flat_fill"],
         },
         tmp_path,
     )
 
     start = args.index("--architectures")
-    assert args[start + 1:start + 3] == ["typed_fill", "flat_fill"]
+    assert args[start + 1:start + 4] == [
+        "legacy_json", "typed_fill", "flat_fill",
+    ]
 
     with pytest.raises(ValueError, match="architectures"):
         publisher._benchmark_args(
