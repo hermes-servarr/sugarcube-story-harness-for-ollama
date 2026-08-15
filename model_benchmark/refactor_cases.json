@@ -6,8 +6,8 @@
     "context_ref": "fantasy",
     "context_size": "S",
     "distractor_density": "D0",
-    "task": "Fill the opening paragraph and two materially different choice-copy slots. Keep the scene focused on the discovered tome.",
-    "plan": {"plan_id":"plan_ordinary_fantasy","revision":1,"passage_mode":"normal","narrative_slots":[{"id":"opening","kind":"paragraph"}],"choice_slots":["choice_read","choice_return"],"allowed_state_refs":[],"allowed_entity_refs":[],"required_components":[]},
+    "task": "Fill the opening paragraph and two distinct choice-copy slots. Keep the scene focused on the discovered tome.",
+    "plan": {"plan_id":"plan_ordinary_fantasy","revision":2,"passage_mode":"normal","narrative_slots":[{"id":"opening","kind":"paragraph"}],"choice_slots":["choice_read","choice_return"],"allowed_state_refs":[],"allowed_entity_refs":[],"required_components":[]},
     "expected": {"context_needles":[],"required_state_refs":[],"required_entity_refs":[],"required_terms":["tome"],"forbidden_terms":[],"min_words":24}
   },
   {

@@ -291,6 +291,23 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 - Rejection conditions: If the test produces identical results across both architectures or if slot-kind or speaker plan-adherence is trivially perfect in both, it does not discriminate.
 - First suite baseline: pending
 
+## HPROP-0007 — Fix R0-ORDINARY-FANTASY task-vs-check overclaim
+
+- Status: proposed
+- Proposed in iteration: iteration-19
+- Action: revise R0-ORDINARY-FANTASY
+- Coverage gap: Task overclaims what the distinct_choices check enforces.
+- Competing structures: All architectures — this is a test-validity fix.
+- Hypothesis: Changing the task from "two materially different" to "two distinct" will accurately reflect what the distinct_choices semantic check enforces (casefolded string distinctness of choice texts only), preventing suite consumers from over-interpreting the check as enforcing semantic or material-content distinctness.
+- Controlled inputs: Same context, plan, seed, budget, and model pairing; only task text changed.
+- Observable outcomes: Same as before — distinct_choices check on choice texts.
+- Existing-case changes: R0-ORDINARY-FANTASY task: "two materially different" to "two distinct"; plan revision 1 to 2.
+- New cases: none
+- Why current corpus is insufficient: The task said "materially different" which implies a stronger semantic requirement than the check enforces. This is the same class of overclaim fixed in iteration-01 for R3-HUB-COPY and R8-CHOICE-DISTINCTION.
+- Resource estimate: no additional model calls (revision of existing case).
+- Rejection conditions: If the revision causes a validation failure.
+- First suite baseline: pending
+
 ## Operator Notes
 
 Added by the operator, not by Hermes. These notes record run provenance and
