@@ -6,7 +6,9 @@ from harness.project import ProjectPaths, init_project, save_config
 from harness.server import app as server_app
 
 
-def test_authoring_ui_defaults_to_legacy():
+def test_schema_fallback_stays_legacy_for_historical_partial_configs():
+    # The schema fallback remains conservative for loading historical partial
+    # configs; project initialization and an unconfigured server default next.
     assert HarnessConfig().authoring_ui == "legacy"
 
 
@@ -21,12 +23,22 @@ def test_explicit_ui_routes_and_configured_cutover(tmp_path, monkeypatch):
 
     assert "Story Harness Next" not in legacy.body.decode()
     assert "Story Harness Next" in next_ui.body.decode()
-    assert default.body == legacy.body
+    assert default.body == next_ui.body
 
     paths = ProjectPaths(tmp_path)
-    save_config(paths, HarnessConfig(authoring_ui="next"))
+    save_config(paths, HarnessConfig(authoring_ui="legacy"))
     configured = asyncio.run(server_app.spa())
-    assert configured.body == next_ui.body
+    assert configured.body == legacy.body
+
+
+def test_unconfigured_server_defaults_to_next(tmp_path, monkeypatch):
+    monkeypatch.setattr(server_app, "_PROJECT_ROOT", tmp_path)
+    monkeypatch.delenv("HARNESS_AUTHORING_UI", raising=False)
+
+    default = asyncio.run(server_app.spa())
+    next_ui = asyncio.run(server_app.next_spa())
+
+    assert default.body == next_ui.body
 
 
 def test_environment_override_is_reversible(tmp_path, monkeypatch):

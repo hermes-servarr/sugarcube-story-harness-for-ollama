@@ -18,7 +18,7 @@ its implementation exists; its exit gate must also have evidence.
 | Phase 7 — legacy retirement | Not started; correctly blocked | The fallback policy is frozen, but no promotion release or following stable-release/30-day observation window exists. Legacy deletion is prohibited at this stage. |
 | Phase 8 — Hybrid and Sandbox simulation | Substantially complete; acceptance expansion continues | Typed topology, clock/resources, systems, encounters, character/faction persistence, fixtures, traces, long-run replay/liveness, and UI authoring exist. Explicitly tagged planned scenes now project to ordered Hybrid `authored_anchor` opportunities; completion is an immutable runtime transition and leaves `story.json` unchanged. Human sandbox narrative variation/agency review is still absent. |
 | UI Phases A–E | Substantially complete | The reversible React/Vite application, generated contracts, accessible outline, authoring workspaces, exact Write lifecycle, recovery, facts, planning, settings, topology/systems/encounters, World, Media, Tests, and initialization are implemented. Write now has structured controls for the entire current `PassagePlan` surface: narrative kinds/speakers, choice destinations/weights/restarts/guards/effects, reference allowlists, fixed and allowlisted effects, optional proposal authority, all form variants/options, loop bindings, room exits, conditional fallback, random-event odds, and lifecycle timing. Required mechanic proposals remain unavailable with the deliberately deferred `typed_staged` strategy. |
-| UI Phase F — cutover | Blocked and incomplete | The new UI is not the default. Independent manual accessibility review, matched old/new compatibility acceptance, the promotion decision, and the fallback observation window remain. |
+| UI Phase F — cutover | Reversible default enabled; external acceptance incomplete | New and unconfigured projects open the new UI by default, existing projects retain their persisted choice, and `/legacy` remains the rollback route. Independent manual accessibility review, matched old/new compatibility acceptance, the promotion decision, and the fallback observation window remain. |
 
 ## Known local implementation gaps
 
@@ -60,5 +60,7 @@ rules:
    promotion release and following stable release for at least 30 days before
    retirement can be considered.
 
-Until both the local cutover requirements and external gates clear, production
-defaults remain `legacy_delimited` and the legacy authoring UI.
+The generation default remains `legacy_delimited`. New and unconfigured
+projects now open the new authoring UI by default, while existing projects
+retain their persisted choice and `/legacy` remains available throughout the
+external review gates.

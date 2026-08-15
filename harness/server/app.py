@@ -4516,7 +4516,12 @@ def _configured_ui() -> str:
     override = os.environ.get("HARNESS_AUTHORING_UI", "").strip().lower()
     if override in {"legacy", "next"}:
         return override
-    return load_config(_p()).authoring_ui
+    paths = _p()
+    # A bare project has not made an explicit UI choice yet. Start it in the
+    # new shell; initialized/existing projects retain their persisted choice.
+    if not paths.config_yaml.exists():
+        return "next"
+    return load_config(paths).authoring_ui
 
 
 @app.get("/legacy", response_class=HTMLResponse)

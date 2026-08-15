@@ -202,6 +202,7 @@ def init_project(root: Path, title: str = "Untitled Story") -> ProjectPaths:
         config = HarnessConfig(
             story_title=title,
             story_ifid=str(uuid.uuid4()).upper(),
+            authoring_ui="next",
         )
         _atomic_write_text(p.config_yaml, yaml.dump(config.model_dump(), allow_unicode=True))
 

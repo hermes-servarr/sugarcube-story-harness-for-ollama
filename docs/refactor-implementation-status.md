@@ -284,7 +284,9 @@ class `TestResult` in `scripts/test_player_flow.py`.
 - Generation default: `generation_strategy: legacy_delimited`.
 - Typed comparison default: `typed_shadow_generation: false`; operators may
   explicitly set it to `true` for isolated, non-committing shadow comparison.
-- UI default: `authoring_ui: legacy`.
+- UI default for new and unconfigured projects: `authoring_ui: next`.
+  Existing projects retain their persisted choice; `/legacy` and
+  `HARNESS_AUTHORING_UI=legacy` remain immediate rollback paths.
 - UI operator override: `HARNESS_AUTHORING_UI=legacy|next`.
 - Explicit routes: `/legacy` and `/next` remain available regardless of the
   configured default.

@@ -1,7 +1,7 @@
 # Story Harness Next UI
 
-This is the greenfield React/TypeScript authoring interface. The existing UI
-remains the default and is always available at `/legacy`.
+This is the default React/TypeScript authoring interface for new and
+unconfigured projects. The existing UI remains available at `/legacy`.
 
 ## Development
 
@@ -41,9 +41,10 @@ The hand-authored UI facade consumes generated `ExperienceProfile` and
 `response_model` declarations remain hand-authored and are an explicit
 follow-up contract gap.
 
-To make it the project default, set `authoring_ui: next` in `config.yaml` or
-set `HARNESS_AUTHORING_UI=next`. Set either value to `legacy` for immediate
-rollback. No story or draft migration occurs when switching interfaces.
+New projects persist `authoring_ui: next`. Existing projects retain their
+persisted choice. Set `authoring_ui: legacy` in `config.yaml` or
+`HARNESS_AUTHORING_UI=legacy` for immediate rollback. No story or draft
+migration occurs when switching interfaces.
 
 Set `HARNESS_BENCHMARK_OUTPUTS` to a benchmark output directory if persisted
 runs live outside the active story project.

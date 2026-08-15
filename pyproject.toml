@@ -16,6 +16,7 @@ dependencies = [
     "networkx>=3.3",
     "pytest>=9.0.3",
     "tinycss2>=1.4.0",
+    "playwright>=1.61.0",
 ]
 
 # Optional dependencies for the playtester
