@@ -1,148 +1,119 @@
-# Iteration 19: Thinking-variant planning emphasis suffix
+# Iteration 19: Harness-Suite R0-ORDINARY-FANTASY task-vs-check alignment
 
 ## Campaign Mode
 
-Prompt overlays only (operator has not stated envelope mode).
+harness-suite (refactor-core profile, typed_fill + flat_fill architectures)
 
-## Baseline Metrics (current best = Experiment 18 after)
+## Baseline Metrics (pre-revision)
 
-- Total cases: 128
-- Passed: 51
-- Pass rate: 0.3984 (39.84%)
-- Mean score: 0.7698
+Published anonymized result summary (before this experiment):
 
-### By Variant
+- harness_architectures: 0 cases (architecture benchmark has not yet produced a result)
+- Overall capability benchmark: 128 cases, 51 passed (39.84%), mean score 0.7698
+- No per-architecture breakdown available
 
-| Variant  | Cases | Passed | Pass Rate | Mean Score |
-|----------|-------|--------|-----------|------------|
-| compact  | 32    | 11     | 0.3438    | 0.7734     |
-| full     | 32    | 12     | 0.375     | 0.7875     |
-| json     | 32    | 22     | 0.6875    | 0.9036     |
-| thinking | 32    | 6      | 0.1875    | 0.6146     |
+The architecture benchmark has not produced a result across prior attempts
+(iteration-01, attempts 1-8, all failed with network-unreachable errors).
+The corpus revision from iteration-01 (R2-MULTI-DIALOGUE rev 2, R3-HUB-COPY
+rev 2, R8-CHOICE-DISTINCTION rev 2) is committed and visible in the current
+working tree.
 
-### Thinking Variant Detail
+## Failure Pattern and Coverage Analysis
 
-- Cases: 32, Passed: 6, Pass rate: 18.75%, Mean score: 0.6146
-- Failed evaluator categories: markup_compliance (17), thinking_quality (15),
-  passage_structure (14), macro_usage (13)
-- Thinking quality failures: 15 (models produce no thinking content)
-- Final passage structure failures: 14
+### Ambiguity found
 
-## Observable Failure Behavior
+**R0-ORDINARY-FANTASY** (T0, S, D0): The task says "Fill the opening paragraph
+and two materially different choice-copy slots." The word "materially"
+implies a semantic-content distinctness requirement, but the
+`distinct_choices` semantic check only verifies that choice texts are
+casefolded-string distinct. This is the same class of task-vs-check
+overclaim that iteration-01 fixed for R3-HUB-COPY ("clearly distinct" to
+"distinct") and R8-CHOICE-DISTINCTION ("meaningfully distinct" to "distinct
+labels"). R0-ORDINARY-FANTASY is the remaining outlier with a qualifying
+adverb ("materially") that overclaims what the deterministic check enforces.
 
-The thinking variant is the weakest at 18.75% with 15 thinking_quality
-failures ("Thinking variant produced no thinking content"). Models skip
-the planning section entirely.
+### Coverage gaps
 
-The current variants.thinking already contains verbose plan-then-render
-guidance: "Plan briefly: identify relevant variables, SugarCube macros,
-and direction constraints, but reserve most of the response for the final
-passage. Then produce the complete passage." Despite this, 15/32 cases
-produce no thinking content.
+No new coverage gaps identified beyond those already recorded as HPROP
+proposals 0002-0004 in iteration-01. Those proposals require an
+operator-approved signed code commit to expand the frozen 24-case corpus
+(the canonical test guard `test_refactor_corpus_has_fixed_core_and_canary_sizes`
+enforces `len(cases) == 24`).
 
-Exp17 showed that replacing the verbose instruction with a concise one
-was harmful (-4, thinking_quality failures 14 to 26). The verbose format
-guidance is load-bearing. The approach here is to ADD a brief reinforcement
-to the end of the existing instruction, not replace it.
+### Prior revisions preserved
 
-The problem may be that "Plan briefly" is too weak a directive. Models
-interpret "briefly" as "optionally" or "in one sentence." A stronger
-directive that explicitly requires a visible planning section before the
-passage may help.
+The three case revisions from iteration-01 remain in the corpus:
+- R2-MULTI-DIALOGUE: plan_multi_dialogue, revision 2 (forbidden_terms now
+  includes "INNER MONOLOGUE:")
+- R3-HUB-COPY: plan_hub_copy, revision 2 (task: "three distinct" not "three
+  clearly distinct")
+- R8-CHOICE-DISTINCTION: plan_choice_distinction, revision 2 (task: "with
+  distinct labels" not "meaningfully distinct")
 
 ## Hypothesis
 
-Appending a concise sentence to the end of the existing thinking instruction
-that explicitly requires a visible planning section before the passage will
-reduce thinking_quality failures (from 15) and improve the thinking variant
-pass rate from 6/32 (18.75%) without affecting compact, full, or json
-variants.
+Changing the R0-ORDINARY-FANTASY task from "two materially different
+choice-copy slots" to "two distinct choice-copy slots" will align the task
+text with the `distinct_choices` check (casefolded string distinctness),
+closing the last task-vs-check overclaim in the corpus. This prevents suite
+consumers from over-interpreting "materially" as enforcing semantic-content
+distinctness that the check does not verify.
 
-This differs from Exp17 by ADDING to the existing verbose instruction rather
-than replacing it. The existing format guidance is preserved. The added
-text reinforces only the planning requirement.
+## Exact Changes
 
-## Exact Overlay Change
+### Revised cases (1)
 
-Append to the end of `variants.thinking`:
+- **R0-ORDINARY-FANTASY** (plan_id: plan_ordinary_fantasy, revision 1 to 2):
+  Change task from "Fill the opening paragraph and two materially different
+  choice-copy slots. Keep the scene focused on the discovered tome." to
+  "Fill the opening paragraph and two distinct choice-copy slots. Keep the
+  scene focused on the discovered tome." No other fields changed.
 
-```
-You must write your plan before the passage. Start with your plan, then write the passage.
-```
+### New cases
 
-The full variants.thinking becomes (existing content + new suffix):
-```
-Plan briefly: identify relevant variables, SugarCube macros, and direction constraints, but reserve most of the response for the final passage. Then produce the complete passage.
-
-Format your output using SugarCube markup, not Markdown.
-
-Required passage sections in this exact order:
-PROSE:
-CHOICES:
-SUMMARY:
-
-SugarCube markup: ''double single quotes'' for bold, //double slashes// for italic. Do not use Markdown ** or * for emphasis.
-
-When the task involves dialogue or conversation between characters, use this layout inside the PROSE section:
-DIALOGUE:
-Speaker: "Spoken words."
-Speaker: "Reply words."
-INNER MONOLOGUE:
-MC: //Private thoughts.//
-
-You must write your plan before the passage. Start with your plan, then write the passage.
-```
-
-All other fields remain unchanged (including the Exp18 full-variant SUMMARY suffix).
-
-## Expected Affected Categories
-
-- thinking_quality failures (expected reduction from 15)
-- thinking variant pass rate (expected improvement from 6/32 = 18.75%)
-- No expected change to compact, full, json, or non-thinking cases
+None. The canonical test guard enforces a frozen 24-case corpus. Adding new
+cases would require an operator-approved signed code commit outside the
+permitted edit set.
 
 ## Rollback Condition
 
-Remove the planning emphasis suffix from variants.thinking if:
-- Aggregate objective pass rate declines below 0.3984, or
-- Any per-variant pass rate declines without offsetting gains, or
-- Any material per-alias regression.
+Revert this change if any validation command fails, if the published result
+shows architecture-pairing violation, or if the revision proves
+non-discriminating.
 
-## After Metrics
+## Suite Baseline Status
 
-### SSH Disconnect at 20.5% Progress
+This is the first suite baseline for the revised corpus (4 cases at
+revision 2: R0-ORDINARY-FANTASY, R2-MULTI-DIALOGUE, R3-HUB-COPY,
+R8-CHOICE-DISTINCTION). The architecture benchmark has not yet produced
+a result. A successful benchmark run will establish the first baseline.
 
-The benchmark process exited with code 255 (SSH error). The output shows
-"Connection reset by peer" and "client_loop: send disconnect: Broken pipe"
-at 36/176 (~20.5% progress, ~1m 45s elapsed).
+## Benchmark Attempt
 
-No anonymized result was published. The experiment did not complete.
+### Attempt 1 (2026-08-15, scheduled cron job)
+
+Pre-flight checks confirmed: no active managed processes, HEAD (083c307)
+descends from signed trust commit 897fc29a, SSH config has the
+sugarcube-benchmark host entry. The corpus (24 cases, 4 at revision 2)
+passed all validation (JSON valid, loader OK, 109 tests passed, working
+tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_a1aca4efb48d). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level - the same
+network-unreachable condition as iteration-01 attempts 1 through 8.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark. This appears to be a persistent
+network outage (now spanning 9 attempts over 9 consecutive days,
+2026-08-07 through 2026-08-15).
 
 ## Conclusion
 
-Experiment 19 was aborted due to an SSH disconnect. The benchmark process
-exited with code 255 after approximately 1m 45s, at 20.5% progress. The
-remote host connection was reset mid-run.
-
-Per the goal's stop conditions:
-- Stop condition 3: SSH disconnect is a campaign stop condition.
-- Stop condition 10: A disconnected trigger may still have started a GPU
-  run. It is unclear whether another GPU run is already active.
-
-The experiment does not count as a completed experiment. No result was
-produced or compared. The thinking-variant planning emphasis suffix was
-never verified.
-
-## Rollback
-
-Reverted variants.thinking to the Exp18 baseline (removed the planning
-emphasis suffix). The last verified best overlay (Exp18: 51/128, 39.84%)
-is preserved. Validated with json.tool and pytest (54 passed). Committed
-and pushed.
-
-## Campaign Stop
-
-The campaign is stopped per stop condition 3 (SSH disconnect) and stop
-condition 10 (unclear whether another GPU run is active). The PC-side
-benchmark may still be running with the Exp19 overlay. Operator action
-is required to verify PC-side state before any further campaigns.
+The corpus revision (R0-ORDINARY-FANTASY rev 1 to 2, task-vs-check
+alignment) is committed and pushed. The architecture benchmark could not
+be completed due to network unreachability. The revised suite baseline
+remains pending a successful benchmark run. The last verified suite is
+preserved. Operator review is required to restore network connectivity
+to the benchmark PC.
