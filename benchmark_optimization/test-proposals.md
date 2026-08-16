@@ -293,17 +293,34 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 
 ## HPROP-0007 — Fix R0-ORDINARY-FANTASY task-vs-check overclaim
 
-- Status: proposed
+- Status: observed
 - Proposed in iteration: iteration-19
 - Action: revise R0-ORDINARY-FANTASY
 - Coverage gap: Task overclaims what the distinct_choices check enforces.
 - Competing structures: All architectures — this is a test-validity fix.
-- Hypothesis: Changing the task from "two materially different" to "two distinct" will accurately reflect what the distinct_choices semantic check enforces (casefolded string distinctness of choice texts only), preventing suite consumers from over-interpreting the check as enforcing semantic or material-content distinctness.
+- Hypothesis: Changing the task from "two materially different" to "two distinct" will accurately reflect what the distinct_choices semantic check enforces (casefolded string distinctness of choice texts only), preventing suite consumers from over-interpreting the check as enforcing semantic-content distinctness.
 - Controlled inputs: Same context, plan, seed, budget, and model pairing; only task text changed.
 - Observable outcomes: Same as before — distinct_choices check on choice texts.
 - Existing-case changes: R0-ORDINARY-FANTASY task: "two materially different" to "two distinct"; plan revision 1 to 2.
 - New cases: none
 - Why current corpus is insufficient: The task said "materially different" which implies a stronger semantic requirement than the check enforces. This is the same class of overclaim fixed in iteration-01 for R3-HUB-COPY and R8-CHOICE-DISTINCTION.
+- Resource estimate: no additional model calls (revision of existing case).
+- Rejection conditions: If the revision causes a validation failure.
+- First suite baseline: pending; the architecture benchmark has not yet produced a result across 10 attempts due to persistent network unreachability.
+
+## HPROP-0008 — Fix R4-STYLE-CANT task-vs-check overclaim
+
+- Status: proposed
+- Proposed in iteration: iteration-20
+- Action: revise R4-STYLE-CANT
+- Coverage gap: Task overclaims what the required_terms check enforces by specifying slot placement ("only in spoken dialogue") that no deterministic check verifies.
+- Competing structures: All architectures — this is a test-validity fix.
+- Hypothesis: Changing the task from "Use chrome-cold and wired-in only in spoken dialogue" to "Use chrome-cold and wired-in in the spoken dialogue lines" will accurately reflect what the required_terms semantic check enforces (casefolded substring presence anywhere in the fill text), preventing suite consumers from over-interpreting "only" as enforcing slot-placement or register-leakage detection that the check does not perform.
+- Controlled inputs: Same context, plan, seed, budget, and model pairing; only task text changed.
+- Observable outcomes: Same as before — required_terms check for substring presence of "chrome-cold" and "wired-in".
+- Existing-case changes: R4-STYLE-CANT task: "Use chrome-cold and wired-in only in spoken dialogue" to "Use chrome-cold and wired-in in the spoken dialogue lines"; plan revision 1 to 2.
+- New cases: none
+- Why current corpus is insufficient: The task said "only in spoken dialogue" which implies the check enforces that the required terms appear exclusively in dialogue slots and not in the narration slot. The required_terms check only verifies casefolded substring presence anywhere in the fill text; it does not check which slot the terms appear in. The word "only" overclaims slot-placement enforcement. This is the same class of task-vs-check overclaim fixed in iteration-01 (R3-HUB-COPY, R8-CHOICE-DISTINCTION) and iteration-19 (R0-ORDINARY-FANTASY), applied to the register-placement axis.
 - Resource estimate: no additional model calls (revision of existing case).
 - Rejection conditions: If the revision causes a validation failure.
 - First suite baseline: pending
