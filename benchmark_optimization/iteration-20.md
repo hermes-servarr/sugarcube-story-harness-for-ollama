@@ -108,3 +108,34 @@ revision 2: R0-ORDINARY-FANTASY, R2-MULTI-DIALOGUE, R3-HUB-COPY,
 R4-STYLE-CANT, R8-CHOICE-DISTINCTION). The architecture benchmark has not
 yet produced a result. A successful benchmark run will establish the
 first baseline.
+
+## Benchmark Attempt
+
+### Attempt 1 (2026-08-16, scheduled cron job)
+
+Pre-flight checks confirmed: no active managed processes, HEAD (0a60af5)
+descends from signed trust commit 897fc29a, SSH config has the
+sugarcube-benchmark host entry. The corpus (24 cases, 5 at revision 2)
+passed all validation (JSON valid, loader OK, 134 tests passed, working
+tree clean).
+
+The SSH command was invoked exactly once as a managed background process
+(session proc_b8a9a6a42141). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the same
+network-unreachable condition as iteration-01 attempts 1 through 8 and
+iteration-19 attempt 1.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark. This appears to be a persistent
+network outage (now spanning 11 attempts over 10 consecutive days,
+2026-08-07 through 2026-08-16).
+
+## Conclusion
+
+The corpus revision (R4-STYLE-CANT rev 1 to 2, task-vs-check alignment on
+the register-placement axis) is committed and pushed. The architecture
+benchmark could not be completed due to network unreachability. The
+revised suite baseline remains pending a successful benchmark run. The
+last verified suite is preserved. Operator review is required to restore
+network connectivity to the benchmark PC.
