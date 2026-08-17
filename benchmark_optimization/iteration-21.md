@@ -132,6 +132,27 @@ establish the first baseline.
 
 Pre-flight checks confirmed: no active managed processes, HEAD
 (6593bc1) descends from signed trust commit 897fc29a, SSH config has the
-sugarcube-benchmark host entry.
+sugarcube-benchmark host entry. The corpus (24 cases, 5 at revision 2
+and R2-MULTI-DIALOGUE at revision 3) passed all validation (JSON valid,
+loader OK, 134 tests passed, working tree clean).
 
-(Pending benchmark execution)
+The SSH command was invoked exactly once as a managed background process
+(session proc_c90e72c1019e). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the same
+network-unreachable condition as iteration-01 attempts 1 through 8,
+iteration-19 attempt 1, and iteration-20 attempt 1.
+
+This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark. This appears to be a persistent
+network outage (now spanning 12 attempts over 11 consecutive days,
+2026-08-07 through 2026-08-17).
+
+## Conclusion
+
+The corpus revision (R2-MULTI-DIALOGUE rev 2 to 3, task-vs-plan slot-kind
+alignment) is committed and pushed. The architecture benchmark could not
+be completed due to network unreachability. The revised suite baseline
+remains pending a successful benchmark run. The last verified suite is
+preserved. Operator review is required to restore network connectivity
+to the benchmark PC.
