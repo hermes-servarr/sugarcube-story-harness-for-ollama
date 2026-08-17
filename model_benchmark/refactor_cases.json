@@ -127,8 +127,8 @@
     "context_ref": "social",
     "context_size": "L",
     "distractor_density": "D0",
-    "task": "Fill six alternating fixed-speaker dialogue slots for a tense treaty negotiation, followed by two choice-copy slots.",
-    "plan": {"plan_id":"plan_multi_dialogue","revision":2,"passage_mode":"normal","narrative_slots":[{"id":"mira_1","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_1","kind":"dialogue","speaker":"Player"},{"id":"mira_2","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_2","kind":"dialogue","speaker":"Player"},{"id":"mira_3","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_thought","kind":"thought"}],"choice_slots":["choice_sign","choice_delay"],"allowed_state_refs":[],"allowed_entity_refs":[],"required_components":[]},
+    "task": "Fill five alternating fixed-speaker dialogue slots and one private thought for a tense treaty negotiation, followed by two choice-copy slots.",
+    "plan": {"plan_id":"plan_multi_dialogue","revision":3,"passage_mode":"normal","narrative_slots":[{"id":"mira_1","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_1","kind":"dialogue","speaker":"Player"},{"id":"mira_2","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_2","kind":"dialogue","speaker":"Player"},{"id":"mira_3","kind":"dialogue","speaker":"Mira Vale"},{"id":"player_thought","kind":"thought"}],"choice_slots":["choice_sign","choice_delay"],"allowed_state_refs":[],"allowed_entity_refs":[],"required_components":[]},
     "expected": {"context_needles":["treaty_name"],"required_state_refs":[],"required_entity_refs":[],"required_terms":[],"forbidden_terms":["DIALOGUE:","INNER MONOLOGUE:"],"min_words":44}
   },
   {

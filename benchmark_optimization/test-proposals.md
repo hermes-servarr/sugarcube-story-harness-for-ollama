@@ -308,6 +308,23 @@ Copy this section for each new proposal. Use the next unused sequential ID.
 - Rejection conditions: If the revision causes a validation failure.
 - First suite baseline: pending; the architecture benchmark has not yet produced a result across 10 attempts due to persistent network unreachability.
 
+## HPROP-0009 — Fix R2-MULTI-DIALOGUE task-vs-plan slot-kind mismatch
+
+- Status: proposed
+- Proposed in iteration: iteration-21
+- Action: revise R2-MULTI-DIALOGUE
+- Coverage gap: Task text mislabels the 6th narrative slot as a dialogue slot when the plan defines it as a thought slot (player_thought, kind=thought, no speaker). Task says "six alternating fixed-speaker dialogue slots" but plan has 5 dialogue + 1 thought.
+- Competing structures: All architectures — this is a test-validity fix. The task-vs-plan mismatch could cause false plan-adherence failures in both typed_fill and flat_fill since both derive slot expectations from the same trusted plan.
+- Hypothesis: Aligning the task text to say "five alternating fixed-speaker dialogue slots and one private thought" will match the plan's actual slot composition (5 dialogue + 1 thought), preventing task-text-induced plan-adherence failures. This mirrors the accurate descriptions in R2-DIALOGUE-THOUGHT ("dialogue turns and private thought") and R9-LONG-DIALOGUE ("eight fixed alternating dialogue slots and one thought slot").
+- Controlled inputs: Same context (L), plan, seed, budget, and model pairing; only task text changed.
+- Observable outcomes: Architecture-neutral request-level plan adherence: slot IDs, slot kinds, and speaker assignments should match the plan. A model following the revised task text should produce 5 dialogue slots with speakers + 1 thought slot, matching the plan.
+- Existing-case changes: R2-MULTI-DIALOGUE task: "six alternating fixed-speaker dialogue slots" to "five alternating fixed-speaker dialogue slots and one private thought"; plan revision 2 to 3.
+- New cases: none
+- Why current corpus is insufficient: R2-MULTI-DIALOGUE is the only dialogue-plus-thought case that mislabels the thought slot as a dialogue slot in the task text. R2-DIALOGUE-THOUGHT and R9-LONG-DIALOGUE both correctly distinguish dialogue from thought. A model following the task literally would write 6 speaker-tagged dialogue lines and fail plan adherence for the 6th slot.
+- Resource estimate: no additional model calls (revision of existing case).
+- Rejection conditions: If the revision causes a validation failure or breaks plan-adherence pairing.
+- First suite baseline: pending
+
 ## HPROP-0008 — Fix R4-STYLE-CANT task-vs-check overclaim
 
 - Status: proposed
