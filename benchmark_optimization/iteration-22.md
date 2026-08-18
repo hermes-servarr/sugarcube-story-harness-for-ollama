@@ -120,4 +120,24 @@ sugarcube-benchmark host entry. The corpus (24 cases, 5 at revision 2+,
 R2-MULTI-DIALOGUE at revision 3) passed all validation (JSON valid, loader
 OK, 134 tests passed, working tree clean).
 
-[benchmark result pending]
+The SSH command was invoked exactly once as a managed background process
+(session proc_8f0c25e9182e). The process exited with exit code 255 (SSH
+error). The benchmark PC was not reachable at the network level — the same
+network-unreachable condition as iteration-01 attempts 1 through 8,
+iteration-19 attempt 1, iteration-20 attempt 1, and iteration-21 attempt 1.
+
+No progress lines were emitted, confirming the PC-side publisher never
+started. This is a stop condition. The benchmark was not retried. The PC
+administrator must inspect network connectivity to the benchmark PC before
+re-running the harness-suite benchmark. This appears to be a persistent
+network outage (now spanning 13 attempts over 12 consecutive days,
+2026-08-07 through 2026-08-18).
+
+## Conclusion
+
+No corpus changes were needed this iteration. The 5 test-validity fixes
+from iterations 01, 19, 20, and 21 remain committed. The corpus is validated
+(134 tests pass). The architecture benchmark could not be completed due to
+network unreachability. The revised suite baseline remains pending a
+successful benchmark run. The last verified suite is preserved. Operator
+review is required to restore network connectivity to the benchmark PC.
