@@ -97,6 +97,14 @@ Stop condition fired: validation failure (protected test enforces frozen
 committed. The three proposals (HPROP-0002, HPROP-0003, HPROP-0004) remain
 `proposed`.
 
+A benchmark attempt was made on the existing frozen 24-case corpus to
+capture the first architecture baseline. The SSH command exited with
+code 255: the benchmark PC was unreachable ("No route to host"). This
+matches the network-unreachable pattern from iterations 20-22. Per the
+goal's stop conditions, this is a disconnect stop condition and must not
+be retried. Operator action required to restore benchmark PC network
+connectivity.
+
 ## Decision
 
 Reverted. The three new-case proposals remain valid coverage gaps but
@@ -105,3 +113,8 @@ require an operator-approved signed code commit to promote into the
 cases to the frozen 24-case baseline. Operator action required to either
 (a) sign a code commit raising the frozen corpus count, or (b) approve a
 separate candidate-test path outside `refactor-core`.
+
+Additionally, the benchmark PC network endpoint is unreachable (exit 255,
+"No route to host"), preventing the architecture baseline run. Operator
+action required to restore PC connectivity before the next benchmark
+attempt.
