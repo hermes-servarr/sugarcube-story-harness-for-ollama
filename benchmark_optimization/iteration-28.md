@@ -66,4 +66,31 @@ operator action.
 
 ## Benchmark attempt
 
-Pending.
+Invoked `/run-sugarcube-benchmark` exactly once on the validated 24-case
+corpus. The SSH command exited with code 255: the benchmark PC was
+unreachable (connection timed out). This matches the network-unreachable
+pattern from iterations 21-27. Per the goal's stop conditions, this is
+a disconnect stop condition and must not be retried. Operator action
+required to restore benchmark PC network connectivity.
+
+## Result
+
+Stop condition fired: SSH disconnect (exit 255, benchmark PC
+unreachable — connection timed out). No architecture benchmark result
+was produced. The `harness_architectures` summary remains 0 cases. No
+corpus change was made or needed. Operator action required to restore
+PC connectivity before the next benchmark attempt.
+
+## Decision
+
+Stopped. The frozen 24-case corpus is validated and ready for the
+first architecture baseline run. The benchmark PC has been unreachable
+for eight consecutive iterations (21-28). Operator action required to
+restore PC network connectivity before the next scheduled benchmark
+attempt.
+
+Three coverage-gap proposals (HPROP-0002: S-context room-mode,
+HPROP-0003: mid-tier D1 distractor, HPROP-0004: S-context mixed-kind)
+remain valid but require an operator-approved signed code commit to
+raise the frozen corpus count from 24 before they can be promoted into
+`refactor-core`.
