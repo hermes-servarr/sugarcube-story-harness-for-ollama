@@ -80,8 +80,33 @@ corpus. Result recorded below.
 
 ## Result
 
-See appended benchmark result below.
+Stop condition fired: SSH disconnect (exit 255, benchmark PC
+unreachable — hostname name resolution failure). The `sugarcube-benchmark`
+host entry is not present in the SSH config file. The SSH config file
+exists at `/opt/data/home/.ssh/config` but was modified on 2026-08-28
+and no longer contains a `sugarcube-benchmark` host entry. The SSH
+command exited with code 255: "Could not resolve hostname
+sugarcube-benchmark: Temporary failure in name resolution." No
+architecture benchmark result was produced. The `harness_architectures`
+summary remains 0 cases. No corpus change was made or needed.
 
 ## Decision
 
-See appended benchmark decision below.
+Stopped. The frozen 24-case corpus is validated and ready for the
+first architecture baseline run. The benchmark PC has been unreachable
+for twelve consecutive iterations (21-32). Two separate issues require
+operator attention:
+
+1. The SSH config file at `/opt/data/home/.ssh/config` was modified on
+   2026-08-28 and no longer contains a `sugarcube-benchmark` host entry.
+   The operator must restore this entry before the next benchmark
+   attempt can even attempt to connect.
+2. Even when the host entry was present (iterations 21-31), the benchmark
+   PC was unreachable via SSH (exit 255). The operator must restore
+   benchmark PC network connectivity.
+
+Three coverage-gap proposals (HPROP-0002: S-context room-mode,
+HPROP-0003: mid-tier D1 distractor, HPROP-0004: S-context mixed-kind)
+remain valid but require an operator-approved signed code commit to
+raise the frozen corpus count from 24 before they can be promoted into
+`refactor-core`.
