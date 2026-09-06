@@ -105,11 +105,36 @@ operator action.
 
 ## Benchmark attempt
 
-Invoking `/run-sugarcube-benchmark` exactly once on the validated 24-case
-corpus. The SSH host is resolvable. The benchmark PC may or may not be
-reachable; if unreachable (exit 255), this is a stop condition per the
-goal and must not be retried.
+Invoked `/run-sugarcube-benchmark` exactly once on the validated 24-case
+corpus (managed process `proc_7badb7b45096`, PID 622). The SSH command
+exited with code 255: hostname resolution failure ("Could not resolve
+hostname sugarcube-benchmark: Temporary failure in name resolution").
+This matches the network-unreachable pattern from iterations 21-37.
+Per the goal's stop conditions, this is a disconnect stop condition and
+must not be retried.
 
 ## Result
 
-(Benchmark result will be appended after completion.)
+Stop condition fired: SSH disconnect (exit 255, benchmark PC
+unreachable — hostname resolution failure). No architecture
+benchmark result was produced. The `harness_architectures` summary
+remains 0 cases. No corpus change was made or needed.
+
+## Decision
+
+Stopped. The frozen 24-case corpus is validated and ready for the
+first architecture baseline run. The benchmark PC has been unreachable
+for eighteen consecutive iterations (21-38). Iterations 34-37
+incorrectly reported the SSH host entry as absent due to a `grep`
+pattern mismatch; this iteration confirmed the host IS resolvable via
+`ssh -G` but the actual SSH connection still fails with DNS resolution
+failure (exit 255). The `sugarcube-benchmark` hostname cannot be
+resolved at the OS DNS level despite being present in the SSH config.
+Operator action required to restore benchmark PC network connectivity
+or DNS resolution before the next scheduled benchmark attempt.
+
+Three coverage-gap proposals (HPROP-0002: S-context room-mode,
+HPROP-0003: mid-tier D1 distractor, HPROP-0004: S-context mixed-kind)
+remain valid but require an operator-approved signed code commit to
+raise the frozen corpus count from 24 before they can be promoted into
+`refactor-core`.
