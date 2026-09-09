@@ -1,7 +1,7 @@
 # Hermes Harness Architecture Benchmark Goal
 
-Use this goal only after the benchmark PC trusts the signed commit containing
-the architecture runner and is configured with:
+Use this goal with the current origin/main HEAD. The benchmark PC must be
+configured with:
 
 - `benchmark_profile: refactor-core`;
 - every approved harness structure in `architectures`;
