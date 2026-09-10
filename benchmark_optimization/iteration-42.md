@@ -101,12 +101,34 @@ operator action.
 
 ## Benchmark attempt
 
-(to be appended after the protected run)
+Invoked `/run-sugarcube-benchmark` exactly once on the validated 24-case
+corpus (managed process `proc_da19704204fa`, PID 29166). The SSH command
+exited with code 255: SSH connect attempt reported a network-level
+"no route to host" failure. This differs from the DNS resolution failure
+seen in iterations 21-41: the `sugarcube-benchmark` host name now
+resolves, but the benchmark PC is not reachable at the routing / network
+layer from this host. Per the goal's stop conditions, this is a
+disconnect stop condition and must not be retried.
 
 ## Result
 
-(to be appended after the protected run)
+Stop condition fired: SSH disconnect (exit 255, no route to host —
+benchmark PC unreachable at the network layer). No architecture
+benchmark result was produced. The `harness_architectures` summary
+remains 0 cases. No corpus change was made or needed.
 
 ## Decision
 
-(to be appended after the protected run)
+Stopped. The frozen 24-case corpus is validated and ready for the
+first architecture baseline run. The benchmark PC remains unreachable.
+Iterations 21-41 failed at name resolution; iteration 42 resolved the
+name but the target host is unreachable ("no route to host", exit 255),
+so the connectivity problem has moved from DNS to routing / firewall /
+link-layer reachability. Operator action is required to restore benchmark
+PC network reachability before the next scheduled benchmark attempt.
+
+Three coverage-gap proposals (HPROP-0002: S-context room-mode,
+HPROP-0003: mid-tier D1 distractor, HPROP-0004: S-context mixed-kind)
+remain valid but require an operator-approved signed code commit to
+raise the frozen corpus count from 24 before they can be promoted into
+`refactor-core`.
