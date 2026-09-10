@@ -132,3 +132,25 @@ HPROP-0003: mid-tier D1 distractor, HPROP-0004: S-context mixed-kind)
 remain valid but require an operator-approved signed code commit to
 raise the frozen corpus count from 24 before they can be promoted into
 `refactor-core`.
+
+## Post-run operator recovery (manual WOL)
+
+After the stop condition above, the operator asked to wake the benchmark
+PC and correct the stale IP record.
+
+- Sent exactly one Wake-on-LAN magic packet via the protected local
+  relay (`/opt/data/bin/wake-windows-pc`, exit 0), targeting the Windows
+  benchmark desktop (MAC 60:CF:84:CD:61:07).
+- Updated the Windows PC record from the stale `192.168.0.123` to the
+  current `192.168.0.111` in `windows-pc-specs.md` (plain file) and in
+  the homelab docs (`security-updates-runbook.md`,
+  `configure-lxc-updates.sh`, committed/pushed).
+- Re-invoked the protected benchmark once after a ~5 minute boot wait.
+  The SSH command now connects (network path restored) but returned
+  **exit 75: "A benchmark is already running."** Per the operator
+  contract, the existing run owns the GPU. No further benchmark was
+  started or scheduled.
+
+Status: the network reachability problem is resolved; the PC publisher
+reports a run in progress. The first `typed_fill` vs `flat_fill`
+architecture baseline is still pending the completion of that run.
