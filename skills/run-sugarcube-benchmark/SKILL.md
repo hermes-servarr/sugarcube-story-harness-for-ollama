@@ -105,8 +105,10 @@ Interpret the result:
   success.
 - `Benchmark completed; anonymized results were unchanged.` — report
   successful completion with no changed result.
-- `A benchmark is already running.` or exit status 75 — report that the
-  existing run owns the GPU; do not start or schedule another.
+- `A benchmark is already running.` or exit status 75 — report that another
+  trigger connection currently owns monitoring; do not start or schedule
+  another. When only the original SSH connection was lost, a new invocation
+  reattaches on the PC and normally waits for the existing run's completion.
 - `Benchmark request failed; ...` or any other nonzero exit — report that
   the PC administrator must inspect the private local log.
 - Tool timeout, SSH disconnect, or ambiguous result — report that status

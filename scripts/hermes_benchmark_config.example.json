@@ -12,19 +12,7 @@
   "publish_path": "benchmark_anon/results_anonymized.json",
   "git_remote": "origin",
   "git_branch": "main",
-  "require_signed_commit": true,
-  "trusted_commit_signers": [
-    "REPLACE_WITH_TRUSTED_SIGNING_KEY_FINGERPRINT"
-  ],
-  "allow_unsigned_candidate_commits": true,
-  "trusted_code_commit": "REPLACE_WITH_SIGNED_TRUSTED_COMMIT_SHA",
-  "candidate_paths": [
-    "model_benchmark/prompt_overrides.json",
-    "model_benchmark/ingestion_overrides.json",
-    "model_benchmark/refactor_cases.json",
-    "benchmark_anon/results_anonymized.json",
-    "benchmark_optimization/**"
-  ],
+  "require_signed_commit": false,
   "commit_message": "Publish anonymized benchmark results",
   "state_dir": "C:/ProgramData/HermesBenchmark/state",
   "benchmark_profile": "refactor-core",

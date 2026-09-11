@@ -14,14 +14,19 @@ merge commits needed locally, authentication failures, or pull failures.
 The publisher acquires an operating-system file lock at
 `<state_dir>/run.lock` before pulling or contacting Ollama and holds it through
 the complete benchmark, anonymization, commit, push, and temporary-file
-cleanup. If another SSH request arrives while that lock is held, it prints
-`A benchmark is already running.`, exits with status 75, and does not start
+cleanup. A later SSH request reattaches to the active request and waits for
+its allowlisted completion result; a concurrently connected trigger still
+gets `A benchmark is already running.` with status 75. Neither path starts
 another model workload.
 
 The lock is process-owned, so Windows or Linux releases it automatically if
-the publisher crashes or is terminated. All trigger installations must use
-the same fixed `state_dir`; using different state directories would create
-independent locks and defeat this protection.
+the publisher crashes or is terminated. The status file is not treated as a
+lock: if it says `queued` or `running` but `run.lock` is free, the next trigger
+replaces that stale request (for example after a reboot). If the publisher lock
+is held, a later trigger reattaches to that request, streams its safe progress,
+and returns its eventual published result instead of reporting a false conflict.
+All trigger installations must use the same fixed `state_dir`; using different
+state directories would create independent locks and defeat this protection.
 
 The security boundary is a dedicated SSH account and a forced command. Give it
 only the platform-specific file access documented below—never an interactive
@@ -49,6 +54,19 @@ private key off the Hermes server.
 Disabling `require_signed_commit` is unsafe when Hermes can push to the
 configured branch: it could change the pulled Python benchmark and bypass the
 anonymization layer.
+
+For a protected branch where Hermes has read/pull access but cannot push,
+current-HEAD operation can explicitly disable commit verification:
+
+```json
+{
+  "require_signed_commit": false
+}
+```
+
+In this mode `trusted_commit_signers`, `trusted_code_commit`, and
+`allow_unsigned_candidate_commits` are ignored. Branch protection and the
+dedicated account boundary become the code-trust controls.
 
 ### Data-only optimization commits
 
@@ -100,6 +118,11 @@ notepad C:\ProgramData\HermesBenchmark\config.json
 
 uv sync
 ```
+
+After changing any of the three protected Python wrappers, copy the updated
+files to `C:\ProgramData\HermesBenchmark` again from an elevated PowerShell.
+The dedicated benchmark clone is pulled by the publisher, but the forced SSH
+command and Scheduled Task execute these installed copies outside that clone.
 
 Set the real explicit model tags, clone path, `.venv\Scripts\python.exe`, Git
 executable, remote, and branch in the config. Configure non-interactive Git

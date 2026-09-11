@@ -18,6 +18,7 @@ STATE_DIR = Path("C:/ProgramData/HermesBenchmark/state")
 STATUS_PATH = STATE_DIR / "task-status.json"
 PROGRESS_PATH = STATE_DIR / "public-progress.json"
 TRIGGER_LOCK_PATH = STATE_DIR / "trigger.lock"
+RUN_LOCK_PATH = STATE_DIR / "run.lock"
 TASK_NAME = "HermesBenchmarkPublisher"
 POLL_SECONDS = 3
 STARTUP_TIMEOUT_SECONDS = 60
@@ -99,6 +100,36 @@ def _write_status(path: Path, payload: dict[str, Any]) -> None:
     finally:
         if os.path.exists(temporary_name):
             os.unlink(temporary_name)
+
+
+def _lock_is_held(path: Path) -> bool:
+    """Return whether another process owns an advisory benchmark lock."""
+    try:
+        with _exclusive_lock(path):
+            return False
+    except BlockingIOError:
+        return True
+
+
+def _valid_request_id(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 32
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _active_status_age_seconds(status: dict[str, Any]) -> float | None:
+    raw = status.get("updated_at")
+    if not isinstance(raw, str):
+        return None
+    try:
+        updated_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - updated_at).total_seconds())
 
 
 def _start_task(task_name: str) -> None:
@@ -187,11 +218,77 @@ def _progress_message(progress: dict[str, Any]) -> str | None:
     return message + "."
 
 
+def _wait_for_request(
+    request_id: str,
+    *,
+    status_path: Path,
+    progress_path: Path,
+    run_lock_path: Path,
+    startup_timeout_seconds: float = STARTUP_TIMEOUT_SECONDS,
+) -> int:
+    """Relay one queued/running request until it publishes a terminal state."""
+    startup_deadline = time.monotonic() + startup_timeout_seconds
+    last_progress_key: tuple[str, int] | None = None
+
+    while True:
+        status = _read_status(status_path)
+        if status.get("request_id") != request_id:
+            print(FAILURE_MESSAGE)
+            return 1
+        if status.get("state") in TERMINAL_STATES:
+            return _emit_terminal(status)
+
+        # The publisher's process-owned lock is the liveness authority.  A
+        # status file can survive a killed task or a reboot, while this lock
+        # cannot.  Once observed, a long benchmark may safely run without a
+        # synthetic wall-clock deadline.
+        if _lock_is_held(run_lock_path):
+            startup_deadline = float("inf")
+
+        progress = _read_status(progress_path)
+        progress_message = _progress_message(progress)
+        if progress_message is not None:
+            try:
+                overall_completed = int(progress["overall_completed"])
+                overall_total = max(1, int(progress["overall_total"]))
+                progress_key = (
+                    str(progress["phase"]),
+                    int(overall_completed / overall_total * 100),
+                )
+            except (KeyError, TypeError, ValueError):
+                progress_key = None
+            if progress_key is not None and progress_key != last_progress_key:
+                print(progress_message, flush=True)
+                last_progress_key = progress_key
+
+        if time.monotonic() >= startup_deadline:
+            # Do not overwrite a terminal state that landed between reads.
+            latest = _read_status(status_path)
+            if (
+                latest.get("request_id") == request_id
+                and latest.get("state") in ACTIVE_STATES
+                and not _lock_is_held(run_lock_path)
+            ):
+                _write_status(
+                    status_path,
+                    {
+                        "request_id": request_id,
+                        "state": "failed",
+                        "message": FAILURE_MESSAGE,
+                        "exit_code": 1,
+                    },
+                )
+            print(FAILURE_MESSAGE)
+            return 1
+        time.sleep(POLL_SECONDS)
+
+
 def trigger(
     *,
     status_path: Path = STATUS_PATH,
     lock_path: Path = TRIGGER_LOCK_PATH,
     progress_path: Path = PROGRESS_PATH,
+    run_lock_path: Path = RUN_LOCK_PATH,
     task_name: str = TASK_NAME,
 ) -> int:
     if os.environ.get("SSH_ORIGINAL_COMMAND", "") != "run":
@@ -202,8 +299,41 @@ def trigger(
         with _exclusive_lock(lock_path):
             existing = _read_status(status_path)
             if existing.get("state") in ACTIVE_STATES:
-                print(RUNNING_MESSAGE)
-                return 75
+                existing_request_id = existing.get("request_id")
+                if _lock_is_held(run_lock_path):
+                    if not _valid_request_id(existing_request_id):
+                        print(RUNNING_MESSAGE)
+                        return 75
+                    # The original SSH connection may have disappeared while
+                    # the Scheduled Task kept running.  Reattach instead of
+                    # rejecting the caller and relay its eventual result.
+                    return _wait_for_request(
+                        existing_request_id,
+                        status_path=status_path,
+                        progress_path=progress_path,
+                        run_lock_path=run_lock_path,
+                    )
+                age = _active_status_age_seconds(existing)
+                if (
+                    _valid_request_id(existing_request_id)
+                    and age is not None
+                    and age < STARTUP_TIMEOUT_SECONDS
+                ):
+                    # A Scheduled Task can set running just before its child
+                    # publisher acquires run.lock.  Preserve that startup
+                    # window rather than replacing a live request in flight.
+                    return _wait_for_request(
+                        existing_request_id,
+                        status_path=status_path,
+                        progress_path=progress_path,
+                        run_lock_path=run_lock_path,
+                        startup_timeout_seconds=(
+                            STARTUP_TIMEOUT_SECONDS - age
+                        ),
+                    )
+                # No process owns the authoritative publisher lock.  The
+                # queued/running JSON is stale (for example after a reboot),
+                # so replace it with a fresh request below.
 
             request_id = secrets.token_hex(16)
             try:
@@ -228,46 +358,12 @@ def trigger(
                     },
                 )
                 raise
-            startup_deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
-            last_progress_key: tuple[str, int] | None = None
-
-            while True:
-                status = _read_status(status_path)
-                if status.get("request_id") == request_id:
-                    if status.get("state") in TERMINAL_STATES:
-                        return _emit_terminal(status)
-                    if status.get("state") == "running":
-                        startup_deadline = float("inf")
-
-                progress = _read_status(progress_path)
-                progress_message = _progress_message(progress)
-                if progress_message is not None:
-                    try:
-                        overall_completed = int(progress["overall_completed"])
-                        overall_total = max(1, int(progress["overall_total"]))
-                        progress_key = (
-                            str(progress["phase"]),
-                            int(overall_completed / overall_total * 100),
-                        )
-                    except (KeyError, TypeError, ValueError):
-                        progress_key = None
-                    if progress_key is not None and progress_key != last_progress_key:
-                        print(progress_message, flush=True)
-                        last_progress_key = progress_key
-
-                if time.monotonic() >= startup_deadline:
-                    _write_status(
-                        status_path,
-                        {
-                            "request_id": request_id,
-                            "state": "failed",
-                            "message": FAILURE_MESSAGE,
-                            "exit_code": 1,
-                        },
-                    )
-                    print(FAILURE_MESSAGE)
-                    return 1
-                time.sleep(POLL_SECONDS)
+            return _wait_for_request(
+                request_id,
+                status_path=status_path,
+                progress_path=progress_path,
+                run_lock_path=run_lock_path,
+            )
     except BlockingIOError:
         print(RUNNING_MESSAGE)
         return 75

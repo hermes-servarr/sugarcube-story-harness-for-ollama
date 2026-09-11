@@ -158,10 +158,15 @@ if (-not $NoWrite) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
     }
 
+    $trustedCodeCommit = ""
+    if ($config.PSObject.Properties.Name -contains "trusted_code_commit") {
+        $trustedCodeCommit = [string]$config.trusted_code_commit
+    }
+
     $document = [ordered]@{
         private = $true
         generated_at = (Get-Date).ToUniversalTime().ToString("o")
-        trusted_code_commit = [string]$config.trusted_code_commit
+        trusted_code_commit = $trustedCodeCommit
         model_aliases = @($mapping)
     }
 

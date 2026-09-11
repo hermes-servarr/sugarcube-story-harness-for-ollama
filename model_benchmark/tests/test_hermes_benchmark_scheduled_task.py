@@ -53,10 +53,90 @@ def test_task_runner_replaces_unexpected_output_with_generic_failure(
     assert task_runner.FAILURE_MESSAGE in rendered
 
 
-def test_trigger_refuses_when_status_is_active(monkeypatch, tmp_path, capsys):
+def test_trigger_replaces_stale_active_status(monkeypatch, tmp_path, capsys):
+    status_path = tmp_path / "status.json"
+    status_path.write_text(
+        json.dumps({"request_id": "c" * 32, "state": "running"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "run")
+
+    def start(task_name):
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        assert status["request_id"] != "c" * 32
+        trigger._write_status(
+            status_path,
+            {
+                "request_id": status["request_id"],
+                "state": "unchanged",
+                "message": trigger.UNCHANGED_MESSAGE,
+                "exit_code": 0,
+            },
+        )
+
+    monkeypatch.setattr(trigger, "_start_task", start)
+
+    assert trigger.trigger(
+        status_path=status_path,
+        lock_path=tmp_path / "trigger.lock",
+        progress_path=tmp_path / "progress.json",
+        run_lock_path=tmp_path / "run.lock",
+    ) == 0
+    assert capsys.readouterr().out.strip() == trigger.UNCHANGED_MESSAGE
+
+
+def test_trigger_reattaches_to_live_request(monkeypatch, tmp_path, capsys):
+    status_path = tmp_path / "status.json"
+    request_id = "d" * 32
+    status_path.write_text(
+        json.dumps({"request_id": request_id, "state": "running"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "run")
+    monkeypatch.setattr(trigger, "_lock_is_held", lambda path: True)
+    monkeypatch.setattr(
+        trigger,
+        "_start_task",
+        lambda task_name: (_ for _ in ()).throw(AssertionError("must not start")),
+    )
+
+    reads = 0
+    real_read_status = trigger._read_status
+
+    def finish_existing(path):
+        nonlocal reads
+        reads += 1
+        if reads == 3:
+            trigger._write_status(
+                status_path,
+                {
+                    "request_id": request_id,
+                    "state": "succeeded",
+                    "message": trigger.PUSHED_MESSAGE,
+                    "exit_code": 0,
+                },
+            )
+        return real_read_status(path)
+
+    monkeypatch.setattr(trigger, "_read_status", finish_existing)
+    monkeypatch.setattr(trigger.time, "sleep", lambda seconds: None)
+
+    assert trigger.trigger(
+        status_path=status_path,
+        lock_path=tmp_path / "trigger.lock",
+        progress_path=tmp_path / "progress.json",
+        run_lock_path=tmp_path / "run.lock",
+    ) == 0
+    assert capsys.readouterr().out.strip() == trigger.PUSHED_MESSAGE
+
+
+def test_trigger_keeps_invalid_active_status_fail_closed(
+    monkeypatch, tmp_path, capsys
+):
     status_path = tmp_path / "status.json"
     status_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
     monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "run")
+    monkeypatch.setattr(trigger, "_lock_is_held", lambda path: True)
     monkeypatch.setattr(
         trigger,
         "_start_task",
@@ -66,6 +146,8 @@ def test_trigger_refuses_when_status_is_active(monkeypatch, tmp_path, capsys):
     assert trigger.trigger(
         status_path=status_path,
         lock_path=tmp_path / "trigger.lock",
+        progress_path=tmp_path / "progress.json",
+        run_lock_path=tmp_path / "run.lock",
     ) == 75
     assert capsys.readouterr().out.strip() == trigger.RUNNING_MESSAGE
 
@@ -95,6 +177,8 @@ def test_trigger_starts_once_and_relays_allowlisted_result(
     assert trigger.trigger(
         status_path=status_path,
         lock_path=tmp_path / "trigger.lock",
+        progress_path=tmp_path / "progress.json",
+        run_lock_path=tmp_path / "run.lock",
     ) == 0
     assert starts == [trigger.TASK_NAME]
     assert capsys.readouterr().out.strip() == trigger.UNCHANGED_MESSAGE
@@ -114,6 +198,8 @@ def test_trigger_records_terminal_failure_when_task_start_fails(
     assert trigger.trigger(
         status_path=status_path,
         lock_path=tmp_path / "trigger.lock",
+        progress_path=tmp_path / "progress.json",
+        run_lock_path=tmp_path / "run.lock",
     ) == 1
     status = json.loads(status_path.read_text(encoding="utf-8"))
     assert status["state"] == "failed"
